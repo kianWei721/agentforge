@@ -2,7 +2,9 @@ package com.agentforge.infrastructure.model;
 
 import com.agentforge.infrastructure.config.ModelProviderProperties;
 import io.agentscope.extensions.model.dashscope.DashScopeChatModel;
+import io.agentscope.extensions.model.dashscope.EndpointType;
 import io.agentscope.extensions.model.dashscope.formatter.DashScopeChatFormatter;
+import java.util.Locale;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -27,21 +29,31 @@ public class DashScopeModelFactory {
                         ? requestedModelName.trim()
                         : config.getModel();
 
+        var builder =
+                DashScopeChatModel.builder()
+                        .apiKey(config.getApiKey())
+                        .modelName(modelName)
+                        .stream(true)
+                        .formatter(new DashScopeChatFormatter());
+
         if (StringUtils.hasText(config.getBaseUrl())) {
-            return DashScopeChatModel.builder()
-                    .apiKey(config.getApiKey())
-                    .baseUrl(config.getBaseUrl())
-                    .modelName(modelName)
-                    .stream(true)
-                    .formatter(new DashScopeChatFormatter())
-                    .build();
+            builder.baseUrl(config.getBaseUrl());
         }
-        return DashScopeChatModel.builder()
-                .apiKey(config.getApiKey())
-                .modelName(modelName)
-                .stream(true)
-                .formatter(new DashScopeChatFormatter())
-                .build();
+
+        if (requiresExplicitMultimodalEndpoint(modelName)) {
+            builder.endpointType(EndpointType.MULTIMODAL);
+        }
+
+        return builder.build();
+    }
+
+    private static boolean requiresExplicitMultimodalEndpoint(String modelName) {
+        if (!StringUtils.hasText(modelName)) {
+            return false;
+        }
+        String normalized = modelName.trim().toLowerCase(Locale.ROOT);
+        return normalized.startsWith("qwen3.8-flash")
+                || normalized.startsWith("qwen3.8-max");
     }
 
     private static void requireApiKey(String apiKey) {
