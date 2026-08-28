@@ -24,7 +24,7 @@ public class AgentController {
 
     @PostMapping(value = "/{agentId}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<AgentStreamChunk>> stream(
-            @PathVariable String agentId,
+            @PathVariable("agentId") String agentId,
             @Valid @RequestBody ChatRequest request) {
         AgentRuntimeRequest runtimeRequest =
                 new AgentRuntimeRequest(request.userId(), request.sessionId(), request.message());

@@ -35,7 +35,7 @@ public class AgentManagementController {
     }
 
     @GetMapping("/{agentId}")
-    public AgentDefinition get(@PathVariable String agentId) {
+    public AgentDefinition get(@PathVariable("agentId") String agentId) {
         return agentService.get(agentId);
     }
 
@@ -56,7 +56,7 @@ public class AgentManagementController {
 
     @PutMapping("/{agentId}")
     public AgentDefinition update(
-            @PathVariable String agentId,
+            @PathVariable("agentId") String agentId,
             @Valid @RequestBody AgentUpdateRequest request) {
         validateTools(request.toolNames());
         AgentDefinition updated =
@@ -76,7 +76,7 @@ public class AgentManagementController {
 
     @DeleteMapping("/{agentId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable String agentId) {
+    public void delete(@PathVariable("agentId") String agentId) {
         agentService.delete(agentId);
         runtimeManager.invalidate(agentId);
     }
