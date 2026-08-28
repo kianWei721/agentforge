@@ -10,7 +10,7 @@ public class AgentDefinitionService {
     private static final String DEFAULT_SYSTEM_PROMPT =
             "你是 AgentForge 企业智能体平台中的助手。回答准确、简洁；需要外部事实时优先使用已绑定工具。";
     private static final String DEFAULT_MODEL_PROVIDER = "dashscope";
-    private static final String DEFAULT_MODEL_NAME = "qwen-plus";
+    private static final String DEFAULT_MODEL_NAME = "qwen3.8-flash";
 
     private final AgentDefinitionRepository repository;
 

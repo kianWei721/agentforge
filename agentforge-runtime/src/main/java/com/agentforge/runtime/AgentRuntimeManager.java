@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 
 public class AgentRuntimeManager implements AutoCloseable {
 
@@ -27,17 +28,22 @@ public class AgentRuntimeManager implements AutoCloseable {
     }
 
     public Flux<AgentStreamChunk> stream(String agentId, AgentRuntimeRequest request) {
-        AgentDefinition definition =
-                agentRepository
-                        .findById(agentId)
-                        .orElseThrow(() -> new AgentNotFoundException(agentId));
+        return Flux.defer(
+                        () -> {
+                            AgentDefinition definition =
+                                    agentRepository
+                                            .findById(agentId)
+                                            .orElseThrow(() -> new AgentNotFoundException(agentId));
 
-        if (!definition.enabled()) {
-            return Flux.error(new IllegalStateException("Agent is disabled: " + agentId));
-        }
+                            if (!definition.enabled()) {
+                                return Flux.error(
+                                        new IllegalStateException("Agent is disabled: " + agentId));
+                            }
 
-        AgentRuntime runtime = resolveRuntime(definition);
-        return runtime.stream(request);
+                            AgentRuntime runtime = resolveRuntime(definition);
+                            return runtime.stream(request);
+                        })
+                .subscribeOn(Schedulers.boundedElastic());
     }
 
     public void invalidate(String agentId) {
@@ -85,6 +91,5 @@ public class AgentRuntimeManager implements AutoCloseable {
         runtimes.clear();
     }
 
-    private record RuntimeHolder(long version, AgentRuntime runtime) {
-    }
+    private record RuntimeHolder(long version, AgentRuntime runtime) {}
 }

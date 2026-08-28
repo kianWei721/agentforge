@@ -1,6 +1,26 @@
 spring:
   application:
     name: agentforge
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3307}/${MYSQL_DATABASE:agentforge}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false
+    username: ${MYSQL_USERNAME:agentforge}
+    password: ${MYSQL_PASSWORD:agentforge-dev}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: ${MYSQL_MAX_POOL_SIZE:10}
+      minimum-idle: ${MYSQL_MIN_IDLE:2}
+      connection-timeout: 5000
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    validate-on-migrate: true
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6380}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      timeout: 2s
 
 server:
   port: ${SERVER_PORT:8080}
@@ -14,14 +34,14 @@ agentforge:
     dashscope:
       api-key: ${DASHSCOPE_API_KEY:}
       base-url: ${DASHSCOPE_BASE_URL:}
-      model: ${DASHSCOPE_MODEL:qwen-plus}
+      model: ${DASHSCOPE_MODEL:qwen3.8-flash}
   agent:
     enabled: ${AGENTFORGE_AGENT_ENABLED:false}
     name: agentforge-assistant
     system-prompt: >-
       你是 AgentForge 企业智能体平台中的助手。回答准确、简洁。
       当用户询问设备状态时，必须优先调用 query_device_status 工具获取数据，不要臆测设备状态。
-      当前 V0.2 仅开放 AgentForge 显式注册的业务工具，不开放文件、Shell、动态技能和子 Agent 工具。
+      当前 V0.3 仅开放 AgentForge 显式注册的业务工具，不开放文件、Shell、动态技能和子 Agent 工具。
 
 management:
   endpoints:

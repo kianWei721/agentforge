@@ -9,8 +9,11 @@ import com.agentforge.runtime.AgentRuntimeManager;
 import com.agentforge.tool.ToolRegistry;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.concurrent.Callable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 @RestController
 @RequestMapping(AgentForgeConstants.API_PREFIX + "/agents")
@@ -30,58 +33,73 @@ public class AgentManagementController {
     }
 
     @GetMapping
-    public List<AgentDefinition> list() {
-        return agentService.list();
+    public Mono<List<AgentDefinition>> list() {
+        return blocking(agentService::list);
     }
 
     @GetMapping("/{agentId}")
-    public AgentDefinition get(@PathVariable("agentId") String agentId) {
-        return agentService.get(agentId);
+    public Mono<AgentDefinition> get(@PathVariable("agentId") String agentId) {
+        return blocking(() -> agentService.get(agentId));
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public AgentDefinition create(@Valid @RequestBody AgentCreateRequest request) {
-        validateTools(request.toolNames());
-        return agentService.create(
-                new AgentCreateCommand(
-                        request.name(),
-                        request.description(),
-                        request.systemPrompt(),
-                        request.modelProvider(),
-                        request.modelName(),
-                        request.toolNames(),
-                        request.enabled()));
+    public Mono<AgentDefinition> create(@Valid @RequestBody AgentCreateRequest request) {
+        return blocking(
+                () -> {
+                    validateTools(request.toolNames());
+                    return agentService.create(
+                            new AgentCreateCommand(
+                                    request.name(),
+                                    request.description(),
+                                    request.systemPrompt(),
+                                    request.modelProvider(),
+                                    request.modelName(),
+                                    request.toolNames(),
+                                    request.enabled()));
+                });
     }
 
     @PutMapping("/{agentId}")
-    public AgentDefinition update(
+    public Mono<AgentDefinition> update(
             @PathVariable("agentId") String agentId,
             @Valid @RequestBody AgentUpdateRequest request) {
-        validateTools(request.toolNames());
-        AgentDefinition updated =
-                agentService.update(
-                        agentId,
-                        new AgentUpdateCommand(
-                                request.name(),
-                                request.description(),
-                                request.systemPrompt(),
-                                request.modelProvider(),
-                                request.modelName(),
-                                request.toolNames(),
-                                request.enabled()));
-        runtimeManager.invalidate(agentId);
-        return updated;
+        return blocking(
+                () -> {
+                    validateTools(request.toolNames());
+                    AgentDefinition updated =
+                            agentService.update(
+                                    agentId,
+                                    new AgentUpdateCommand(
+                                            request.name(),
+                                            request.description(),
+                                            request.systemPrompt(),
+                                            request.modelProvider(),
+                                            request.modelName(),
+                                            request.toolNames(),
+                                            request.enabled()));
+                    runtimeManager.invalidate(agentId);
+                    return updated;
+                });
     }
 
     @DeleteMapping("/{agentId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable("agentId") String agentId) {
-        agentService.delete(agentId);
-        runtimeManager.invalidate(agentId);
+    public Mono<Void> delete(@PathVariable("agentId") String agentId) {
+        return blocking(
+                        () -> {
+                            agentService.delete(agentId);
+                            runtimeManager.invalidate(agentId);
+                            return true;
+                        })
+                .then();
     }
 
     private void validateTools(List<String> toolNames) {
         toolRegistry.resolve(toolNames == null ? List.of() : toolNames);
+    }
+
+    private static <T> Mono<T> blocking(Callable<T> callable) {
+        return Mono.fromCallable(callable).subscribeOn(Schedulers.boundedElastic());
     }
 }
