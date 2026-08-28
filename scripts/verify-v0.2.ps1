@@ -6,6 +6,17 @@ $baseUrl = if ($env:AGENTFORGE_BASE_URL) {
     "http://localhost:8080"
 }
 
+function Invoke-AgentForgeSse {
+    param(
+        [Parameter(Mandatory = $true)][string]$Uri,
+        [Parameter(Mandatory = $true)][object]$Payload
+    )
+
+    $json = $Payload | ConvertTo-Json -Depth 8 -Compress
+    $response = Invoke-WebRequest -Method Post -Uri $Uri -ContentType "application/json; charset=utf-8" -Body $json -UseBasicParsing
+    Write-Host $response.Content
+}
+
 $created = $null
 
 try {
@@ -31,9 +42,9 @@ try {
         modelName = "qwen-plus"
         toolNames = @("query_device_status")
         enabled = $true
-    } | ConvertTo-Json -Depth 8
+    }
 
-    $created = Invoke-RestMethod -Method Post -Uri "$baseUrl/api/v1/agents" -ContentType "application/json; charset=utf-8" -Body $createBody
+    $created = Invoke-RestMethod -Method Post -Uri "$baseUrl/api/v1/agents" -ContentType "application/json; charset=utf-8" -Body ($createBody | ConvertTo-Json -Depth 8)
     $created | ConvertTo-Json -Depth 8
 
     $fetched = Invoke-RestMethod -Method Get -Uri "$baseUrl/api/v1/agents/$($created.id)"
@@ -43,16 +54,20 @@ try {
     Write-Host ""
 
     Write-Host "[4/5] Raw Model Gateway SSE"
-    $modelPayload = '{"userId":"verify-user","sessionId":"verify-model","message":"Reply exactly: MODEL_OK"}'
-    curl.exe -N -sS -X POST "$baseUrl/api/v1/chat/stream" -H "Content-Type: application/json" --data-binary $modelPayload
-    Write-Host ""
+    Invoke-AgentForgeSse -Uri "$baseUrl/api/v1/chat/stream" -Payload @{
+        userId = "verify-user"
+        sessionId = "verify-model"
+        message = "Reply exactly: MODEL_OK"
+    }
     Write-Host ""
 
     Write-Host "[5/5] Agent Tool Calling"
     if ($health.agentRuntimeEnabled -eq $true) {
-        $agentPayload = '{"userId":"verify-user","sessionId":"verify-agent","message":"What is the current status of device 367? Call query_device_status first, then answer from the tool result."}'
-        curl.exe -N -sS -X POST "$baseUrl/api/v1/agents/$($created.id)/stream" -H "Content-Type: application/json" --data-binary $agentPayload
-        Write-Host ""
+        Invoke-AgentForgeSse -Uri "$baseUrl/api/v1/agents/$($created.id)/stream" -Payload @{
+            userId = "verify-user"
+            sessionId = "verify-agent"
+            message = "What is the current status of device 367? Call query_device_status first, then answer from the tool result."
+        }
         Write-Host ""
     } else {
         Write-Host "Skipped: agentRuntimeEnabled=false. Start with run-dashscope.ps1 to test real Function Calling."
