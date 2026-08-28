@@ -1,14 +1,13 @@
 $ErrorActionPreference = "Stop"
 
+& "$PSScriptRoot\dev-env.ps1"
+
 if ([string]::IsNullOrWhiteSpace($env:DASHSCOPE_API_KEY)) {
-    throw "DASHSCOPE_API_KEY is not set. Set it in this PowerShell session before running."
+    throw "DASHSCOPE_API_KEY is not configured. Run .\scripts\setup-dev.ps1 once."
 }
 
 $env:AGENTFORGE_MODEL_PROVIDER = "dashscope"
 $env:AGENTFORGE_AGENT_ENABLED = "true"
-if ([string]::IsNullOrWhiteSpace($env:DASHSCOPE_MODEL)) {
-    $env:DASHSCOPE_MODEL = "qwen-plus"
-}
 
 Write-Host "[1/2] Installing AgentForge modules to the local Maven repository..."
 mvn -pl agentforge-app -am install -DskipTests

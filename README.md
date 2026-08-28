@@ -64,38 +64,41 @@ agentforge
 └── agentforge-app
 ```
 
-## 快速开始
+## 本地开发环境
 
-### 1. 环境
+第一次拉取项目后执行一次：
 
 ```powershell
-.\scripts\check-env.ps1
-mvn clean test
+.\scripts\setup-dev.ps1
 ```
 
-要求 JDK 17+、Maven 3.9+。
+脚本会创建被 Git 忽略的 `.env.local`，保存本机 JDK 路径、DashScope API Key 和默认模型。真实密钥不会提交到 Git。
 
-### 2. Mock 模式
+之后即使重启 IDEA / PowerShell，也不需要手工重新设置 `JAVA_HOME`、`DASHSCOPE_API_KEY` 和 `DASHSCOPE_MODEL`。
+
+运行 Maven：
+
+```powershell
+.\scripts\mvn.ps1 clean test
+```
+
+启动 Mock：
 
 ```powershell
 .\scripts\run-mock.ps1
 ```
 
-无需 API Key。可验证 Agent CRUD、Tool Registry 和 Raw Model SSE。
-
-### 3. DashScope + AgentScope
-
-不要把 API Key 写入 Git。
+启动 DashScope + AgentScope：
 
 ```powershell
-$env:DASHSCOPE_API_KEY="你的 DashScope API Key"
-$env:DASHSCOPE_MODEL="qwen-plus"
 .\scripts\run-dashscope.ps1
 ```
 
-此模式会启用 Agent Runtime，自动创建 `default` Agent，并绑定 `query_device_status`。
+这些脚本都会自动加载 `.env.local`、切换到项目配置的 JDK 17+，并检查环境。直接使用错误的 JDK 执行 Maven 时，Maven Enforcer 也会给出明确的 JDK 版本错误，而不是等到 Java `record` 编译时报错。
 
-### 4. 自动验收
+当前开发验证模型默认使用 `qwen3.8-flash`。
+
+## 自动验收
 
 ```powershell
 .\scripts\verify-v0.2.ps1
@@ -132,6 +135,8 @@ model_call_start
 message
 done
 ```
+
+V0.2 已通过真实 DashScope / Qwen Function Calling 验证：模型会调用 `query_device_status`，工具通过 Demo Adapter 返回设备状态，再由模型基于 Tool Result 生成最终回答。
 
 ## 设计说明
 

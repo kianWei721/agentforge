@@ -1,5 +1,7 @@
 $ErrorActionPreference = "Stop"
 
+& "$PSScriptRoot\dev-env.ps1"
+
 $env:AGENTFORGE_MODEL_PROVIDER = "mock"
 $env:AGENTFORGE_AGENT_ENABLED = "false"
 
