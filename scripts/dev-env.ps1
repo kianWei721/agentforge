@@ -48,18 +48,35 @@ if ([string]::IsNullOrWhiteSpace($javaHome)) {
 }
 
 $javaExe = Join-Path $javaHome "bin\java.exe"
+$javacExe = Join-Path $javaHome "bin\javac.exe"
+
 if (-not (Test-Path $javaExe)) {
     throw "Configured Java home does not contain bin\java.exe: $javaHome"
+}
+if (-not (Test-Path $javacExe)) {
+    throw "Configured Java home is not a full JDK (bin\javac.exe is missing): $javaHome"
 }
 
 $env:JAVA_HOME = $javaHome
 $javaBin = Join-Path $javaHome "bin"
-$pathParts = @($env:Path -split ";" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and $_ -ne $javaBin })
+$pathParts = @(
+    $env:Path -split ";" |
+        Where-Object {
+            -not [string]::IsNullOrWhiteSpace($_) -and
+            $_.TrimEnd("\") -ne $javaBin.TrimEnd("\")
+        }
+)
 $env:Path = (@($javaBin) + $pathParts) -join ";"
 
-$javaVersionOutput = (& $javaExe -version 2>&1 | Out-String)
-if ($javaVersionOutput -notmatch 'version "([0-9]+)') {
-    throw "Unable to determine Java version from $javaExe"
+# Use javac for version detection. Unlike "java -version", javac writes its
+# version to stdout on Windows PowerShell 5, so ErrorActionPreference=Stop
+# does not turn a normal version check into NativeCommandError.
+$javacVersionOutput = (& $javacExe -version | Out-String).Trim()
+if ($LASTEXITCODE -ne 0) {
+    throw "Unable to execute javac from configured Java home: $javaHome"
+}
+if ($javacVersionOutput -notmatch '^javac\s+([0-9]+)') {
+    throw "Unable to determine Java version from output: $javacVersionOutput"
 }
 
 $javaMajor = [int]$Matches[1]
@@ -73,5 +90,6 @@ if ([string]::IsNullOrWhiteSpace($env:DASHSCOPE_MODEL)) {
 
 $keyState = if ([string]::IsNullOrWhiteSpace($env:DASHSCOPE_API_KEY)) { "NOT_SET" } else { "SET" }
 Write-Host "[dev-env] JAVA_HOME=$env:JAVA_HOME"
+Write-Host "[dev-env] JAVA_VERSION=$javacVersionOutput"
 Write-Host "[dev-env] DASHSCOPE_MODEL=$env:DASHSCOPE_MODEL"
 Write-Host "[dev-env] DASHSCOPE_API_KEY=$keyState"
