@@ -1,32 +1,42 @@
 # AgentForge
 
-AgentForge 是一个基于 Java 的企业级 AI Agent 编排与运行平台练习项目，目标是覆盖 Agent Runtime、Model Gateway、Function Calling / Tool Use、RAG、Workflow、MCP 和 Observability 等工程能力。
+AgentForge 是一个基于 Java 的企业级 AI Agent 编排与运行平台练习项目。
 
-当前里程碑：**V0.1 - Real Model + AgentScope Runtime**。
+当前里程碑：**V0.2 — Agent CRUD + Tool Registry + Function Calling**。
 
-## 当前已经实现
+## V0.2 已实现
 
 ```text
-/api/v1/chat/stream
-        |
-        v
-   ModelGateway
-        |
- RoutingModelGateway
-    /           \
- Mock        DashScope/Qwen
+                      AgentForge
 
-/api/v1/agent/stream
-        |
-        v
-    AgentRuntime
-        |
-AgentScope HarnessAgent
-        |
-   AgentEvent -> SSE
+     Agent CRUD                    Tool Registry
+         |                              |
+         +-------------+----------------+
+                       |
+                       v
+               AgentRuntimeManager
+                       |
+              AgentScope HarnessAgent
+                       |
+                  Toolkit / ReAct
+                       |
+              Function Calling
+                       |
+             AgentForge Tool SPI
+                       |
+             query_device_status
+                       |
+             DeviceStatusQueryPort
 ```
 
-V0.1 的 HarnessAgent 默认关闭文件系统、Shell、动态 Skill 和 SubAgent 等高权限能力，只验证会话上下文和事件流。Week 2 再通过 AgentForge Tool SPI 加入受控业务工具。
+同时保留：
+
+- Model Gateway
+- Mock Model Provider
+- DashScope / Qwen Provider
+- Reactor + SSE
+- AgentScope Session
+- 模型调用 / Tool 调用事件流
 
 ## 技术基线
 
@@ -36,6 +46,7 @@ V0.1 的 HarnessAgent 默认关闭文件系统、Shell、动态 Skill 和 SubAge
 - AgentScope Java 2.0.0
 - DashScope / Qwen
 - Maven Multi-Module
+- GitHub Actions CI
 
 ## 模块
 
@@ -43,6 +54,7 @@ V0.1 的 HarnessAgent 默认关闭文件系统、Shell、动态 Skill 和 SubAge
 agentforge
 ├── agentforge-core
 ├── agentforge-model
+├── agentforge-agent
 ├── agentforge-tool
 ├── agentforge-runtime
 ├── agentforge-rag
@@ -52,40 +64,28 @@ agentforge
 └── agentforge-app
 ```
 
-## 1. 环境检查
+## 快速开始
 
-Windows PowerShell：
+### 1. 环境
 
 ```powershell
 .\scripts\check-env.ps1
+mvn clean test
 ```
 
-要求：
+要求 JDK 17+、Maven 3.9+。
 
-```text
-JDK >= 17
-Maven >= 3.9
-```
-
-## 2. Mock 模式启动
-
-不需要任何模型 Key：
+### 2. Mock 模式
 
 ```powershell
 .\scripts\run-mock.ps1
 ```
 
-或：
+无需 API Key。可验证 Agent CRUD、Tool Registry 和 Raw Model SSE。
 
-```powershell
-$env:AGENTFORGE_MODEL_PROVIDER="mock"
-$env:AGENTFORGE_AGENT_ENABLED="false"
-mvn -pl agentforge-app -am spring-boot:run
-```
+### 3. DashScope + AgentScope
 
-## 3. DashScope + AgentScope 启动
-
-不要把 API Key 写进 `application.yml` 或提交到 Git。
+不要把 API Key 写入 Git。
 
 ```powershell
 $env:DASHSCOPE_API_KEY="你的 DashScope API Key"
@@ -93,69 +93,65 @@ $env:DASHSCOPE_MODEL="qwen-plus"
 .\scripts\run-dashscope.ps1
 ```
 
-等价配置：
+此模式会启用 Agent Runtime，自动创建 `default` Agent，并绑定 `query_device_status`。
+
+### 4. 自动验收
+
+```powershell
+.\scripts\verify-v0.2.ps1
+```
+
+## API
+
+- `GET /api/v1/system/health`
+- `POST /api/v1/chat/stream`
+- `GET /api/v1/tools`
+- `POST /api/v1/agents`
+- `GET /api/v1/agents`
+- `GET /api/v1/agents/{agentId}`
+- `PUT /api/v1/agents/{agentId}`
+- `DELETE /api/v1/agents/{agentId}`
+- `POST /api/v1/agents/{agentId}/stream`
+
+兼容 V0.1：
+
+`POST /api/v1/agent/stream` → default Agent。
+
+## Function Calling Trace
+
+Agent SSE 会输出：
 
 ```text
-AGENTFORGE_MODEL_PROVIDER=dashscope
-AGENTFORGE_AGENT_ENABLED=true
-DASHSCOPE_API_KEY=...
-DASHSCOPE_MODEL=qwen-plus
+model_call_start
+tool_call_start
+tool_call_end
+tool_result_start
+tool_result_delta
+tool_result_end
+model_call_start
+message
+done
 ```
 
-可参考 `.env.example`，但本项目没有自动读取 `.env` 文件，实际运行仍应通过系统环境变量、IDE Run Configuration 或后续 Secret Manager 注入。
+## 设计说明
 
-## 4. 验证
-
-健康状态：
-
-```powershell
-curl.exe http://localhost:8080/api/v1/system/health
-```
-
-直接模型 SSE：
-
-```powershell
-curl.exe -N -X POST http://localhost:8080/api/v1/chat/stream `
-  -H "Content-Type: application/json" `
-  -d '{"userId":"u1","sessionId":"s1","message":"解释一下 Function Calling"}'
-```
-
-AgentScope HarnessAgent SSE（仅 Agent enabled 时存在）：
-
-```powershell
-curl.exe -N -X POST http://localhost:8080/api/v1/agent/stream `
-  -H "Content-Type: application/json" `
-  -d '{"userId":"u1","sessionId":"s1","message":"你好，介绍一下你自己"}'
-```
-
-也可以执行 V0.1 验收脚本：
-
-```powershell
-.\scripts\verify-v0.1.ps1
-```
-
-DashScope 模式下脚本会使用同一个 `userId + sessionId` 连续调用两轮 Agent，用于验证进程内会话记忆。
-
-## 5. 文档
-
-- `docs/AgentForge-V1.0.md`：产品需求、架构、数据库、6 周计划
-- `docs/V0.1-real-model-agent-runtime.md`：本阶段设计与验收
-- `docs/adr/ADR-001-modular-monolith.md`：为什么 V1 采用模块化单体
+- `docs/AgentForge-V1.0.md`
+- `docs/V0.1-real-model-agent-runtime.md`
+- `docs/V0.2-agent-crud-tool-calling.md`
+- `docs/adr/ADR-001-modular-monolith.md`
 
 ## 下一阶段
 
-Week 2 的核心不是继续堆模型，而是完成：
+V0.3：
 
 ```text
-Agent CRUD
-   +
-Tool SPI Registry
-   +
-Function Calling
-   +
-第一个 IoT DeviceStatusTool
-   +
-Tool Call Trace
+MySQL Agent Persistence
++
+Redis Session
++
+真实 IoT HTTP Tool Adapter
++
+Execution / Tool Trace Persistence
 ```
 
-做到 Agent 能自主判断何时调用一个真实业务 Tool。
+随后进入 RAG。

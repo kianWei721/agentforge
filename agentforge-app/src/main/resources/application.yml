@@ -19,8 +19,9 @@ agentforge:
     enabled: ${AGENTFORGE_AGENT_ENABLED:false}
     name: agentforge-assistant
     system-prompt: >-
-      你是 AgentForge 企业智能体平台中的助手。回答准确、简洁；不确定时明确说明。
-      当前阶段只验证 AgentScope HarnessAgent 的多轮会话和流式事件链路，不允许文件、Shell、动态技能和子 Agent 工具。
+      你是 AgentForge 企业智能体平台中的助手。回答准确、简洁。
+      当用户询问设备状态时，必须优先调用 query_device_status 工具获取数据，不要臆测设备状态。
+      当前 V0.2 仅开放 AgentForge 显式注册的业务工具，不开放文件、Shell、动态技能和子 Agent 工具。
 
 management:
   endpoints:

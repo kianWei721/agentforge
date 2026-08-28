@@ -1,20 +1,49 @@
 package com.agentforge.infrastructure.agent;
 
-import com.agentforge.infrastructure.config.AgentRuntimeProperties;
+import com.agentforge.agent.AgentDefinition;
+import com.agentforge.agent.AgentDefinitionRepository;
 import com.agentforge.infrastructure.model.DashScopeModelFactory;
 import com.agentforge.runtime.AgentRuntime;
+import com.agentforge.runtime.AgentRuntimeFactory;
+import com.agentforge.runtime.AgentRuntimeManager;
 import com.agentforge.runtime.AgentScopeHarnessRuntime;
+import com.agentforge.tool.AgentTool;
+import com.agentforge.tool.ToolRegistry;
 import io.agentscope.core.model.Model;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class AgentScopeRuntimeConfiguration {
+
+    @Bean
+    public AgentRuntimeFactory agentRuntimeFactory(DashScopeModelFactory modelFactory) {
+        return new AgentRuntimeFactory() {
+            @Override
+            public AgentRuntime create(AgentDefinition definition, List<AgentTool> tools) {
+                if (!"dashscope".equalsIgnoreCase(definition.modelProvider())) {
+                    throw new IllegalArgumentException(
+                            "AgentScope runtime currently supports modelProvider=dashscope only. Requested: "
+                                    + definition.modelProvider());
+                }
+
+                Model model = modelFactory.createStreamingModel(definition.modelName());
+                return new AgentScopeHarnessRuntime(
+                        definition.id(),
+                        definition.name(),
+                        definition.systemPrompt(),
+                        model,
+                        tools);
+            }
+        };
+    }
+
     @Bean(destroyMethod = "close")
-    @ConditionalOnProperty(name = "agentforge.agent.enabled", havingValue = "true")
-    public AgentRuntime agentRuntime(AgentRuntimeProperties properties, DashScopeModelFactory modelFactory) {
-        Model model = modelFactory.createStreamingModel();
-        return new AgentScopeHarnessRuntime(properties.getName(), properties.getSystemPrompt(), model);
+    public AgentRuntimeManager agentRuntimeManager(
+            AgentDefinitionRepository agentRepository,
+            ToolRegistry toolRegistry,
+            AgentRuntimeFactory runtimeFactory) {
+        return new AgentRuntimeManager(agentRepository, toolRegistry, runtimeFactory);
     }
 }
