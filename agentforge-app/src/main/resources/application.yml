@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: agentforge
+
+server:
+  port: ${SERVER_PORT:8080}
+
+agentforge:
+  model:
+    provider: ${AGENTFORGE_MODEL_PROVIDER:mock}
+    mock:
+      model: mock-stream-v0
+      delay-millis: 120
+    dashscope:
+      api-key: ${DASHSCOPE_API_KEY:}
+      base-url: ${DASHSCOPE_BASE_URL:}
+      model: ${DASHSCOPE_MODEL:qwen-plus}
+  agent:
+    enabled: ${AGENTFORGE_AGENT_ENABLED:false}
+    name: agentforge-assistant
+    system-prompt: >-
+      你是 AgentForge 企业智能体平台中的助手。回答准确、简洁；不确定时明确说明。
+      当前阶段只验证 AgentScope HarnessAgent 的多轮会话和流式事件链路，不允许文件、Shell、动态技能和子 Agent 工具。
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
