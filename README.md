@@ -2,161 +2,54 @@
 
 AgentForge 是一个基于 Java 的企业级 AI Agent 编排与运行平台练习项目。
 
-当前里程碑：**V0.2 — Agent CRUD + Tool Registry + Function Calling**。
+当前里程碑：V0.3 — MySQL Agent Persistence + Redis Foundation + Local Docker Infrastructure。
 
-## V0.2 已实现
+## V0.3 第一阶段
 
-```text
-                      AgentForge
+- Agent Definition 从内存仓库切换为 MySQL 持久化。
+- 使用 af_agent / af_agent_tool 保存 Agent 和 Tool 绑定。
+- 使用 Flyway 管理数据库版本。
+- 更新 Agent 时使用 version 做乐观并发校验。
+- Redis 完成 Spring Boot 基础连接和健康探测。
+- Docker Compose 提供本地 MySQL 8.4 + Redis 7.4。
+- JDBC 调用在 WebFlux 链路中隔离到 boundedElastic，避免阻塞 Netty EventLoop。
 
-     Agent CRUD                    Tool Registry
-         |                              |
-         +-------------+----------------+
-                       |
-                       v
-               AgentRuntimeManager
-                       |
-              AgentScope HarnessAgent
-                       |
-                  Toolkit / ReAct
-                       |
-              Function Calling
-                       |
-             AgentForge Tool SPI
-                       |
-             query_device_status
-                       |
-             DeviceStatusQueryPort
-```
+## 本地启动
 
-同时保留：
+第一次初始化本机配置：
 
-- Model Gateway
-- Mock Model Provider
-- DashScope / Qwen Provider
-- Reactor + SSE
-- AgentScope Session
-- 模型调用 / Tool 调用事件流
+    .\scripts\setup-dev.ps1
 
-## 技术基线
+已有 .env.local 的开发机不需要重新执行。V0.3 新增的 MySQL / Redis 配置缺失时会使用本地开发默认值。
 
-- Java 17+
-- Spring Boot 4.0.8
-- Spring WebFlux / Reactor / SSE
-- AgentScope Java 2.0.0
-- DashScope / Qwen
-- Maven Multi-Module
-- GitHub Actions CI
+启动 MySQL + Redis：
 
-## 模块
+    .\scripts\start-infra.ps1
 
-```text
-agentforge
-├── agentforge-core
-├── agentforge-model
-├── agentforge-agent
-├── agentforge-tool
-├── agentforge-runtime
-├── agentforge-rag
-├── agentforge-workflow
-├── agentforge-observability
-├── agentforge-infrastructure
-└── agentforge-app
-```
+默认端口：MySQL 3307，Redis 6380。
 
-## 本地开发环境
+运行测试：
 
-第一次拉取项目后执行一次：
+    .\scripts\mvn.ps1 clean test
 
-```powershell
-.\scripts\setup-dev.ps1
-```
+启动 DashScope Agent：
 
-脚本会创建被 Git 忽略的 `.env.local`，保存本机 JDK 路径、DashScope API Key 和默认模型。真实密钥不会提交到 Git。
+    .\scripts\run-dashscope.ps1
 
-之后即使重启 IDEA / PowerShell，也不需要手工重新设置 `JAVA_HOME`、`DASHSCOPE_API_KEY` 和 `DASHSCOPE_MODEL`。
+停止本地基础设施：
 
-运行 Maven：
+    .\scripts\stop-infra.ps1
 
-```powershell
-.\scripts\mvn.ps1 clean test
-```
+普通 docker compose down 不会删除 named volume，因此 MySQL Agent 数据会保留。
 
-启动 Mock：
+## 数据职责
 
-```powershell
-.\scripts\run-mock.ps1
-```
+MySQL 是 Agent Definition 的 Source of Truth（事实数据源）。Redis 当前只做基础接入和健康探测，不存 Agent Definition。后续 Session / Runtime State 再进入 Redis。
 
-启动 DashScope + AgentScope：
+## Health
 
-```powershell
-.\scripts\run-dashscope.ps1
-```
+GET /api/v1/system/health 在 V0.3 增加 mysql 和 redis 字段；两者都 UP 时平台状态为 UP。
 
-这些脚本都会自动加载 `.env.local`、切换到项目配置的 JDK 17+，并检查环境。直接使用错误的 JDK 执行 Maven 时，Maven Enforcer 也会给出明确的 JDK 版本错误，而不是等到 Java `record` 编译时报错。
+## 下一步
 
-当前开发验证模型默认使用 `qwen3.8-flash`。
-
-## 自动验收
-
-```powershell
-.\scripts\verify-v0.2.ps1
-```
-
-## API
-
-- `GET /api/v1/system/health`
-- `POST /api/v1/chat/stream`
-- `GET /api/v1/tools`
-- `POST /api/v1/agents`
-- `GET /api/v1/agents`
-- `GET /api/v1/agents/{agentId}`
-- `PUT /api/v1/agents/{agentId}`
-- `DELETE /api/v1/agents/{agentId}`
-- `POST /api/v1/agents/{agentId}/stream`
-
-兼容 V0.1：
-
-`POST /api/v1/agent/stream` → default Agent。
-
-## Function Calling Trace
-
-Agent SSE 会输出：
-
-```text
-model_call_start
-tool_call_start
-tool_call_end
-tool_result_start
-tool_result_delta
-tool_result_end
-model_call_start
-message
-done
-```
-
-V0.2 已通过真实 DashScope / Qwen Function Calling 验证：模型会调用 `query_device_status`，工具通过 Demo Adapter 返回设备状态，再由模型基于 Tool Result 生成最终回答。
-
-## 设计说明
-
-- `docs/AgentForge-V1.0.md`
-- `docs/V0.1-real-model-agent-runtime.md`
-- `docs/V0.2-agent-crud-tool-calling.md`
-- `docs/adr/ADR-001-modular-monolith.md`
-
-## 下一阶段
-
-V0.3：
-
-```text
-MySQL Agent Persistence
-+
-Redis Session
-+
-真实 IoT HTTP Tool Adapter
-+
-Execution / Tool Trace Persistence
-```
-
-随后进入 RAG。
+V0.3 后续依次进入 Session / Message Persistence、Execution / Tool Trace Persistence、Redis Session Cache、真实 IoT HTTP Tool Adapter。
