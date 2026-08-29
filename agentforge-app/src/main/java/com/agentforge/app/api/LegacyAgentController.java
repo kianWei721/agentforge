@@ -1,7 +1,7 @@
 package com.agentforge.app.api;
 
 import com.agentforge.core.AgentForgeConstants;
-import com.agentforge.runtime.AgentRuntimeManager;
+import com.agentforge.runtime.AgentConversationRuntimeService;
 import com.agentforge.runtime.AgentRuntimeRequest;
 import com.agentforge.runtime.AgentStreamChunk;
 import jakarta.validation.Valid;
@@ -16,17 +16,17 @@ import reactor.core.publisher.Flux;
 @RequestMapping(AgentForgeConstants.API_PREFIX + "/agent")
 public class LegacyAgentController {
 
-    private final AgentRuntimeManager runtimeManager;
+    private final AgentConversationRuntimeService conversationRuntimeService;
 
-    public LegacyAgentController(AgentRuntimeManager runtimeManager) {
-        this.runtimeManager = runtimeManager;
+    public LegacyAgentController(AgentConversationRuntimeService conversationRuntimeService) {
+        this.conversationRuntimeService = conversationRuntimeService;
     }
 
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<AgentStreamChunk>> stream(@Valid @RequestBody ChatRequest request) {
         AgentRuntimeRequest runtimeRequest =
                 new AgentRuntimeRequest(request.userId(), request.sessionId(), request.message());
-        return runtimeManager
+        return conversationRuntimeService
                 .stream("default", runtimeRequest)
                 .map(
                         chunk ->

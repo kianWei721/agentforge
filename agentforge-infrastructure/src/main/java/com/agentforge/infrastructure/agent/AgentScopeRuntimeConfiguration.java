@@ -2,7 +2,9 @@ package com.agentforge.infrastructure.agent;
 
 import com.agentforge.agent.AgentDefinition;
 import com.agentforge.agent.AgentDefinitionRepository;
+import com.agentforge.conversation.ConversationService;
 import com.agentforge.infrastructure.model.DashScopeModelFactory;
+import com.agentforge.runtime.AgentConversationRuntimeService;
 import com.agentforge.runtime.AgentRuntime;
 import com.agentforge.runtime.AgentRuntimeFactory;
 import com.agentforge.runtime.AgentRuntimeManager;
@@ -45,5 +47,14 @@ public class AgentScopeRuntimeConfiguration {
             ToolRegistry toolRegistry,
             AgentRuntimeFactory runtimeFactory) {
         return new AgentRuntimeManager(agentRepository, toolRegistry, runtimeFactory);
+    }
+
+    @Bean
+    public AgentConversationRuntimeService agentConversationRuntimeService(
+            AgentDefinitionRepository agentRepository,
+            ConversationService conversationService,
+            AgentRuntimeManager runtimeManager) {
+        return new AgentConversationRuntimeService(
+                agentRepository, conversationService, runtimeManager);
     }
 }
