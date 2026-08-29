@@ -179,7 +179,7 @@ final class ToolGovernanceState {
     }
 
     private static String escape(String value) {
-        return value.replace("\\", "\\\\").replace(""", "\\"");
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
     record ToolGovernanceDecision(
