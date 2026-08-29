@@ -60,7 +60,8 @@ public class AgentConversationRuntimeService {
                             ConversationSession session =
                                     conversationService.openSession(agentId, userId, sessionKey);
 
-                            contextRestoreService.ensureContext(userId, session.id());
+                            SessionContextRestoreService.ContextRestoreResult restoreResult =
+                                    contextRestoreService.ensureContext(userId, session.id());
 
                             ConversationMessage userMessage =
                                     conversationService.appendMessage(
@@ -91,23 +92,38 @@ public class AgentConversationRuntimeService {
                                             request.message());
 
                             Flux<AgentStreamChunk> executionStart =
-                                    Mono.fromCallable(
-                                                    () -> {
-                                                        AgentStreamChunk chunk =
-                                                                AgentStreamChunk.trace(
-                                                                        "execution_start",
-                                                                        "",
-                                                                        "agentforge-runtime",
-                                                                        Map.of(
-                                                                                "executionId",
-                                                                                execution.id()));
-                                                        executionService.appendTrace(
-                                                                execution.id(),
-                                                                toTraceInput(chunk));
-                                                        return chunk;
-                                                    })
-                                            .subscribeOn(Schedulers.boundedElastic())
-                                            .flux();
+                                    Flux.fromIterable(
+                                                    java.util.List.of(
+                                                            AgentStreamChunk.trace(
+                                                                    "execution_start",
+                                                                    "",
+                                                                    "agentforge-runtime",
+                                                                    Map.of(
+                                                                            "executionId",
+                                                                            execution.id())),
+                                                            AgentStreamChunk.trace(
+                                                                    "context_restore",
+                                                                    "source="
+                                                                            + restoreResult.source()
+                                                                            + ";restoredMessages="
+                                                                            + restoreResult
+                                                                                    .restoredMessages(),
+                                                                    "session-context",
+                                                                    Map.of())))
+                                            .concatMap(
+                                                    chunk ->
+                                                            Mono.fromCallable(
+                                                                            () -> {
+                                                                                executionService
+                                                                                        .appendTrace(
+                                                                                                execution.id(),
+                                                                                                toTraceInput(
+                                                                                                        chunk));
+                                                                                return chunk;
+                                                                            })
+                                                                    .subscribeOn(
+                                                                            Schedulers
+                                                                                    .boundedElastic()));
 
                             Flux<AgentStreamChunk> runtimeStream =
                                     runtimeManager
