@@ -16,6 +16,10 @@ import io.agentscope.core.event.ToolResultStartEvent;
 import io.agentscope.core.event.ToolResultTextDeltaEvent;
 import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.core.model.Model;
+import io.agentscope.core.permission.PermissionBehavior;
+import io.agentscope.core.permission.PermissionContextState;
+import io.agentscope.core.permission.PermissionMode;
+import io.agentscope.core.permission.PermissionRule;
 import io.agentscope.core.state.AgentStateStore;
 import io.agentscope.core.tool.Toolkit;
 import io.agentscope.harness.agent.HarnessAgent;
@@ -116,15 +120,25 @@ public final class AgentScopeHarnessRuntime implements AgentRuntime, AutoCloseab
         this.toolConfirmationService = toolConfirmationService;
 
         Toolkit toolkit = new Toolkit();
+        var permissionContextBuilder =
+                PermissionContextState.builder().mode(PermissionMode.DEFAULT);
         if (businessTools != null) {
             businessTools.forEach(
-                    tool ->
-                            toolkit.registerTool(
-                                    new AgentScopeToolAdapter(
-                                            agentId,
-                                            tool,
-                                            this.toolExecutionPolicy,
-                                            this.toolConfirmationService)));
+                    tool -> {
+                        toolkit.registerTool(
+                                new AgentScopeToolAdapter(
+                                        agentId,
+                                        tool,
+                                        this.toolExecutionPolicy,
+                                        this.toolConfirmationService));
+                        permissionContextBuilder.addAllowRule(
+                                tool.name(),
+                                new PermissionRule(
+                                        tool.name(),
+                                        null,
+                                        PermissionBehavior.ALLOW,
+                                        "agentforge-policy"));
+                    });
         }
 
         this.agent =
@@ -133,6 +147,7 @@ public final class AgentScopeHarnessRuntime implements AgentRuntime, AutoCloseab
                         .sysPrompt(systemPrompt)
                         .model(model)
                         .toolkit(toolkit)
+                        .permissionContext(permissionContextBuilder.build())
                         .generateOptions(GenerateOptions.builder().build())
                         .stateStore(stateStore)
                         .disableFilesystemTools()
