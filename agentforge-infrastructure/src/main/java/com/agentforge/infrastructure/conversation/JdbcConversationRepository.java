@@ -102,7 +102,7 @@ public class JdbcConversationRepository implements ConversationRepository {
                         sessionId);
 
         if (sequences.isEmpty()) {
-            throw new ConversationNotFoundException("unknown", "unknown", sessionId);
+            throw ConversationNotFoundException.byInternalId(sessionId);
         }
 
         long sequenceNo = sequences.get(0);
