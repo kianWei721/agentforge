@@ -120,8 +120,26 @@ class JdbcExecutionRepositoryTest {
                                 null,
                                 null));
 
+        ExecutionTraceEvent usage =
+                repository.appendTrace(
+                        execution.id(),
+                        new TraceEventInput(
+                                "model_call_end",
+                                "agentscope-harness",
+                                "",
+                                null,
+                                null,
+                                "reply-1",
+                                null,
+                                null,
+                                120,
+                                8,
+                                20,
+                                315L));
+
         assertEquals(1L, first.sequenceNo());
         assertEquals(2L, second.sequenceNo());
+        assertEquals(3L, usage.sequenceNo());
 
         AgentExecution completed = repository.markSucceeded(execution.id(), "message-2");
         assertEquals(ExecutionStatus.SUCCEEDED, completed.status());
@@ -130,10 +148,14 @@ class JdbcExecutionRepositoryTest {
         assertNotNull(completed.durationMs());
 
         List<ExecutionTraceEvent> traces = repository.findTraces(execution.id());
-        assertEquals(2, traces.size());
+        assertEquals(3, traces.size());
         assertEquals("model_call_start", traces.get(0).eventType());
         assertEquals("query_device_status", traces.get(1).toolName());
         assertEquals("reply-1", traces.get(1).replyId());
+        assertEquals(120, traces.get(2).inputTokens());
+        assertEquals(8, traces.get(2).outputTokens());
+        assertEquals(20, traces.get(2).cachedTokens());
+        assertEquals(315L, traces.get(2).modelTimeMs());
     }
 
     @Test
