@@ -2,7 +2,7 @@
 
 AgentForge 是一个基于 Java 的企业级 AI Agent 编排与运行平台练习项目。
 
-当前里程碑：V0.4 — Tool Governance & Resilience（Slice 1/2/3A 已验收，Slice 3B-1 实施中）。
+当前里程碑：V0.4 — Tool Governance & Resilience（Slice 1/2/3A 已验收，Slice 3B-1 基础设施已真库验证，Slice 3B-2 实施中）。
 
 ## 已完成链路
 
@@ -183,3 +183,19 @@ V0.3 当前只接入只读设备详情查询。认证使用 AgentForge 侧固定
 - `docs/V0.4-tool-governance-resilience.md`
 - `docs/V0.2-agent-crud-tool-calling.md`
 - `docs/adr/ADR-001-modular-monolith.md`
+
+
+### Restricted IoT Write Tool
+
+V0.4 Slice 3B-2 正在实现第一个真实 Write Tool：
+
+```text
+set_lure_lamp_state
+deviceId = 373 only
+productId = 25 only
+target = ON / OFF
+```
+
+底层固定映射到 yudao 的无参数 `SERVICE_INVOKE TrapLight {}` toggle 动作。AgentForge 在确认后的执行时刻重新读取 `PeripheralStatus.TrapLight`，只有当前状态与目标不同才发送一次命令；Mutation POST 禁止自动 retry，并在发送后用只读状态查询确认目标状态。
+
+真实写 Tool 默认通过 `AGENTFORGE_IOT_LURE_LAMP_CONTROL_ENABLED=false` 关闭，首次真实执行必须在 Maven、Confirmation PENDING Trace 和人工批准链路全部验收后进行。
