@@ -175,6 +175,9 @@ public class AgentConversationRuntimeService {
                                                                                     error))
                                                             .subscribeOn(
                                                                     Schedulers.boundedElastic())
+                                                            .onErrorResume(
+                                                                    markFailure ->
+                                                                            Mono.empty())
                                                             .then(Mono.error(error)))
                                     .doFinally(
                                             signalType -> {
