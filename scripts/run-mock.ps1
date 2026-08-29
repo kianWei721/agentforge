@@ -1,6 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 & "$PSScriptRoot\dev-env.ps1"
+& "$PSScriptRoot\assert-infra-config.ps1"
 
 $env:AGENTFORGE_MODEL_PROVIDER = "mock"
 $env:AGENTFORGE_AGENT_ENABLED = "false"
