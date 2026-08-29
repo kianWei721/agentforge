@@ -11,4 +11,13 @@ public class ConversationNotFoundException extends RuntimeException {
                         + ", sessionId="
                         + sessionKey);
     }
+
+    public static ConversationNotFoundException byInternalId(String sessionId) {
+        return new ConversationNotFoundException(
+                "Conversation session not found by internal id: " + sessionId);
+    }
+
+    private ConversationNotFoundException(String message) {
+        super(message);
+    }
 }
