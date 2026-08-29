@@ -71,6 +71,7 @@ $mysqlPassword = Read-SecretValue "MySQL password (blank allowed)"
 
 $redisHost = Read-TextValue "Redis host"
 $redisPort = Read-TextValue "Redis port" "6379"
+$redisUsername = Read-TextValue "Redis username (blank for default user)"
 $redisDatabase = Read-TextValue "Redis database index" "0"
 $redisPassword = Read-SecretValue "Redis password (blank allowed)"
 
@@ -85,12 +86,14 @@ Set-EnvFileValue $localEnvPath "MYSQL_USERNAME" $mysqlUsername
 Set-EnvFileValue $localEnvPath "MYSQL_PASSWORD" $mysqlPassword
 Set-EnvFileValue $localEnvPath "REDIS_HOST" $redisHost
 Set-EnvFileValue $localEnvPath "REDIS_PORT" $redisPort
+Set-EnvFileValue $localEnvPath "REDIS_USERNAME" $redisUsername
 Set-EnvFileValue $localEnvPath "REDIS_PASSWORD" $redisPassword
 Set-EnvFileValue $localEnvPath "REDIS_DATABASE" $redisDatabase
 
 Write-Host ""
 Write-Host "Infrastructure configuration saved to ignored .env.local."
 Write-Host ("MySQL: {0}:{1}/{2} user={3}" -f $mysqlHost, $mysqlPort, $mysqlDatabase, $mysqlUsername)
-Write-Host ("Redis: {0}:{1} db={2}" -f $redisHost, $redisPort, $redisDatabase)
+$redisUserDisplay = if ([string]::IsNullOrWhiteSpace($redisUsername)) { "default" } else { $redisUsername }
+Write-Host ("Redis: {0}:{1} db={2} user={3}" -f $redisHost, $redisPort, $redisDatabase, $redisUserDisplay)
 Write-Host "Passwords were not printed."
 Write-Host "Next: .\scripts\run-dashscope.ps1"
