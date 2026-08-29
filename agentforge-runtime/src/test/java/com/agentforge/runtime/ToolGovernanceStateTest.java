@@ -5,6 +5,10 @@ import static org.junit.jupiter.api.Assertions.*;
 import com.agentforge.tool.AgentTool;
 import com.agentforge.tool.ToolInvocationContext;
 import com.agentforge.tool.ToolResult;
+import com.agentforge.runtime.confirmation.ToolConfirmation;
+import com.agentforge.runtime.confirmation.ToolConfirmationRepository;
+import com.agentforge.runtime.confirmation.ToolConfirmationService;
+import com.agentforge.runtime.confirmation.ToolConfirmationStatus;
 import com.agentforge.tool.ToolRiskLevel;
 import com.agentforge.tool.telemetry.OutboundHttpTelemetry;
 import io.agentscope.core.agent.RuntimeContext;
@@ -14,6 +18,12 @@ import io.agentscope.core.tool.ToolCallParam;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.HashMap;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
@@ -334,6 +344,111 @@ class ToolGovernanceStateTest {
     }
 
     @Test
+    void approvedConfirmationShouldAuthorizeExactlyOneMatchingWriteInvocation() {
+        AtomicInteger executions = new AtomicInteger();
+        AgentTool writeTool = policyTestTool(false, ToolRiskLevel.HIGH, executions);
+        FakeConfirmationRepository repository = new FakeConfirmationRepository();
+        ToolConfirmationService confirmationService =
+                new ToolConfirmationService(
+                        repository,
+                        Duration.ofMinutes(5),
+                        Clock.fixed(
+                                Instant.parse("2026-08-29T07:00:00Z"),
+                                ZoneOffset.UTC));
+        AgentScopeToolAdapter adapter =
+                new AgentScopeToolAdapter(
+                        "agent",
+                        writeTool,
+                        new BaselineToolExecutionPolicy(ToolPolicyOptions.defaults()),
+                        confirmationService);
+
+        Map<String, Object> input = Map.of("value", "same");
+        ToolGovernanceState firstState =
+                new ToolGovernanceState(new ToolGovernanceOptions(true, true, 32));
+        RuntimeContext firstContext =
+                RuntimeContext.builder()
+                        .userId("user")
+                        .sessionId("session")
+                        .put(ToolGovernanceState.class, firstState)
+                        .put(ToolExecutionIdentity.class, new ToolExecutionIdentity("execution-1"))
+                        .build();
+
+        adapter.callAsync(
+                        param(
+                                "call-1",
+                                "policy_test_tool",
+                                input,
+                                firstContext))
+                .block();
+
+        assertEquals(0, executions.get());
+        ToolGovernanceState.ToolInvocationTelemetry first =
+                firstState.telemetry("call-1");
+        assertNotNull(first);
+        assertEquals("REQUIRE_CONFIRMATION", first.policyDecision());
+        assertEquals("PENDING", first.confirmationStatus());
+        assertNotNull(first.confirmationId());
+        assertEquals(0, first.outboundAttempts());
+
+        ToolConfirmation approved =
+                confirmationService.approve(first.confirmationId(), "user");
+        assertEquals(ToolConfirmationStatus.APPROVED, approved.status());
+
+        ToolGovernanceState secondState =
+                new ToolGovernanceState(new ToolGovernanceOptions(true, true, 32));
+        RuntimeContext secondContext =
+                RuntimeContext.builder()
+                        .userId("user")
+                        .sessionId("session")
+                        .put(ToolGovernanceState.class, secondState)
+                        .put(ToolExecutionIdentity.class, new ToolExecutionIdentity("execution-2"))
+                        .build();
+
+        adapter.callAsync(
+                        param(
+                                "call-2",
+                                "policy_test_tool",
+                                input,
+                                secondContext))
+                .block();
+
+        assertEquals(1, executions.get());
+        ToolGovernanceState.ToolInvocationTelemetry second =
+                secondState.telemetry("call-2");
+        assertNotNull(second);
+        assertEquals("ALLOW", second.policyDecision());
+        assertEquals("approved_confirmation", second.policyReason());
+        assertEquals(first.confirmationId(), second.confirmationId());
+        assertEquals("CONSUMED", second.confirmationStatus());
+
+        ToolGovernanceState thirdState =
+                new ToolGovernanceState(new ToolGovernanceOptions(true, true, 32));
+        RuntimeContext thirdContext =
+                RuntimeContext.builder()
+                        .userId("user")
+                        .sessionId("session")
+                        .put(ToolGovernanceState.class, thirdState)
+                        .put(ToolExecutionIdentity.class, new ToolExecutionIdentity("execution-3"))
+                        .build();
+
+        adapter.callAsync(
+                        param(
+                                "call-3",
+                                "policy_test_tool",
+                                input,
+                                thirdContext))
+                .block();
+
+        assertEquals(1, executions.get());
+        ToolGovernanceState.ToolInvocationTelemetry third =
+                thirdState.telemetry("call-3");
+        assertNotNull(third);
+        assertEquals("REQUIRE_CONFIRMATION", third.policyDecision());
+        assertEquals("PENDING", third.confirmationStatus());
+        assertNotEquals(first.confirmationId(), third.confirmationId());
+    }
+
+    @Test
     void stateMustBeIsolatedPerAgentCall() {
         ToolGovernanceState firstState =
                 new ToolGovernanceState(new ToolGovernanceOptions(true, true, 32));
@@ -348,6 +463,142 @@ class ToolGovernanceStateTest {
                 secondState
                         .beforeInvocation("call-2", "test", Map.of("x", 1))
                         .allowed());
+    }
+
+    private static final class FakeConfirmationRepository
+            implements ToolConfirmationRepository {
+
+        private final Map<String, ToolConfirmation> byId = new HashMap<>();
+        private ToolConfirmation active;
+
+        @Override
+        public ToolConfirmation createOrGetActive(
+                ToolConfirmation draft, Instant now) {
+            if (active != null
+                    && active.status().active()
+                    && active.expiresAt().isAfter(now)
+                    && active.activeKey().equals(draft.activeKey())) {
+                return active;
+            }
+            active = draft;
+            byId.put(draft.id(), draft);
+            return draft;
+        }
+
+        @Override
+        public Optional<ToolConfirmation> findById(String confirmationId) {
+            return Optional.ofNullable(byId.get(confirmationId));
+        }
+
+        @Override
+        public ToolConfirmation approve(
+                String confirmationId, String userId, Instant now) {
+            ToolConfirmation current = byId.get(confirmationId);
+            if (current == null) {
+                throw new IllegalStateException("missing confirmation");
+            }
+            if (!current.userId().equals(userId)) {
+                throw new IllegalStateException("wrong user");
+            }
+            ToolConfirmation approved =
+                    copy(
+                            current,
+                            current.activeKey(),
+                            ToolConfirmationStatus.APPROVED,
+                            now,
+                            null,
+                            null,
+                            null,
+                            null);
+            byId.put(approved.id(), approved);
+            active = approved;
+            return approved;
+        }
+
+        @Override
+        public ToolConfirmation reject(
+                String confirmationId, String userId, Instant now) {
+            ToolConfirmation current = byId.get(confirmationId);
+            ToolConfirmation rejected =
+                    copy(
+                            current,
+                            null,
+                            ToolConfirmationStatus.REJECTED,
+                            current.approvedAt(),
+                            now,
+                            null,
+                            null,
+                            null);
+            byId.put(rejected.id(), rejected);
+            if (active != null && active.id().equals(rejected.id())) {
+                active = null;
+            }
+            return rejected;
+        }
+
+        @Override
+        public Optional<ToolConfirmation> consumeApproved(
+                String activeKey,
+                String consumedExecutionId,
+                String consumedToolCallId,
+                Instant now) {
+            if (active == null
+                    || active.status() != ToolConfirmationStatus.APPROVED
+                    || !active.activeKey().equals(activeKey)
+                    || !active.expiresAt().isAfter(now)) {
+                return Optional.empty();
+            }
+            ToolConfirmation consumed =
+                    copy(
+                            active,
+                            null,
+                            ToolConfirmationStatus.CONSUMED,
+                            active.approvedAt(),
+                            active.rejectedAt(),
+                            now,
+                            consumedExecutionId,
+                            consumedToolCallId);
+            byId.put(consumed.id(), consumed);
+            active = null;
+            return Optional.of(consumed);
+        }
+
+        private static ToolConfirmation copy(
+                ToolConfirmation source,
+                String activeKey,
+                ToolConfirmationStatus status,
+                Instant approvedAt,
+                Instant rejectedAt,
+                Instant consumedAt,
+                String consumedExecutionId,
+                String consumedToolCallId) {
+            return new ToolConfirmation(
+                    source.id(),
+                    activeKey,
+                    source.requestedExecutionId(),
+                    source.requestedToolCallId(),
+                    consumedExecutionId,
+                    consumedToolCallId,
+                    source.agentId(),
+                    source.userId(),
+                    source.sessionId(),
+                    source.toolName(),
+                    source.argumentFingerprint(),
+                    source.summary(),
+                    status,
+                    source.expiresAt(),
+                    approvedAt,
+                    rejectedAt,
+                    consumedAt,
+                    source.createdAt(),
+                    consumedAt != null
+                            ? consumedAt
+                            : rejectedAt != null
+                                    ? rejectedAt
+                                    : approvedAt != null
+                                            ? approvedAt
+                                            : source.updatedAt());
+        }
     }
 
     private static AgentTool policyTestTool(
