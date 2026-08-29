@@ -208,3 +208,6 @@ V0.4 Slice 3B-2 PENDING-only Runtime acceptance passed with a dedicated Agent. T
 
 
 V0.4 Slice 3B-2 safety-run confirmation reached terminal state `EXPIRED` with `consumedExecutionId=null` and `consumedAt=null`. This confirms the authorization permit was never consumed and cannot authorize a later device mutation. The PENDING-only safety acceptance is now fully closed.
+
+
+V0.4 Slice 3B-2 real-device write acceptance is CLOSED / ACCEPTED. The restricted tool consumed a single-use approval, issued exactly one downstream write for device 373, received a successful device reply (command 2883), observed the requested ON state, and later observed the device return to OFF. This validates the distinction between command acceptance, device execution, target-state observation, and persistence guarantees.
