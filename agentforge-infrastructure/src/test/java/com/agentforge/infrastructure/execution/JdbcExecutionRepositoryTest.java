@@ -66,6 +66,14 @@ class JdbcExecutionRepositoryTest {
                     output_tokens INT,
                     cached_tokens INT,
                     model_time_ms BIGINT,
+                    tool_duration_ms BIGINT,
+                    failure_code VARCHAR(64),
+                    retryable BOOLEAN,
+                    governance_decision VARCHAR(32),
+                    governance_reason VARCHAR(128),
+                    argument_fingerprint VARCHAR(64),
+                    blocked_by_tool_call_id VARCHAR(128),
+                    blocked_by_failure_code VARCHAR(64),
                     occurred_at TIMESTAMP(6) NOT NULL,
                     UNIQUE (execution_id, sequence_no)
                 )
@@ -137,9 +145,35 @@ class JdbcExecutionRepositoryTest {
                                 20,
                                 315L));
 
+        ExecutionTraceEvent governedTool =
+                repository.appendTrace(
+                        execution.id(),
+                        new TraceEventInput(
+                                "tool_result_end",
+                                "agentscope-harness",
+                                "",
+                                "tool-call-1",
+                                "query_device_status",
+                                "reply-2",
+                                "error",
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                21L,
+                                "REPEATED_NON_RETRYABLE_CALL",
+                                false,
+                                "BLOCK",
+                                "repeated_non_retryable_failure",
+                                "abc123",
+                                "tool-call-0",
+                                "FORBIDDEN"));
+
         assertEquals(1L, first.sequenceNo());
         assertEquals(2L, second.sequenceNo());
         assertEquals(3L, usage.sequenceNo());
+        assertEquals(4L, governedTool.sequenceNo());
 
         AgentExecution completed = repository.markSucceeded(execution.id(), "message-2");
         assertEquals(ExecutionStatus.SUCCEEDED, completed.status());
@@ -148,7 +182,7 @@ class JdbcExecutionRepositoryTest {
         assertNotNull(completed.durationMs());
 
         List<ExecutionTraceEvent> traces = repository.findTraces(execution.id());
-        assertEquals(3, traces.size());
+        assertEquals(4, traces.size());
         assertEquals("model_call_start", traces.get(0).eventType());
         assertEquals("query_device_status", traces.get(1).toolName());
         assertEquals("reply-1", traces.get(1).replyId());
@@ -156,6 +190,14 @@ class JdbcExecutionRepositoryTest {
         assertEquals(8, traces.get(2).outputTokens());
         assertEquals(20, traces.get(2).cachedTokens());
         assertEquals(315L, traces.get(2).modelTimeMs());
+        assertEquals(21L, traces.get(3).toolDurationMs());
+        assertEquals("REPEATED_NON_RETRYABLE_CALL", traces.get(3).failureCode());
+        assertFalse(traces.get(3).retryable());
+        assertEquals("BLOCK", traces.get(3).governanceDecision());
+        assertEquals("repeated_non_retryable_failure", traces.get(3).governanceReason());
+        assertEquals("abc123", traces.get(3).argumentFingerprint());
+        assertEquals("tool-call-0", traces.get(3).blockedByToolCallId());
+        assertEquals("FORBIDDEN", traces.get(3).blockedByFailureCode());
     }
 
     @Test

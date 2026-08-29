@@ -19,6 +19,14 @@ public record ExecutionTraceEvent(
         Integer outputTokens,
         Integer cachedTokens,
         Long modelTimeMs,
+        Long toolDurationMs,
+        String failureCode,
+        Boolean retryable,
+        String governanceDecision,
+        String governanceReason,
+        String argumentFingerprint,
+        String blockedByToolCallId,
+        String blockedByFailureCode,
         Instant occurredAt) {
 
     public ExecutionTraceEvent {

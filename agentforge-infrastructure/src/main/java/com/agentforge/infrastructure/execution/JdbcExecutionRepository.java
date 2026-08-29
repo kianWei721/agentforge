@@ -122,6 +122,14 @@ public class JdbcExecutionRepository implements ExecutionRepository {
                         input.outputTokens(),
                         input.cachedTokens(),
                         input.modelTimeMs(),
+                        input.toolDurationMs(),
+                        input.failureCode(),
+                        input.retryable(),
+                        input.governanceDecision(),
+                        input.governanceReason(),
+                        input.argumentFingerprint(),
+                        input.blockedByToolCallId(),
+                        input.blockedByFailureCode(),
                         Instant.now());
 
         jdbcTemplate.update(
@@ -129,8 +137,11 @@ public class JdbcExecutionRepository implements ExecutionRepository {
                 INSERT INTO af_trace_event (
                     id, execution_id, sequence_no, event_type, source, content,
                     tool_call_id, tool_name, reply_id, state, usage_text,
-                    input_tokens, output_tokens, cached_tokens, model_time_ms, occurred_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    input_tokens, output_tokens, cached_tokens, model_time_ms,
+                    tool_duration_ms, failure_code, retryable, governance_decision,
+                    governance_reason, argument_fingerprint, blocked_by_tool_call_id,
+                    blocked_by_failure_code, occurred_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 event.id(),
                 event.executionId(),
@@ -147,6 +158,14 @@ public class JdbcExecutionRepository implements ExecutionRepository {
                 event.outputTokens(),
                 event.cachedTokens(),
                 event.modelTimeMs(),
+                event.toolDurationMs(),
+                event.failureCode(),
+                event.retryable(),
+                event.governanceDecision(),
+                event.governanceReason(),
+                event.argumentFingerprint(),
+                event.blockedByToolCallId(),
+                event.blockedByFailureCode(),
                 Timestamp.from(event.occurredAt()));
 
         jdbcTemplate.update(
@@ -163,7 +182,10 @@ public class JdbcExecutionRepository implements ExecutionRepository {
                 """
                 SELECT id, execution_id, sequence_no, event_type, source, content,
                        tool_call_id, tool_name, reply_id, state, usage_text,
-                       input_tokens, output_tokens, cached_tokens, model_time_ms, occurred_at
+                       input_tokens, output_tokens, cached_tokens, model_time_ms,
+                       tool_duration_ms, failure_code, retryable, governance_decision,
+                       governance_reason, argument_fingerprint, blocked_by_tool_call_id,
+                       blocked_by_failure_code, occurred_at
                 FROM af_trace_event
                 WHERE execution_id = ?
                 ORDER BY sequence_no
@@ -293,12 +315,25 @@ public class JdbcExecutionRepository implements ExecutionRepository {
                 nullableInteger(rs, "output_tokens"),
                 nullableInteger(rs, "cached_tokens"),
                 nullableLong(rs, "model_time_ms"),
+                nullableLong(rs, "tool_duration_ms"),
+                rs.getString("failure_code"),
+                nullableBoolean(rs, "retryable"),
+                rs.getString("governance_decision"),
+                rs.getString("governance_reason"),
+                rs.getString("argument_fingerprint"),
+                rs.getString("blocked_by_tool_call_id"),
+                rs.getString("blocked_by_failure_code"),
                 toInstant(rs.getTimestamp("occurred_at")));
     }
 
     private static Integer nullableInteger(ResultSet rs, String column) throws SQLException {
         Object value = rs.getObject(column);
         return value == null ? null : rs.getInt(column);
+    }
+
+    private static Boolean nullableBoolean(ResultSet rs, String column) throws SQLException {
+        Object value = rs.getObject(column);
+        return value == null ? null : rs.getBoolean(column);
     }
 
     private static Long nullableLong(ResultSet rs, String column) throws SQLException {

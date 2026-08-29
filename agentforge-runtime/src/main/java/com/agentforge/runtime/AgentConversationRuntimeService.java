@@ -245,7 +245,15 @@ public class AgentConversationRuntimeService {
                 integerMetadata(metadata, "inputTokens"),
                 integerMetadata(metadata, "outputTokens"),
                 integerMetadata(metadata, "cachedTokens"),
-                longMetadata(metadata, "modelTimeMs"));
+                longMetadata(metadata, "modelTimeMs"),
+                longMetadata(metadata, "toolDurationMs"),
+                stringMetadata(metadata, "failureCode"),
+                booleanMetadata(metadata, "retryable"),
+                stringMetadata(metadata, "governanceDecision"),
+                stringMetadata(metadata, "governanceReason"),
+                stringMetadata(metadata, "argumentFingerprint"),
+                stringMetadata(metadata, "blockedByToolCallId"),
+                stringMetadata(metadata, "blockedByFailureCode"));
     }
 
     private static String stringMetadata(Map<String, Object> metadata, String key) {
@@ -262,6 +270,17 @@ public class AgentConversationRuntimeService {
             return number.intValue();
         }
         return Integer.valueOf(String.valueOf(value));
+    }
+
+    private static Boolean booleanMetadata(Map<String, Object> metadata, String key) {
+        Object value = metadata.get(key);
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Boolean bool) {
+            return bool;
+        }
+        return Boolean.valueOf(String.valueOf(value));
     }
 
     private static Long longMetadata(Map<String, Object> metadata, String key) {
