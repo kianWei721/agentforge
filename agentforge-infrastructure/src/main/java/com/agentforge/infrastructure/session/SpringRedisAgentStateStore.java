@@ -54,8 +54,6 @@ public class SpringRedisAgentStateStore implements AgentStateStore {
                     values.stream().map(value -> JsonUtils.getJsonCodec().toJson(value)).toList();
             redisTemplate.opsForList().rightPushAll(redisKey, jsonValues);
             redisTemplate.expire(redisKey, ttl);
-        } else {
-            redisTemplate.opsForValue().set(redisKey, "[]", ttl);
         }
 
         redisTemplate.opsForSet().add(markerKey, redisKey);
