@@ -76,6 +76,8 @@ public class AgentConversationRuntimeService {
                             StringBuilder assistantText = new StringBuilder();
                             AtomicReference<String> assistantSource =
                                     new AtomicReference<>(DEFAULT_ASSISTANT_SOURCE);
+                            AtomicReference<String> doneSource =
+                                    new AtomicReference<>(DEFAULT_ASSISTANT_SOURCE);
 
                             AgentRuntimeRequest scopedRequest =
                                     new AgentRuntimeRequest(
@@ -92,6 +94,13 @@ public class AgentConversationRuntimeService {
                                                                 chunk,
                                                                 assistantText,
                                                                 assistantSource);
+                                                        if ("done".equals(chunk.type())) {
+                                                            if (chunk.source() != null
+                                                                    && !chunk.source().isBlank()) {
+                                                                doneSource.set(chunk.source());
+                                                            }
+                                                            return Mono.empty();
+                                                        }
                                                         if (!isPersistedTrace(chunk)) {
                                                             return Mono.just(chunk);
                                                         }
@@ -129,10 +138,11 @@ public class AgentConversationRuntimeService {
                                                         executionService.succeed(
                                                                 execution.id(),
                                                                 assistantMessageId);
-                                                        return true;
+                                                        return AgentStreamChunk.done(
+                                                                doneSource.get());
                                                     })
                                             .subscribeOn(Schedulers.boundedElastic())
-                                            .thenMany(Flux.empty());
+                                            .flux();
 
                             return runtimeStream
                                     .concatWith(successTail)
