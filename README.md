@@ -199,3 +199,6 @@ target = ON / OFF
 底层固定映射到 yudao 的无参数 `SERVICE_INVOKE TrapLight {}` toggle 动作。AgentForge 在确认后的执行时刻重新读取 `PeripheralStatus.TrapLight`，只有当前状态与目标不同才发送一次命令；Mutation POST 禁止自动 retry，并在发送后用只读状态查询确认目标状态。
 
 真实写 Tool 默认通过 `AGENTFORGE_IOT_LURE_LAMP_CONTROL_ENABLED=false` 关闭，首次真实执行必须在 Maven、Confirmation PENDING Trace 和人工批准链路全部验收后进行。
+
+
+V0.4 Slice 3B-2 local verification: full Maven reactor passed after the fixture correction. The restricted write feature remains disabled by default; next acceptance is a PENDING-only confirmation test with `outboundAttempts=0`, followed by REJECT rather than APPROVE.
