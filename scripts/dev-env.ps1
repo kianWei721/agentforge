@@ -68,9 +68,6 @@ $pathParts = @(
 )
 $env:Path = (@($javaBin) + $pathParts) -join ";"
 
-# Use javac for version detection. Unlike "java -version", javac writes its
-# version to stdout on Windows PowerShell 5, so ErrorActionPreference=Stop
-# does not turn a normal version check into NativeCommandError.
 $javacVersionOutput = (& $javacExe -version | Out-String).Trim()
 if ($LASTEXITCODE -ne 0) {
     throw "Unable to execute javac from configured Java home: $javaHome"
@@ -88,22 +85,13 @@ if ([string]::IsNullOrWhiteSpace($env:DASHSCOPE_MODEL)) {
     $env:DASHSCOPE_MODEL = "qwen3.8-flash"
 }
 
-if ([string]::IsNullOrWhiteSpace($env:MYSQL_HOST)) { $env:MYSQL_HOST = "127.0.0.1" }
-if ([string]::IsNullOrWhiteSpace($env:MYSQL_PORT)) { $env:MYSQL_PORT = "3307" }
-if ([string]::IsNullOrWhiteSpace($env:MYSQL_DATABASE)) { $env:MYSQL_DATABASE = "agentforge" }
-if ([string]::IsNullOrWhiteSpace($env:MYSQL_USERNAME)) { $env:MYSQL_USERNAME = "agentforge" }
-if ([string]::IsNullOrWhiteSpace($env:MYSQL_PASSWORD)) { $env:MYSQL_PASSWORD = "agentforge-dev" }
-if ([string]::IsNullOrWhiteSpace($env:MYSQL_ROOT_PASSWORD)) { $env:MYSQL_ROOT_PASSWORD = "agentforge-root-dev" }
-
-if ([string]::IsNullOrWhiteSpace($env:REDIS_HOST)) { $env:REDIS_HOST = "127.0.0.1" }
-if ([string]::IsNullOrWhiteSpace($env:REDIS_PORT)) { $env:REDIS_PORT = "6380" }
-if ($null -eq $env:REDIS_PASSWORD) { $env:REDIS_PASSWORD = "" }
-if ([string]::IsNullOrWhiteSpace($env:REDIS_DATABASE)) { $env:REDIS_DATABASE = "0" }
-
 $keyState = if ([string]::IsNullOrWhiteSpace($env:DASHSCOPE_API_KEY)) { "NOT_SET" } else { "SET" }
+$mysqlState = if ([string]::IsNullOrWhiteSpace($env:MYSQL_HOST)) { "NOT_CONFIGURED" } else { "$env:MYSQL_HOST`:$env:MYSQL_PORT/$env:MYSQL_DATABASE" }
+$redisState = if ([string]::IsNullOrWhiteSpace($env:REDIS_HOST)) { "NOT_CONFIGURED" } else { "$env:REDIS_HOST`:$env:REDIS_PORT db=$env:REDIS_DATABASE" }
+
 Write-Host "[dev-env] JAVA_HOME=$env:JAVA_HOME"
 Write-Host "[dev-env] JAVA_VERSION=$javacVersionOutput"
 Write-Host "[dev-env] DASHSCOPE_MODEL=$env:DASHSCOPE_MODEL"
 Write-Host "[dev-env] DASHSCOPE_API_KEY=$keyState"
-Write-Host ("[dev-env] MYSQL={0}:{1}/{2}" -f $env:MYSQL_HOST, $env:MYSQL_PORT, $env:MYSQL_DATABASE)
-Write-Host ("[dev-env] REDIS={0}:{1} db={2}" -f $env:REDIS_HOST, $env:REDIS_PORT, $env:REDIS_DATABASE)
+Write-Host "[dev-env] MYSQL=$mysqlState"
+Write-Host "[dev-env] REDIS=$redisState"
