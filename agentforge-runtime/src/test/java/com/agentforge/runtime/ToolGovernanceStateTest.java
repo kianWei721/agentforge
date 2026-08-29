@@ -187,6 +187,66 @@ class ToolGovernanceStateTest {
     }
 
     @Test
+    void adapterShouldCarryToolTelemetryFromInvocationContext() {
+        AgentTool tool =
+                new AgentTool() {
+                    @Override
+                    public String name() {
+                        return "telemetry_tool";
+                    }
+
+                    @Override
+                    public String description() {
+                        return "telemetry test";
+                    }
+
+                    @Override
+                    public Map<String, Object> inputSchema() {
+                        return Map.of("type", "object", "properties", Map.of());
+                    }
+
+                    @Override
+                    public ToolResult execute(
+                            ToolInvocationContext context, Map<String, Object> arguments) {
+                        context.telemetry()
+                                .recordOutboundHttp(
+                                        new OutboundHttpTelemetry(
+                                                "HTTP",
+                                                "test-downstream",
+                                                1,
+                                                200,
+                                                200,
+                                                9L,
+                                                "SUCCESS"));
+                        return ToolResult.success("ok", Map.of());
+                    }
+                };
+
+        ToolGovernanceState state =
+                new ToolGovernanceState(new ToolGovernanceOptions(true, true, 32));
+        RuntimeContext context =
+                RuntimeContext.builder()
+                        .userId("user")
+                        .sessionId("session")
+                        .put(ToolGovernanceState.class, state)
+                        .build();
+
+        AgentScopeToolAdapter adapter = new AgentScopeToolAdapter("agent", tool);
+        adapter.callAsync(param("call-telemetry", "telemetry_tool", Map.of(), context)).block();
+
+        ToolGovernanceState.ToolInvocationTelemetry telemetry =
+                state.telemetry("call-telemetry");
+        assertNotNull(telemetry);
+        assertEquals("HTTP", telemetry.outboundProtocol());
+        assertEquals("test-downstream", telemetry.downstreamSystem());
+        assertEquals(1, telemetry.outboundAttempts());
+        assertEquals(200, telemetry.httpStatus());
+        assertEquals(200, telemetry.businessCode());
+        assertEquals(9L, telemetry.downstreamDurationMs());
+        assertEquals("SUCCESS", telemetry.outboundOutcome());
+    }
+
+    @Test
     void stateMustBeIsolatedPerAgentCall() {
         ToolGovernanceState firstState =
                 new ToolGovernanceState(new ToolGovernanceOptions(true, true, 32));

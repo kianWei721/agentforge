@@ -79,6 +79,8 @@ public class HttpDeviceStatusQueryAdapter implements DeviceStatusQueryPort {
             DeviceStatusQueryException lastFailure = null;
             for (int attempt = 1; attempt <= properties.getMaxAttempts(); attempt++) {
                 observation.attempts = attempt;
+                observation.httpStatus = null;
+                observation.businessCode = null;
                 try {
                     Optional<DeviceStatusSnapshot> result =
                             executeOnce(deviceId, observation);
@@ -93,7 +95,12 @@ public class HttpDeviceStatusQueryAdapter implements DeviceStatusQueryPort {
                         throw exception;
                     }
                     if (attempt < properties.getMaxAttempts()) {
-                        sleepBeforeRetry();
+                        try {
+                            sleepBeforeRetry();
+                        } catch (DeviceStatusQueryException interrupted) {
+                            observation.outcome = interrupted.reason().name();
+                            throw interrupted;
+                        }
                     }
                 }
             }
