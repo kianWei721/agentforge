@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,9 +54,13 @@ public class JdbcAgentDefinitionRepository implements AgentDefinitionRepository 
         Map<String, List<String>> toolsByAgent = new LinkedHashMap<>();
         jdbcTemplate.query(
                 "SELECT agent_id, tool_name FROM af_agent_tool ORDER BY agent_id, sort_order, tool_name",
-                rs -> toolsByAgent
-                        .computeIfAbsent(rs.getString("agent_id"), ignored -> new ArrayList<>())
-                        .add(rs.getString("tool_name")));
+                (RowCallbackHandler)
+                        rs ->
+                                toolsByAgent
+                                        .computeIfAbsent(
+                                                rs.getString("agent_id"),
+                                                ignored -> new ArrayList<>())
+                                        .add(rs.getString("tool_name")));
 
         return rows.stream()
                 .map(row -> toDefinition(row, toolsByAgent.getOrDefault(row.id(), List.of())))
