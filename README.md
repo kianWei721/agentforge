@@ -205,3 +205,6 @@ V0.4 Slice 3B-2 local verification: full Maven reactor passed after the fixture 
 
 
 V0.4 Slice 3B-2 PENDING-only Runtime acceptance passed with a dedicated Agent. The HIGH/write Tool produced a durable PENDING confirmation and recorded `outboundAttempts=0`, proving AgentForge did not issue the mutation HTTP request. The safety-run confirmation must be REJECTED; a later real-device test requires a fresh confirmation and a separate explicit operator approval decision.
+
+
+V0.4 Slice 3B-2 safety-run confirmation reached terminal state `EXPIRED` with `consumedExecutionId=null` and `consumedAt=null`. This confirms the authorization permit was never consumed and cannot authorize a later device mutation. The PENDING-only safety acceptance is now fully closed.
