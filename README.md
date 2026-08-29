@@ -2,7 +2,7 @@
 
 AgentForge 是一个基于 Java 的企业级 AI Agent 编排与运行平台练习项目。
 
-当前里程碑：V0.4 — Tool Governance & Resilience（Slice 1/2 已验收，Slice 3 设计中）。
+当前里程碑：V0.4 — Tool Governance & Resilience（Slice 1/2 已验收，Slice 3A 实施中）。
 
 ## 已完成链路
 
@@ -62,6 +62,9 @@ HTTP / SSE
 - Slice 2 增加结构化 Outbound HTTP Telemetry：protocol、downstream system、attempts、HTTP status、business code、downstream duration 与 outcome；不记录 URL、Token、tenant-id 或 response body。
 - Slice 1 已通过真实 Runtime 与 Durable Trace 验收：第一次 FORBIDDEN 正常执行，第二次相同不可重试调用由治理层 BLOCK，未再次进入业务 Tool。
 - Slice 2 已通过真实成功、HTTP 200 + business 403 错误路径与 Durable Trace 验收；Governance Block 明确记录 `outboundAttempts=0`，可证明第二次调用未穿透下游。
+- Slice 3A 新增 ToolRiskLevel（LOW/MEDIUM/HIGH）与 ToolExecutionPolicy；默认 Read Tool 低风险、Write Tool 高风险且要求确认。
+- Policy Decision 支持 ALLOW / DENY / REQUIRE_CONFIRMATION；当前确认生命周期尚未实现，因此 REQUIRE_CONFIRMATION 会 fail closed，不执行 Tool。
+- Policy Trace 持久化 tool risk、read-only、policy decision/reason，并以 `outboundAttempts=0` 证明 Policy 阻断未访问下游。
 
 ## Conversation 数据模型
 
