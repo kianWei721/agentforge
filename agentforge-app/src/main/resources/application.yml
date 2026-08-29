@@ -49,6 +49,8 @@ agentforge:
       retry-backoff: ${AGENTFORGE_IOT_RETRY_BACKOFF:150ms}
       circuit-breaker-failure-threshold: ${AGENTFORGE_IOT_CIRCUIT_FAILURE_THRESHOLD:3}
       circuit-breaker-open-duration: ${AGENTFORGE_IOT_CIRCUIT_OPEN_DURATION:30s}
+  tool-confirmation:
+    ttl: ${AGENTFORGE_TOOL_CONFIRMATION_TTL:5m}
   tool-policy:
     enabled: ${AGENTFORGE_TOOL_POLICY_ENABLED:true}
     require-confirmation-for-write-tools: ${AGENTFORGE_TOOL_POLICY_CONFIRM_WRITE:true}

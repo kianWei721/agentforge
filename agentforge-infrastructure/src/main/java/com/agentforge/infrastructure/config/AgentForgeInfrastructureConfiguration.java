@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Configuration;
     AgentSessionCacheProperties.class,
     IoTDeviceStatusProperties.class,
     ToolGovernanceProperties.class,
-    ToolPolicyProperties.class
+    ToolPolicyProperties.class,
+    ToolConfirmationProperties.class
 })
 public class AgentForgeInfrastructureConfiguration {}
