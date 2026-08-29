@@ -35,17 +35,7 @@ $content = @(
     "# AgentForge local development configuration - DO NOT COMMIT",
     "AGENTFORGE_JAVA_HOME=$javaHome",
     "DASHSCOPE_API_KEY=$apiKey",
-    "DASHSCOPE_MODEL=$model",
-    "MYSQL_HOST=127.0.0.1",
-    "MYSQL_PORT=3307",
-    "MYSQL_DATABASE=agentforge",
-    "MYSQL_USERNAME=agentforge",
-    "MYSQL_PASSWORD=agentforge-dev",
-    "MYSQL_ROOT_PASSWORD=agentforge-root-dev",
-    "REDIS_HOST=127.0.0.1",
-    "REDIS_PORT=6380",
-    "REDIS_PASSWORD=",
-    "REDIS_DATABASE=0"
+    "DASHSCOPE_MODEL=$model"
 ) -join [Environment]::NewLine
 
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
@@ -53,4 +43,4 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
 Write-Host "Created $localEnvPath"
 Write-Host "Local secrets are ignored by Git."
-Write-Host "From now on start with: .\scripts\run-dashscope.ps1"
+Write-Host "Next: configure MySQL/Redis with .\scripts\configure-infra.ps1"
