@@ -2,7 +2,7 @@
 
 AgentForge 是一个基于 Java 的企业级 AI Agent 编排与运行平台练习项目。
 
-当前里程碑：V0.4 — Tool Governance & Resilience（Slice 1/2/3A 已验收，Slice 3B-1 基础设施已真库验证，Slice 3B-2 实施中）。
+当前里程碑：V0.4 — Tool Governance & Resilience（Slice 1/2/3A/3B-1 已验收，Slice 3B-2 PENDING Safety Gate 已验收，真实设备写执行尚未进行）。
 
 ## 已完成链路
 
@@ -202,3 +202,6 @@ target = ON / OFF
 
 
 V0.4 Slice 3B-2 local verification: full Maven reactor passed after the fixture correction. The restricted write feature remains disabled by default; next acceptance is a PENDING-only confirmation test with `outboundAttempts=0`, followed by REJECT rather than APPROVE.
+
+
+V0.4 Slice 3B-2 PENDING-only Runtime acceptance passed with a dedicated Agent. The HIGH/write Tool produced a durable PENDING confirmation and recorded `outboundAttempts=0`, proving AgentForge did not issue the mutation HTTP request. The safety-run confirmation must be REJECTED; a later real-device test requires a fresh confirmation and a separate explicit operator approval decision.
