@@ -85,6 +85,8 @@ class JdbcExecutionRepositoryTest {
                     tool_read_only BOOLEAN,
                     policy_decision VARCHAR(32),
                     policy_reason VARCHAR(128),
+                    confirmation_id VARCHAR(64),
+                    confirmation_status VARCHAR(16),
                     occurred_at TIMESTAMP(6) NOT NULL,
                     UNIQUE (execution_id, sequence_no)
                 )
@@ -190,7 +192,9 @@ class JdbcExecutionRepositoryTest {
                                 "HIGH",
                                 false,
                                 "REQUIRE_CONFIRMATION",
-                                "write_tool_requires_confirmation"));
+                                "write_tool_requires_confirmation",
+                                "confirmation-1",
+                                "PENDING"));
 
         assertEquals(1L, first.sequenceNo());
         assertEquals(2L, second.sequenceNo());
@@ -231,6 +235,8 @@ class JdbcExecutionRepositoryTest {
         assertFalse(traces.get(3).toolReadOnly());
         assertEquals("REQUIRE_CONFIRMATION", traces.get(3).policyDecision());
         assertEquals("write_tool_requires_confirmation", traces.get(3).policyReason());
+        assertEquals("confirmation-1", traces.get(3).confirmationId());
+        assertEquals("PENDING", traces.get(3).confirmationStatus());
     }
 
     @Test
