@@ -2,16 +2,14 @@
 
 AgentForge 是一个基于 Java 的企业级 AI Agent 编排与运行平台练习项目。
 
-当前里程碑：V0.3 — Redis Session Cache / Context Restore。
+当前里程碑：V0.3 — Real IoT HTTP Tool Adapter。
 
 ## 已完成链路
 
 ```text
 HTTP / SSE
   -> AgentConversationRuntimeService
-  -> Conversation Session
-  -> persist USER message
-  -> resolve persistent Session
+  -> resolve persistent Conversation Session
   -> restore AgentState from Redis cache or MySQL transcript
   -> persist current USER message
   -> create af_execution
@@ -47,6 +45,13 @@ HTTP / SSE
 - Redis 异常时降级到 JVM 内存 StateStore，不让缓存故障直接中断 Agent 请求。
 - MySQL 回源默认最多恢复最近 40 条 USER / ASSISTANT Message，避免无限历史一次性灌入上下文。
 - `context_restore` Trace 记录本轮上下文来自 CACHE / MYSQL_TRANSCRIPT / EMPTY。
+- `query_device_status` 支持 `demo` / `http` 两种 DeviceStatusQueryPort 适配器。
+- HTTP 模式真实调用 yudao Device Mini API：`GET /admin-api/device/mini/devices/{deviceId}`。
+- 后端认证固定由 AgentForge 配置注入 `Authorization: Bearer ...` 与 `tenant-id`，LLM 无法控制目标地址或凭据。
+- 真实后端中文状态统一归一化为 ONLINE / OFFLINE / SLEEP / INACTIVE。
+- HTTP Tool 调用配置 connect/request timeout、只读安全重试和简单 Circuit Breaker（熔断器）。
+- 阻塞 HTTP Tool 执行隔离到 Reactor `boundedElastic`，避免占用响应式事件线程。
+- Tool Error 只向模型暴露安全错误类别，不回显 Token、内部 URL 或后端原始错误正文。
 
 ## Conversation 数据模型
 
@@ -115,6 +120,14 @@ GET /api/v1/agents/{agentId}/sessions/{sessionId}/executions?userId={userId}
 .\scripts\configure-infra.ps1
 ```
 
+切换到真实 IoT HTTP Tool：
+
+```powershell
+.\scripts\configure-iot.ps1
+```
+
+脚本会把 IoT Base URL、tenant-id 与 Access Token 写入被 Git 忽略的 `.env.local`；Token 不会打印到终端。
+
 运行测试：
 
 ```powershell
@@ -137,9 +150,9 @@ Redis 是 AgentScope Runtime State 的热缓存，不替代 MySQL 的持久化�
 
 ## 设计边界
 
-当前 Redis Session Cache / Context Restore 解决的是“Runtime State 不再只依赖单 JVM 内存，并且 Redis miss 后仍能从 MySQL 对话事实恢复基本上下文”。
+当前 Real IoT HTTP Tool Adapter 解决的是“Agent 的 Tool Call 不再只命中确定性 demo data，而是通过稳定的 Port / Adapter 边界调用真实 IoT 后端”。
 
-Redis 命中可恢复 AgentScope 完整 AgentState；MySQL fallback 当前只重建 USER / ASSISTANT 文本 Transcript，不承诺恢复过去的 ToolUseBlock、ToolResultBlock、权限上下文或执行中断点。
+V0.3 当前只接入只读设备详情查询。认证使用 AgentForge 侧固定服务凭据与固定租户配置，不做终端用户 Token 透传；因此适合受控单租户/服务身份集成，不等于已经完成多租户用户级 Credential Delegation（凭据委托）。
 
 详细设计见：
 
@@ -147,5 +160,6 @@ Redis 命中可恢复 AgentScope 完整 AgentState；MySQL fallback 当前只重
 - `docs/V0.3-session-message-persistence.md`
 - `docs/V0.3-execution-tool-trace-persistence.md`
 - `docs/V0.3-redis-session-cache-context-restore.md`
+- `docs/V0.3-real-iot-http-tool-adapter.md`
 - `docs/V0.2-agent-crud-tool-calling.md`
 - `docs/adr/ADR-001-modular-monolith.md`
