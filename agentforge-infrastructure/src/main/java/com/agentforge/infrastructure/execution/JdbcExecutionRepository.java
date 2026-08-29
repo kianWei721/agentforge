@@ -118,14 +118,19 @@ public class JdbcExecutionRepository implements ExecutionRepository {
                         input.replyId(),
                         input.state(),
                         input.usageText(),
+                        input.inputTokens(),
+                        input.outputTokens(),
+                        input.cachedTokens(),
+                        input.modelTimeMs(),
                         Instant.now());
 
         jdbcTemplate.update(
                 """
                 INSERT INTO af_trace_event (
                     id, execution_id, sequence_no, event_type, source, content,
-                    tool_call_id, tool_name, reply_id, state, usage_text, occurred_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    tool_call_id, tool_name, reply_id, state, usage_text,
+                    input_tokens, output_tokens, cached_tokens, model_time_ms, occurred_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 event.id(),
                 event.executionId(),
@@ -138,6 +143,10 @@ public class JdbcExecutionRepository implements ExecutionRepository {
                 event.replyId(),
                 event.state(),
                 event.usageText(),
+                event.inputTokens(),
+                event.outputTokens(),
+                event.cachedTokens(),
+                event.modelTimeMs(),
                 Timestamp.from(event.occurredAt()));
 
         jdbcTemplate.update(
@@ -153,7 +162,8 @@ public class JdbcExecutionRepository implements ExecutionRepository {
         return jdbcTemplate.query(
                 """
                 SELECT id, execution_id, sequence_no, event_type, source, content,
-                       tool_call_id, tool_name, reply_id, state, usage_text, occurred_at
+                       tool_call_id, tool_name, reply_id, state, usage_text,
+                       input_tokens, output_tokens, cached_tokens, model_time_ms, occurred_at
                 FROM af_trace_event
                 WHERE execution_id = ?
                 ORDER BY sequence_no
@@ -279,7 +289,21 @@ public class JdbcExecutionRepository implements ExecutionRepository {
                 rs.getString("reply_id"),
                 rs.getString("state"),
                 rs.getString("usage_text"),
+                nullableInteger(rs, "input_tokens"),
+                nullableInteger(rs, "output_tokens"),
+                nullableInteger(rs, "cached_tokens"),
+                nullableLong(rs, "model_time_ms"),
                 toInstant(rs.getTimestamp("occurred_at")));
+    }
+
+    private static Integer nullableInteger(ResultSet rs, String column) throws SQLException {
+        Object value = rs.getObject(column);
+        return value == null ? null : rs.getInt(column);
+    }
+
+    private static Long nullableLong(ResultSet rs, String column) throws SQLException {
+        Object value = rs.getObject(column);
+        return value == null ? null : rs.getLong(column);
     }
 
     private static Instant toInstant(Timestamp timestamp) {

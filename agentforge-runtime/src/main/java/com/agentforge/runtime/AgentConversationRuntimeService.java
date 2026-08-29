@@ -197,11 +197,37 @@ public class AgentConversationRuntimeService {
                 stringMetadata(metadata, "toolName"),
                 stringMetadata(metadata, "replyId"),
                 stringMetadata(metadata, "state"),
-                stringMetadata(metadata, "usage"));
+                stringMetadata(metadata, "usage"),
+                integerMetadata(metadata, "inputTokens"),
+                integerMetadata(metadata, "outputTokens"),
+                integerMetadata(metadata, "cachedTokens"),
+                longMetadata(metadata, "modelTimeMs"));
     }
 
     private static String stringMetadata(Map<String, Object> metadata, String key) {
         Object value = metadata.get(key);
         return value == null ? null : String.valueOf(value);
+    }
+
+    private static Integer integerMetadata(Map<String, Object> metadata, String key) {
+        Object value = metadata.get(key);
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        return Integer.valueOf(String.valueOf(value));
+    }
+
+    private static Long longMetadata(Map<String, Object> metadata, String key) {
+        Object value = metadata.get(key);
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        return Long.valueOf(String.valueOf(value));
     }
 }

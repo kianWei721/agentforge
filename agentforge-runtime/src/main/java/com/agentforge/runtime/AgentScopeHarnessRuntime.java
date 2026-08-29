@@ -7,6 +7,7 @@ import io.agentscope.core.event.AgentEventType;
 import io.agentscope.core.event.ModelCallEndEvent;
 import io.agentscope.core.event.ModelCallStartEvent;
 import io.agentscope.core.event.TextBlockDeltaEvent;
+import io.agentscope.core.event.ToolCallDeltaEvent;
 import io.agentscope.core.event.ToolCallEndEvent;
 import io.agentscope.core.event.ToolCallStartEvent;
 import io.agentscope.core.event.ToolResultEndEvent;
@@ -97,33 +98,58 @@ public final class AgentScopeHarnessRuntime implements AgentRuntime, AutoCloseab
                     "tool_call_start",
                     "",
                     SOURCE,
-                    toolMetadata(toolEvent.getToolCallId(), toolEvent.getToolCallName()));
+                    toolMetadata(
+                            toolEvent.getReplyId(),
+                            toolEvent.getToolCallId(),
+                            toolEvent.getToolCallName()));
+        }
+        if (event instanceof ToolCallDeltaEvent toolEvent) {
+            return AgentStreamChunk.trace(
+                    "tool_call_delta",
+                    toolEvent.getDelta(),
+                    SOURCE,
+                    toolMetadata(
+                            toolEvent.getReplyId(),
+                            toolEvent.getToolCallId(),
+                            toolEvent.getToolCallName()));
         }
         if (event instanceof ToolCallEndEvent toolEvent) {
             return AgentStreamChunk.trace(
                     "tool_call_end",
                     "",
                     SOURCE,
-                    toolMetadata(toolEvent.getToolCallId(), toolEvent.getToolCallName()));
+                    toolMetadata(
+                            toolEvent.getReplyId(),
+                            toolEvent.getToolCallId(),
+                            toolEvent.getToolCallName()));
         }
         if (event instanceof ToolResultStartEvent toolEvent) {
             return AgentStreamChunk.trace(
                     "tool_result_start",
                     "",
                     SOURCE,
-                    toolMetadata(toolEvent.getToolCallId(), toolEvent.getToolCallName()));
+                    toolMetadata(
+                            toolEvent.getReplyId(),
+                            toolEvent.getToolCallId(),
+                            toolEvent.getToolCallName()));
         }
         if (event instanceof ToolResultTextDeltaEvent toolEvent) {
             return AgentStreamChunk.trace(
                     "tool_result_delta",
                     toolEvent.getDelta(),
                     SOURCE,
-                    toolMetadata(toolEvent.getToolCallId(), toolEvent.getToolCallName()));
+                    toolMetadata(
+                            toolEvent.getReplyId(),
+                            toolEvent.getToolCallId(),
+                            toolEvent.getToolCallName()));
         }
         if (event instanceof ToolResultEndEvent toolEvent) {
             Map<String, Object> metadata =
                     new LinkedHashMap<>(
-                            toolMetadata(toolEvent.getToolCallId(), toolEvent.getToolCallName()));
+                            toolMetadata(
+                                    toolEvent.getReplyId(),
+                                    toolEvent.getToolCallId(),
+                                    toolEvent.getToolCallName()));
             metadata.put(
                     "state",
                     toolEvent.getState() == null ? "unknown" : toolEvent.getState().getValue());
@@ -140,15 +166,22 @@ public final class AgentScopeHarnessRuntime implements AgentRuntime, AutoCloseab
             Map<String, Object> metadata = new LinkedHashMap<>();
             metadata.put("replyId", modelEvent.getReplyId());
             if (modelEvent.getUsage() != null) {
-                metadata.put("usage", modelEvent.getUsage().toString());
+                metadata.put("inputTokens", modelEvent.getUsage().getInputTokens());
+                metadata.put("outputTokens", modelEvent.getUsage().getOutputTokens());
+                metadata.put("cachedTokens", modelEvent.getUsage().getCachedTokens());
+                metadata.put(
+                        "modelTimeMs",
+                        Math.round(modelEvent.getUsage().getTime() * 1000.0d));
             }
             return AgentStreamChunk.trace("model_call_end", "", SOURCE, metadata);
         }
         return null;
     }
 
-    private static Map<String, Object> toolMetadata(String toolCallId, String toolName) {
+    private static Map<String, Object> toolMetadata(
+            String replyId, String toolCallId, String toolName) {
         Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("replyId", replyId);
         metadata.put("toolCallId", toolCallId);
         metadata.put("toolName", toolName);
         return metadata;

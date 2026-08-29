@@ -8,7 +8,11 @@ public record TraceEventInput(
         String toolName,
         String replyId,
         String state,
-        String usageText) {
+        String usageText,
+        Integer inputTokens,
+        Integer outputTokens,
+        Integer cachedTokens,
+        Long modelTimeMs) {
 
     public TraceEventInput {
         if (eventType == null || eventType.isBlank()) {

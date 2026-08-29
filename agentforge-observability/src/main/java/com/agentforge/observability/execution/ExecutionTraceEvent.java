@@ -15,6 +15,10 @@ public record ExecutionTraceEvent(
         String replyId,
         String state,
         String usageText,
+        Integer inputTokens,
+        Integer outputTokens,
+        Integer cachedTokens,
+        Long modelTimeMs,
         Instant occurredAt) {
 
     public ExecutionTraceEvent {

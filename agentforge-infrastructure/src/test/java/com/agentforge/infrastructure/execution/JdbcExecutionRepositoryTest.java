@@ -62,6 +62,10 @@ class JdbcExecutionRepositoryTest {
                     reply_id VARCHAR(128),
                     state VARCHAR(32),
                     usage_text CLOB,
+                    input_tokens INT,
+                    output_tokens INT,
+                    cached_tokens INT,
+                    model_time_ms BIGINT,
                     occurred_at TIMESTAMP(6) NOT NULL,
                     UNIQUE (execution_id, sequence_no)
                 )
@@ -94,6 +98,10 @@ class JdbcExecutionRepositoryTest {
                                 null,
                                 "reply-1",
                                 null,
+                                null,
+                                null,
+                                null,
+                                null,
                                 null));
         ExecutionTraceEvent second =
                 repository.appendTrace(
@@ -104,6 +112,10 @@ class JdbcExecutionRepositoryTest {
                                 "",
                                 "tool-call-1",
                                 "query_device_status",
+                                "reply-1",
+                                null,
+                                null,
+                                null,
                                 null,
                                 null,
                                 null));
@@ -121,6 +133,7 @@ class JdbcExecutionRepositoryTest {
         assertEquals(2, traces.size());
         assertEquals("model_call_start", traces.get(0).eventType());
         assertEquals("query_device_status", traces.get(1).toolName());
+        assertEquals("reply-1", traces.get(1).replyId());
     }
 
     @Test
