@@ -2,7 +2,7 @@
 
 AgentForge 是一个基于 Java 的企业级 AI Agent 编排与运行平台练习项目。
 
-当前里程碑：V0.3 — Real IoT HTTP Tool Adapter。
+当前里程碑：V0.3 — Real IoT HTTP Tool Adapter（已验收）。
 
 ## 已完成链路
 
@@ -34,7 +34,7 @@ HTTP / SSE
 - JDBC 调用在 WebFlux 链路中隔离到 `boundedElastic`。
 - 每次 Agent 请求生成一条 `af_execution`，记录 RUNNING / SUCCEEDED / FAILED / CANCELLED 生命周期。
 - 模型调用、Tool Call、Tool Result 持久化到 `af_trace_event`。
-- `replyId` 与 `toolCallId` 用于关联一次推理和工具调用链。
+- `toolCallId` 用于稳定关联一次 Tool Call / Tool Result；`replyId` 表示 AgentScope 不同回复/事件阶段，不能替代 `toolCallId` 做工具调用关联。
 - Tool 参数增量与 Tool Result 增量保留，可按 `sequence_no` 重放。
 - Model Call End 持久化 input/output/cached tokens 与模型耗时。
 - SSE 首事件暴露 `executionId`，用于关联实时流与后台 Trace。
@@ -49,9 +49,12 @@ HTTP / SSE
 - HTTP 模式真实调用 yudao Device Web API：`GET /admin-api/device/web/devices/{deviceId}`。
 - 后端认证固定由 AgentForge 配置注入 `Authorization: Bearer ...` 与 `tenant-id`，LLM 无法控制目标地址或凭据。
 - 真实后端中文状态统一归一化为 ONLINE / OFFLINE / SLEEP / INACTIVE。
+- `lastReceiveTime` 的 Unix 毫秒时间戳在 Adapter 层归一化为 UTC ISO-8601，避免把时间换算交给 LLM。
+- `query_device_status` 按数据最小化原则只向模型暴露状态查询所需字段，不透传 `productKey`、精确地址或经纬度。
 - HTTP Tool 调用配置 connect/request timeout、只读安全重试和简单 Circuit Breaker（熔断器）。
 - 阻塞 HTTP Tool 执行隔离到 Reactor `boundedElastic`，避免占用响应式事件线程。
 - Tool Error 只向模型暴露安全错误类别，不回显 Token、内部 URL 或后端原始错误正文。
+- 真实环境已验证设备查询 SUCCESS、AUTHENTICATION_FAILED、FORBIDDEN，以及 Tool Result 持久化到 `af_trace_event` 后可通过 Execution Trace API 重放。
 
 ## Conversation 数据模型
 
