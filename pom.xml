@@ -25,6 +25,7 @@
         <module>agentforge-model</module>
         <module>agentforge-agent</module>
         <module>agentforge-tool</module>
+        <module>agentforge-conversation</module>
         <module>agentforge-runtime</module>
         <module>agentforge-rag</module>
         <module>agentforge-workflow</module>
