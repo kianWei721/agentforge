@@ -29,6 +29,7 @@ public final class AgentScopeHarnessRuntime implements AgentRuntime, AutoCloseab
     private static final String SOURCE = "agentscope-harness";
 
     private final HarnessAgent agent;
+    private final ToolGovernanceOptions toolGovernanceOptions;
 
     public AgentScopeHarnessRuntime(
             String agentId,
@@ -37,8 +38,30 @@ public final class AgentScopeHarnessRuntime implements AgentRuntime, AutoCloseab
             Model model,
             List<AgentTool> businessTools,
             AgentStateStore stateStore) {
+        this(
+                agentId,
+                name,
+                systemPrompt,
+                model,
+                businessTools,
+                stateStore,
+                ToolGovernanceOptions.defaults());
+    }
+
+    public AgentScopeHarnessRuntime(
+            String agentId,
+            String name,
+            String systemPrompt,
+            Model model,
+            List<AgentTool> businessTools,
+            AgentStateStore stateStore,
+            ToolGovernanceOptions toolGovernanceOptions) {
         Objects.requireNonNull(model, "model must not be null");
         Objects.requireNonNull(stateStore, "stateStore must not be null");
+        this.toolGovernanceOptions =
+                toolGovernanceOptions == null
+                        ? ToolGovernanceOptions.defaults()
+                        : toolGovernanceOptions;
 
         Toolkit toolkit = new Toolkit();
         if (businessTools != null) {
@@ -68,17 +91,19 @@ public final class AgentScopeHarnessRuntime implements AgentRuntime, AutoCloseab
 
     @Override
     public Flux<AgentStreamChunk> stream(AgentRuntimeRequest request) {
+        ToolGovernanceState governanceState = new ToolGovernanceState(toolGovernanceOptions);
         RuntimeContext context =
                 RuntimeContext.builder()
                         .userId(normalizeId(request.userId(), "anonymous"))
                         .sessionId(normalizeId(request.sessionId(), "default"))
+                        .put(ToolGovernanceState.class, governanceState)
                         .build();
 
         Flux<AgentStreamChunk> events =
                 agent.streamEvents(request.message(), context)
                         .handle(
                                 (event, sink) -> {
-                                    AgentStreamChunk chunk = mapEvent(event);
+                                    AgentStreamChunk chunk = mapEvent(event, context);
                                     if (chunk != null) {
                                         sink.next(chunk);
                                     }
@@ -87,7 +112,7 @@ public final class AgentScopeHarnessRuntime implements AgentRuntime, AutoCloseab
         return events.concatWithValues(AgentStreamChunk.done(SOURCE));
     }
 
-    private AgentStreamChunk mapEvent(AgentEvent event) {
+    private AgentStreamChunk mapEvent(AgentEvent event, RuntimeContext context) {
         if (event.getType() == AgentEventType.TEXT_BLOCK_DELTA) {
             String delta = ((TextBlockDeltaEvent) event).getDelta();
             return delta == null || delta.isEmpty()
@@ -155,6 +180,7 @@ public final class AgentScopeHarnessRuntime implements AgentRuntime, AutoCloseab
             metadata.put(
                     "state",
                     toolEvent.getState() == null ? "unknown" : toolEvent.getState().getValue());
+            appendGovernanceMetadata(metadata, context, toolEvent.getToolCallId());
             return AgentStreamChunk.trace("tool_result_end", "", SOURCE, metadata);
         }
         if (event instanceof ModelCallStartEvent modelEvent) {
@@ -187,6 +213,37 @@ public final class AgentScopeHarnessRuntime implements AgentRuntime, AutoCloseab
         metadata.put("toolCallId", toolCallId);
         metadata.put("toolName", toolName);
         return metadata;
+    }
+
+    private static void appendGovernanceMetadata(
+            Map<String, Object> metadata, RuntimeContext context, String toolCallId) {
+        if (context == null) {
+            return;
+        }
+        ToolGovernanceState governance = context.get(ToolGovernanceState.class);
+        if (governance == null) {
+            return;
+        }
+        ToolGovernanceState.ToolInvocationTelemetry telemetry = governance.telemetry(toolCallId);
+        if (telemetry == null) {
+            return;
+        }
+        metadata.put("toolDurationMs", telemetry.toolDurationMs());
+        if (telemetry.failureCode() != null) {
+            metadata.put("failureCode", telemetry.failureCode());
+        }
+        if (telemetry.retryable() != null) {
+            metadata.put("retryable", telemetry.retryable());
+        }
+        metadata.put("governanceDecision", telemetry.governanceDecision());
+        metadata.put("governanceReason", telemetry.governanceReason());
+        metadata.put("argumentFingerprint", telemetry.argumentFingerprint());
+        if (telemetry.blockedByToolCallId() != null) {
+            metadata.put("blockedByToolCallId", telemetry.blockedByToolCallId());
+        }
+        if (telemetry.blockedByFailureCode() != null) {
+            metadata.put("blockedByFailureCode", telemetry.blockedByFailureCode());
+        }
     }
 
     @Override

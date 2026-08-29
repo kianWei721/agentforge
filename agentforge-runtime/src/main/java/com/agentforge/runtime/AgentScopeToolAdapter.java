@@ -1,5 +1,6 @@
 package com.agentforge.runtime;
 
+import com.agentforge.runtime.ToolGovernanceState.ToolGovernanceDecision;
 import com.agentforge.tool.AgentTool;
 import com.agentforge.tool.ToolInvocationContext;
 import com.agentforge.tool.ToolResult;
@@ -13,6 +14,7 @@ import io.agentscope.core.tool.ToolBase;
 import io.agentscope.core.tool.ToolCallParam;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
@@ -53,23 +55,81 @@ final class AgentScopeToolAdapter extends ToolBase {
                                     new ToolInvocationContext(
                                             agentId,
                                             runtimeContext != null ? runtimeContext.getUserId() : null,
-                                            runtimeContext != null ? runtimeContext.getSessionId() : null);
+                                            runtimeContext != null
+                                                    ? runtimeContext.getSessionId()
+                                                    : null);
 
-                            ToolResult result = delegate.execute(context, param.getInput());
-                            return ToolResultBlock.builder()
-                                    .id(param.getToolUseBlock().getId())
-                                    .name(delegate.name())
-                                    .output(
-                                            List.of(
-                                                    TextBlock.builder()
-                                                            .text(result.toModelText())
-                                                            .build()))
-                                    .state(
-                                            result.success()
-                                                    ? ToolResultState.SUCCESS
-                                                    : ToolResultState.ERROR)
-                                    .build();
+                            String toolCallId =
+                                    param.getToolUseBlock() == null
+                                            ? null
+                                            : param.getToolUseBlock().getId();
+                            ToolGovernanceState governance =
+                                    runtimeContext == null
+                                            ? null
+                                            : runtimeContext.get(ToolGovernanceState.class);
+                            ToolGovernanceDecision decision =
+                                    governance == null
+                                            ? ToolGovernanceDecision.allow(
+                                                    ToolGovernanceState.fingerprint(
+                                                            delegate.name(), param.getInput()))
+                                            : governance.beforeInvocation(
+                                                    toolCallId,
+                                                    delegate.name(),
+                                                    param.getInput());
+
+                            long startedNanos = System.nanoTime();
+                            try {
+                                ToolResult result;
+                                if (!decision.allowed()) {
+                                    String previousCode =
+                                            decision.blockedByFailureCode() == null
+                                                    ? "NON_RETRYABLE_FAILURE"
+                                                    : decision.blockedByFailureCode();
+                                    result =
+                                            ToolResult.failure(
+                                                    "tool invocation blocked by governance: identical arguments already failed with "
+                                                            + previousCode
+                                                            + "; do not retry unchanged arguments",
+                                                    ToolGovernanceState
+                                                            .FAILURE_REPEATED_NON_RETRYABLE_CALL,
+                                                    false);
+                                } else {
+                                    result = delegate.execute(context, param.getInput());
+                                }
+
+                                if (governance != null) {
+                                    governance.recordResult(
+                                            toolCallId,
+                                            decision,
+                                            result,
+                                            elapsedMillis(startedNanos));
+                                }
+                                return toToolResultBlock(param, result);
+                            } catch (RuntimeException exception) {
+                                if (governance != null) {
+                                    governance.recordException(
+                                            toolCallId,
+                                            decision,
+                                            elapsedMillis(startedNanos));
+                                }
+                                throw exception;
+                            }
                         })
                 .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    private ToolResultBlock toToolResultBlock(ToolCallParam param, ToolResult result) {
+        return ToolResultBlock.builder()
+                .id(param.getToolUseBlock().getId())
+                .name(delegate.name())
+                .output(List.of(TextBlock.builder().text(result.toModelText()).build()))
+                .state(result.success() ? ToolResultState.SUCCESS : ToolResultState.ERROR)
+                .build();
+    }
+
+    private static long elapsedMillis(long startedNanos) {
+        return Math.max(
+                0L,
+                TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedNanos));
     }
 }

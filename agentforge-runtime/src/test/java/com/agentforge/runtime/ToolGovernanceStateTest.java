@@ -1,0 +1,184 @@
+package com.agentforge.runtime;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+import com.agentforge.tool.AgentTool;
+import com.agentforge.tool.ToolInvocationContext;
+import com.agentforge.tool.ToolResult;
+import io.agentscope.core.agent.RuntimeContext;
+import io.agentscope.core.message.ToolUseBlock;
+import io.agentscope.core.tool.ToolCallParam;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.Test;
+
+class ToolGovernanceStateTest {
+
+    @Test
+    void shouldBlockRepeatedIdenticalCallAfterNonRetryableFailure() {
+        ToolGovernanceState state =
+                new ToolGovernanceState(new ToolGovernanceOptions(true, true, 32));
+
+        ToolGovernanceState.ToolGovernanceDecision first =
+                state.beforeInvocation("call-1", "query_device_status", Map.of("deviceId", "999"));
+        assertTrue(first.allowed());
+
+        state.recordResult(
+                "call-1",
+                first,
+                ToolResult.failure(
+                        "device status query unavailable: FORBIDDEN",
+                        "FORBIDDEN",
+                        false),
+                12L);
+
+        ToolGovernanceState.ToolGovernanceDecision second =
+                state.beforeInvocation("call-2", "query_device_status", Map.of("deviceId", "999"));
+
+        assertFalse(second.allowed());
+        assertEquals("FORBIDDEN", second.blockedByFailureCode());
+        assertEquals("call-1", second.blockedByToolCallId());
+    }
+
+    @Test
+    void shouldAllowRepeatedCallAfterRetryableFailure() {
+        ToolGovernanceState state =
+                new ToolGovernanceState(new ToolGovernanceOptions(true, true, 32));
+
+        ToolGovernanceState.ToolGovernanceDecision first =
+                state.beforeInvocation("call-1", "query_device_status", Map.of("deviceId", "367"));
+        state.recordResult(
+                "call-1",
+                first,
+                ToolResult.failure(
+                        "device status query unavailable: TIMEOUT",
+                        "TIMEOUT",
+                        true),
+                3000L);
+
+        assertTrue(
+                state.beforeInvocation(
+                                "call-2",
+                                "query_device_status",
+                                Map.of("deviceId", "367"))
+                        .allowed());
+    }
+
+    @Test
+    void shouldCanonicalizeEquivalentArgumentMaps() {
+        ToolGovernanceState state =
+                new ToolGovernanceState(new ToolGovernanceOptions(true, true, 32));
+
+        Map<String, Object> firstArgs = new LinkedHashMap<>();
+        firstArgs.put("deviceId", "999");
+        firstArgs.put("options", Map.of("b", 2, "a", 1));
+
+        Map<String, Object> secondArgs = new LinkedHashMap<>();
+        secondArgs.put("options", Map.of("a", 1, "b", 2));
+        secondArgs.put("deviceId", "999");
+
+        ToolGovernanceState.ToolGovernanceDecision first =
+                state.beforeInvocation("call-1", "query_device_status", firstArgs);
+        state.recordResult(
+                "call-1",
+                first,
+                ToolResult.failure("forbidden", "FORBIDDEN", false),
+                5L);
+
+        ToolGovernanceState.ToolGovernanceDecision second =
+                state.beforeInvocation("call-2", "query_device_status", secondArgs);
+
+        assertFalse(second.allowed());
+        assertEquals(first.argumentFingerprint(), second.argumentFingerprint());
+    }
+
+    @Test
+    void adapterShouldNotExecuteDelegateTwiceAfterNonRetryableFailure() {
+        AtomicInteger executions = new AtomicInteger();
+        AgentTool tool =
+                new AgentTool() {
+                    @Override
+                    public String name() {
+                        return "test_tool";
+                    }
+
+                    @Override
+                    public String description() {
+                        return "test";
+                    }
+
+                    @Override
+                    public Map<String, Object> inputSchema() {
+                        return Map.of(
+                                "type",
+                                "object",
+                                "properties",
+                                Map.of("value", Map.of("type", "string")),
+                                "required",
+                                List.of("value"));
+                    }
+
+                    @Override
+                    public ToolResult execute(
+                            ToolInvocationContext context, Map<String, Object> arguments) {
+                        executions.incrementAndGet();
+                        return ToolResult.failure("forbidden", "FORBIDDEN", false);
+                    }
+                };
+
+        ToolGovernanceState state =
+                new ToolGovernanceState(new ToolGovernanceOptions(true, true, 32));
+        RuntimeContext context =
+                RuntimeContext.builder()
+                        .userId("user")
+                        .sessionId("session")
+                        .put(ToolGovernanceState.class, state)
+                        .build();
+        AgentScopeToolAdapter adapter = new AgentScopeToolAdapter("agent", tool);
+
+        Map<String, Object> input = Map.of("value", "same");
+        adapter.callAsync(param("call-1", "test_tool", input, context)).block();
+        adapter.callAsync(param("call-2", "test_tool", input, context)).block();
+
+        assertEquals(1, executions.get());
+        ToolGovernanceState.ToolInvocationTelemetry second = state.telemetry("call-2");
+        assertNotNull(second);
+        assertEquals("BLOCK", second.governanceDecision());
+        assertEquals(
+                ToolGovernanceState.FAILURE_REPEATED_NON_RETRYABLE_CALL,
+                second.failureCode());
+        assertEquals("call-1", second.blockedByToolCallId());
+        assertEquals("FORBIDDEN", second.blockedByFailureCode());
+    }
+
+    @Test
+    void stateMustBeIsolatedPerAgentCall() {
+        ToolGovernanceState firstState =
+                new ToolGovernanceState(new ToolGovernanceOptions(true, true, 32));
+        ToolGovernanceState.ToolGovernanceDecision first =
+                firstState.beforeInvocation("call-1", "test", Map.of("x", 1));
+        firstState.recordResult(
+                "call-1", first, ToolResult.failure("bad", "BAD_REQUEST", false), 1L);
+
+        ToolGovernanceState secondState =
+                new ToolGovernanceState(new ToolGovernanceOptions(true, true, 32));
+        assertTrue(
+                secondState
+                        .beforeInvocation("call-2", "test", Map.of("x", 1))
+                        .allowed());
+    }
+
+    private static ToolCallParam param(
+            String callId,
+            String toolName,
+            Map<String, Object> input,
+            RuntimeContext context) {
+        return ToolCallParam.builder()
+                .toolUseBlock(new ToolUseBlock(callId, toolName, input))
+                .input(input)
+                .runtimeContext(context)
+                .build();
+    }
+}
