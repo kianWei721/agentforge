@@ -14,6 +14,7 @@ import java.net.http.HttpResponse;
 import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -185,10 +186,12 @@ public class HttpDeviceStatusQueryAdapter implements DeviceStatusQueryPort {
 
         String rawState = text(data, "state");
         String normalizedState = normalizeState(rawState);
-        String lastSeenAt = text(data, "lastReceiveTime");
+        JsonNode rawLastReceiveTime = data.get("lastReceiveTime");
+        String lastSeenAt = normalizeLastSeenAt(rawLastReceiveTime);
 
         Map<String, Object> attributes = new LinkedHashMap<>();
         put(attributes, "stateRaw", rawState);
+        put(attributes, "lastReceiveTimeRaw", scalar(rawLastReceiveTime));
         put(attributes, "deviceName", text(data, "deviceName"));
         put(attributes, "deviceAlias", text(data, "deviceAlias"));
         put(attributes, "deviceNickname", text(data, "deviceNickname"));
@@ -210,6 +213,17 @@ public class HttpDeviceStatusQueryAdapter implements DeviceStatusQueryPort {
                         lastSeenAt,
                         "yudao-device-web-http",
                         attributes));
+    }
+
+    static String normalizeLastSeenAt(JsonNode value) {
+        if (value == null || value.isNull()) {
+            return null;
+        }
+        if (value.isIntegralNumber()) {
+            return Instant.ofEpochMilli(value.longValue()).toString();
+        }
+        String text = value.asText();
+        return text == null || text.isBlank() ? null : text.trim();
     }
 
     static String normalizeState(String rawState) {
