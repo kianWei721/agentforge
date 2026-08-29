@@ -27,3 +27,11 @@ CREATE TABLE af_tool_confirmation (
     INDEX idx_af_tool_confirmation_requested_execution (requested_execution_id),
     INDEX idx_af_tool_confirmation_consumed_execution (consumed_execution_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+
+ALTER TABLE af_trace_event
+    ADD COLUMN confirmation_id VARCHAR(64) NULL AFTER policy_reason,
+    ADD COLUMN confirmation_status VARCHAR(16) NULL AFTER confirmation_id;
+
+CREATE INDEX idx_af_trace_confirmation_id
+    ON af_trace_event (confirmation_id);

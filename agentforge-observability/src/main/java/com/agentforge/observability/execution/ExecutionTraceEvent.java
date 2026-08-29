@@ -38,6 +38,8 @@ public record ExecutionTraceEvent(
         Boolean toolReadOnly,
         String policyDecision,
         String policyReason,
+        String confirmationId,
+        String confirmationStatus,
         Instant occurredAt) {
 
     public ExecutionTraceEvent {

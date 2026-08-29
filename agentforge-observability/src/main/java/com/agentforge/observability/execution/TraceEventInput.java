@@ -31,7 +31,9 @@ public record TraceEventInput(
         String toolRiskLevel,
         Boolean toolReadOnly,
         String policyDecision,
-        String policyReason) {
+        String policyReason,
+        String confirmationId,
+        String confirmationStatus) {
 
     public TraceEventInput(
             String eventType,
@@ -59,6 +61,8 @@ public record TraceEventInput(
                 outputTokens,
                 cachedTokens,
                 modelTimeMs,
+                null,
+                null,
                 null,
                 null,
                 null,

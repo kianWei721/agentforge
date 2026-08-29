@@ -141,6 +141,8 @@ public class JdbcExecutionRepository implements ExecutionRepository {
                         input.toolReadOnly(),
                         input.policyDecision(),
                         input.policyReason(),
+                        input.confirmationId(),
+                        input.confirmationStatus(),
                         Instant.now());
 
         jdbcTemplate.update(
@@ -154,8 +156,8 @@ public class JdbcExecutionRepository implements ExecutionRepository {
                     blocked_by_failure_code, outbound_protocol, downstream_system,
                     outbound_attempts, http_status, business_code, downstream_duration_ms,
                     outbound_outcome, tool_risk_level, tool_read_only, policy_decision,
-                    policy_reason, occurred_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    policy_reason, confirmation_id, confirmation_status, occurred_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 event.id(),
                 event.executionId(),
@@ -191,6 +193,8 @@ public class JdbcExecutionRepository implements ExecutionRepository {
                 event.toolReadOnly(),
                 event.policyDecision(),
                 event.policyReason(),
+                event.confirmationId(),
+                event.confirmationStatus(),
                 Timestamp.from(event.occurredAt()));
 
         jdbcTemplate.update(
@@ -213,7 +217,7 @@ public class JdbcExecutionRepository implements ExecutionRepository {
                        blocked_by_failure_code, outbound_protocol, downstream_system,
                        outbound_attempts, http_status, business_code, downstream_duration_ms,
                        outbound_outcome, tool_risk_level, tool_read_only, policy_decision,
-                       policy_reason, occurred_at
+                       policy_reason, confirmation_id, confirmation_status, occurred_at
                 FROM af_trace_event
                 WHERE execution_id = ?
                 ORDER BY sequence_no
@@ -362,6 +366,8 @@ public class JdbcExecutionRepository implements ExecutionRepository {
                 nullableBoolean(rs, "tool_read_only"),
                 rs.getString("policy_decision"),
                 rs.getString("policy_reason"),
+                rs.getString("confirmation_id"),
+                rs.getString("confirmation_status"),
                 toInstant(rs.getTimestamp("occurred_at")));
     }
 

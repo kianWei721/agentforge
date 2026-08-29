@@ -90,6 +90,14 @@ public class ToolConfirmationService {
                 .orElseThrow(() -> new ToolConfirmationNotFoundException(confirmationId));
     }
 
+    public ToolConfirmation getForUser(String confirmationId, String userId) {
+        ToolConfirmation confirmation = get(confirmationId);
+        if (!confirmation.userId().equals(required(userId, "userId"))) {
+            throw new ToolConfirmationAccessDeniedException();
+        }
+        return confirmation;
+    }
+
     public ToolConfirmation approve(String confirmationId, String userId) {
         return repository.approve(
                 required(confirmationId, "confirmationId"),

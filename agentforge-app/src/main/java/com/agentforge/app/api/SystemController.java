@@ -5,6 +5,7 @@ import com.agentforge.core.AgentForgeConstants;
 import com.agentforge.infrastructure.config.AgentRuntimeProperties;
 import com.agentforge.infrastructure.config.AgentSessionCacheProperties;
 import com.agentforge.infrastructure.config.IoTDeviceStatusProperties;
+import com.agentforge.infrastructure.config.ToolConfirmationProperties;
 import com.agentforge.infrastructure.config.ToolGovernanceProperties;
 import com.agentforge.infrastructure.config.ToolPolicyProperties;
 import com.agentforge.infrastructure.health.InfrastructureStatus;
@@ -32,6 +33,7 @@ public class SystemController {
     private final IoTDeviceStatusProperties iotDeviceStatusProperties;
     private final ToolGovernanceProperties toolGovernanceProperties;
     private final ToolPolicyProperties toolPolicyProperties;
+    private final ToolConfirmationProperties toolConfirmationProperties;
 
     public SystemController(
             ModelGatewayCatalog modelGatewayCatalog,
@@ -43,7 +45,8 @@ public class SystemController {
             AgentSessionCacheProperties sessionCacheProperties,
             IoTDeviceStatusProperties iotDeviceStatusProperties,
             ToolGovernanceProperties toolGovernanceProperties,
-            ToolPolicyProperties toolPolicyProperties) {
+            ToolPolicyProperties toolPolicyProperties,
+            ToolConfirmationProperties toolConfirmationProperties) {
         this.modelGatewayCatalog = modelGatewayCatalog;
         this.agentProperties = agentProperties;
         this.agentService = agentService;
@@ -54,6 +57,7 @@ public class SystemController {
         this.iotDeviceStatusProperties = iotDeviceStatusProperties;
         this.toolGovernanceProperties = toolGovernanceProperties;
         this.toolPolicyProperties = toolPolicyProperties;
+        this.toolConfirmationProperties = toolConfirmationProperties;
     }
 
     @GetMapping("/health")
@@ -105,6 +109,7 @@ public class SystemController {
         result.put(
                 "toolPolicyConfirmHighRiskReadOnly",
                 toolPolicyProperties.isRequireConfirmationForHighRiskReadOnly());
+        result.put("toolConfirmationTtl", toolConfirmationProperties.getTtl().toString());
         return result;
     }
 }

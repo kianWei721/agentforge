@@ -265,7 +265,9 @@ public class AgentConversationRuntimeService {
                 stringMetadata(metadata, "toolRiskLevel"),
                 booleanMetadata(metadata, "toolReadOnly"),
                 stringMetadata(metadata, "policyDecision"),
-                stringMetadata(metadata, "policyReason"));
+                stringMetadata(metadata, "policyReason"),
+                stringMetadata(metadata, "confirmationId"),
+                stringMetadata(metadata, "confirmationStatus"));
     }
 
     private static String stringMetadata(Map<String, Object> metadata, String key) {
