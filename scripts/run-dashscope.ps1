@@ -1,6 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 & "$PSScriptRoot\dev-env.ps1"
+& "$PSScriptRoot\assert-infra-config.ps1"
 
 if ([string]::IsNullOrWhiteSpace($env:DASHSCOPE_API_KEY)) {
     throw "DASHSCOPE_API_KEY is not configured. Run .\scripts\setup-dev.ps1 once."
