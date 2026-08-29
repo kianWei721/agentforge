@@ -1,6 +1,7 @@
 package com.agentforge.runtime;
 
 import com.agentforge.tool.ToolResult;
+import com.agentforge.tool.telemetry.OutboundHttpTelemetry;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -55,6 +56,15 @@ final class ToolGovernanceState {
             ToolGovernanceDecision decision,
             ToolResult result,
             long durationMs) {
+        recordResult(toolCallId, decision, result, durationMs, null);
+    }
+
+    void recordResult(
+            String toolCallId,
+            ToolGovernanceDecision decision,
+            ToolResult result,
+            long durationMs,
+            OutboundHttpTelemetry outbound) {
         if (toolCallId == null || toolCallId.isBlank() || result == null) {
             return;
         }
@@ -72,7 +82,18 @@ final class ToolGovernanceState {
                         decision.reason(),
                         decision.argumentFingerprint(),
                         decision.blockedByToolCallId(),
-                        decision.blockedByFailureCode()));
+                        decision.blockedByFailureCode(),
+                        outbound == null ? null : outbound.protocol(),
+                        outbound == null ? null : outbound.downstreamSystem(),
+                        decision.allowed()
+                                ? (outbound == null ? null : outbound.attempts())
+                                : 0,
+                        outbound == null ? null : outbound.httpStatus(),
+                        outbound == null ? null : outbound.businessCode(),
+                        outbound == null ? null : outbound.downstreamDurationMs(),
+                        decision.allowed()
+                                ? (outbound == null ? null : outbound.outcome())
+                                : "GOVERNANCE_BLOCKED"));
 
         if (options.enabled()
                 && options.blockRepeatedNonRetryableCalls()
@@ -89,6 +110,14 @@ final class ToolGovernanceState {
             String toolCallId,
             ToolGovernanceDecision decision,
             long durationMs) {
+        recordException(toolCallId, decision, durationMs, null);
+    }
+
+    void recordException(
+            String toolCallId,
+            ToolGovernanceDecision decision,
+            long durationMs,
+            OutboundHttpTelemetry outbound) {
         if (toolCallId == null || toolCallId.isBlank()) {
             return;
         }
@@ -105,7 +134,14 @@ final class ToolGovernanceState {
                         decision.reason(),
                         decision.argumentFingerprint(),
                         decision.blockedByToolCallId(),
-                        decision.blockedByFailureCode()));
+                        decision.blockedByFailureCode(),
+                        outbound == null ? null : outbound.protocol(),
+                        outbound == null ? null : outbound.downstreamSystem(),
+                        outbound == null ? null : outbound.attempts(),
+                        outbound == null ? null : outbound.httpStatus(),
+                        outbound == null ? null : outbound.businessCode(),
+                        outbound == null ? null : outbound.downstreamDurationMs(),
+                        outbound == null ? null : outbound.outcome()));
     }
 
     ToolInvocationTelemetry telemetry(String toolCallId) {
@@ -218,7 +254,14 @@ final class ToolGovernanceState {
             String governanceReason,
             String argumentFingerprint,
             String blockedByToolCallId,
-            String blockedByFailureCode) {}
+            String blockedByFailureCode,
+            String outboundProtocol,
+            String downstreamSystem,
+            Integer outboundAttempts,
+            Integer httpStatus,
+            Integer businessCode,
+            Long downstreamDurationMs,
+            String outboundOutcome) {}
 
     private record PriorFailure(String toolCallId, String failureCode) {}
 }

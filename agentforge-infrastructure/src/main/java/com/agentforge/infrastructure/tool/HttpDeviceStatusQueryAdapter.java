@@ -4,6 +4,8 @@ import com.agentforge.infrastructure.config.IoTDeviceStatusProperties;
 import com.agentforge.tool.device.DeviceStatusQueryException;
 import com.agentforge.tool.device.DeviceStatusQueryPort;
 import com.agentforge.tool.device.DeviceStatusSnapshot;
+import com.agentforge.tool.telemetry.OutboundHttpTelemetry;
+import com.agentforge.tool.telemetry.ToolTelemetrySink;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
@@ -18,12 +20,14 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class HttpDeviceStatusQueryAdapter implements DeviceStatusQueryPort {
 
     private static final int SUCCESS_CODE = 200;
+    private static final String DOWNSTREAM_SYSTEM = "yudao-device-web";
 
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
@@ -46,43 +50,76 @@ public class HttpDeviceStatusQueryAdapter implements DeviceStatusQueryPort {
 
     @Override
     public Optional<DeviceStatusSnapshot> findByDeviceId(String deviceId) {
-        if (deviceId == null || !deviceId.matches("\\d{1,19}")) {
-            throw new DeviceStatusQueryException(
-                    DeviceStatusQueryException.Reason.BAD_REQUEST,
-                    false,
-                    "deviceId must be numeric");
-        }
-
-        circuitBreaker.beforeCall();
-
-        DeviceStatusQueryException lastFailure = null;
-        for (int attempt = 1; attempt <= properties.getMaxAttempts(); attempt++) {
-            try {
-                Optional<DeviceStatusSnapshot> result = executeOnce(deviceId);
-                circuitBreaker.recordSuccess();
-                return result;
-            } catch (DeviceStatusQueryException exception) {
-                lastFailure = exception;
-                if (!exception.retryable()) {
-                    circuitBreaker.recordSuccess();
-                    throw exception;
-                }
-                if (attempt < properties.getMaxAttempts()) {
-                    sleepBeforeRetry();
-                }
-            }
-        }
-
-        circuitBreaker.recordFailure();
-        throw lastFailure == null
-                ? new DeviceStatusQueryException(
-                        DeviceStatusQueryException.Reason.BACKEND_UNAVAILABLE,
-                        true,
-                        "IoT backend request failed")
-                : lastFailure;
+        return findByDeviceId(deviceId, ToolTelemetrySink.noop());
     }
 
-    private Optional<DeviceStatusSnapshot> executeOnce(String deviceId) {
+    @Override
+    public Optional<DeviceStatusSnapshot> findByDeviceId(
+            String deviceId, ToolTelemetrySink telemetry) {
+        ToolTelemetrySink sink = telemetry == null ? ToolTelemetrySink.noop() : telemetry;
+        HttpObservation observation = new HttpObservation();
+        long startedNanos = System.nanoTime();
+
+        try {
+            if (deviceId == null || !deviceId.matches("\\d{1,19}")) {
+                observation.outcome = DeviceStatusQueryException.Reason.BAD_REQUEST.name();
+                throw new DeviceStatusQueryException(
+                        DeviceStatusQueryException.Reason.BAD_REQUEST,
+                        false,
+                        "deviceId must be numeric");
+            }
+
+            try {
+                circuitBreaker.beforeCall();
+            } catch (DeviceStatusQueryException exception) {
+                observation.outcome = exception.reason().name();
+                throw exception;
+            }
+
+            DeviceStatusQueryException lastFailure = null;
+            for (int attempt = 1; attempt <= properties.getMaxAttempts(); attempt++) {
+                observation.attempts = attempt;
+                try {
+                    Optional<DeviceStatusSnapshot> result =
+                            executeOnce(deviceId, observation);
+                    circuitBreaker.recordSuccess();
+                    observation.outcome = result.isPresent() ? "SUCCESS" : "NOT_FOUND";
+                    return result;
+                } catch (DeviceStatusQueryException exception) {
+                    lastFailure = exception;
+                    observation.outcome = exception.reason().name();
+                    if (!exception.retryable()) {
+                        circuitBreaker.recordSuccess();
+                        throw exception;
+                    }
+                    if (attempt < properties.getMaxAttempts()) {
+                        sleepBeforeRetry();
+                    }
+                }
+            }
+
+            circuitBreaker.recordFailure();
+            throw lastFailure == null
+                    ? new DeviceStatusQueryException(
+                            DeviceStatusQueryException.Reason.BACKEND_UNAVAILABLE,
+                            true,
+                            "IoT backend request failed")
+                    : lastFailure;
+        } finally {
+            sink.recordOutboundHttp(
+                    new OutboundHttpTelemetry(
+                            "HTTP",
+                            DOWNSTREAM_SYSTEM,
+                            observation.attempts,
+                            observation.httpStatus,
+                            observation.businessCode,
+                            elapsedMillis(startedNanos),
+                            observation.outcome));
+        }
+    }
+
+    private Optional<DeviceStatusSnapshot> executeOnce(
+            String deviceId, HttpObservation observation) {
         URI uri = buildDeviceUri(deviceId);
         HttpRequest request =
                 HttpRequest.newBuilder(uri)
@@ -90,7 +127,7 @@ public class HttpDeviceStatusQueryAdapter implements DeviceStatusQueryPort {
                         .header("Accept", "application/json")
                         .header("Authorization", properties.authorizationHeaderValue())
                         .header("tenant-id", properties.getTenantId())
-                        .header("User-Agent", "AgentForge/0.3")
+                        .header("User-Agent", "AgentForge/0.4")
                         .GET()
                         .build();
 
@@ -99,7 +136,9 @@ public class HttpDeviceStatusQueryAdapter implements DeviceStatusQueryPort {
                     httpClient.send(
                             request,
                             HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            return parseResponse(response.statusCode(), response.body(), deviceId);
+            observation.httpStatus = response.statusCode();
+            return parseResponse(
+                    response.statusCode(), response.body(), deviceId, observation);
         } catch (HttpTimeoutException exception) {
             throw new DeviceStatusQueryException(
                     DeviceStatusQueryException.Reason.TIMEOUT,
@@ -124,8 +163,21 @@ public class HttpDeviceStatusQueryAdapter implements DeviceStatusQueryPort {
 
     Optional<DeviceStatusSnapshot> parseResponse(
             int httpStatus, String body, String requestedDeviceId) {
+        HttpObservation observation = new HttpObservation();
+        observation.httpStatus = httpStatus;
+        return parseResponse(httpStatus, body, requestedDeviceId, observation);
+    }
+
+    private Optional<DeviceStatusSnapshot> parseResponse(
+            int httpStatus,
+            String body,
+            String requestedDeviceId,
+            HttpObservation observation) {
         if (httpStatus == 401) {
-            throw failure(DeviceStatusQueryException.Reason.AUTHENTICATION_FAILED, false, httpStatus);
+            throw failure(
+                    DeviceStatusQueryException.Reason.AUTHENTICATION_FAILED,
+                    false,
+                    httpStatus);
         }
         if (httpStatus == 403) {
             throw failure(DeviceStatusQueryException.Reason.FORBIDDEN, false, httpStatus);
@@ -134,7 +186,10 @@ public class HttpDeviceStatusQueryAdapter implements DeviceStatusQueryPort {
             return Optional.empty();
         }
         if (httpStatus >= 500) {
-            throw failure(DeviceStatusQueryException.Reason.BACKEND_UNAVAILABLE, true, httpStatus);
+            throw failure(
+                    DeviceStatusQueryException.Reason.BACKEND_UNAVAILABLE,
+                    true,
+                    httpStatus);
         }
         if (httpStatus < 200 || httpStatus >= 300) {
             throw failure(DeviceStatusQueryException.Reason.BAD_REQUEST, false, httpStatus);
@@ -152,20 +207,33 @@ public class HttpDeviceStatusQueryAdapter implements DeviceStatusQueryPort {
         }
 
         int businessCode = root.path("code").asInt(-1);
+        observation.businessCode = businessCode;
         if (businessCode == 401) {
-            throw failure(DeviceStatusQueryException.Reason.AUTHENTICATION_FAILED, false, businessCode);
+            throw failure(
+                    DeviceStatusQueryException.Reason.AUTHENTICATION_FAILED,
+                    false,
+                    businessCode);
         }
         if (businessCode == 403) {
-            throw failure(DeviceStatusQueryException.Reason.FORBIDDEN, false, businessCode);
+            throw failure(
+                    DeviceStatusQueryException.Reason.FORBIDDEN,
+                    false,
+                    businessCode);
         }
         if (businessCode == 404) {
             return Optional.empty();
         }
         if (businessCode == 500 || businessCode == 503) {
-            throw failure(DeviceStatusQueryException.Reason.BACKEND_UNAVAILABLE, true, businessCode);
+            throw failure(
+                    DeviceStatusQueryException.Reason.BACKEND_UNAVAILABLE,
+                    true,
+                    businessCode);
         }
         if (businessCode != SUCCESS_CODE) {
-            throw failure(DeviceStatusQueryException.Reason.BAD_REQUEST, false, businessCode);
+            throw failure(
+                    DeviceStatusQueryException.Reason.BAD_REQUEST,
+                    false,
+                    businessCode);
         }
 
         JsonNode data = root.get("data");
@@ -271,6 +339,12 @@ public class HttpDeviceStatusQueryAdapter implements DeviceStatusQueryPort {
                 reason, retryable, "IoT backend rejected request with code " + code);
     }
 
+    private static long elapsedMillis(long startedNanos) {
+        return Math.max(
+                0L,
+                TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedNanos));
+    }
+
     private static String text(JsonNode node, String field) {
         JsonNode value = node.get(field);
         return value == null || value.isNull() ? null : value.asText();
@@ -296,6 +370,13 @@ public class HttpDeviceStatusQueryAdapter implements DeviceStatusQueryPort {
         if (value != null) {
             target.put(key, value);
         }
+    }
+
+    private static final class HttpObservation {
+        private int attempts;
+        private Integer httpStatus;
+        private Integer businessCode;
+        private String outcome = "UNKNOWN";
     }
 
     private static final class SimpleCircuitBreaker {
@@ -332,7 +413,8 @@ public class HttpDeviceStatusQueryAdapter implements DeviceStatusQueryPort {
         void recordFailure() {
             int failures = consecutiveFailures.incrementAndGet();
             if (failures >= failureThreshold) {
-                openUntilEpochMillis.set(System.currentTimeMillis() + openDurationMillis);
+                openUntilEpochMillis.set(
+                        System.currentTimeMillis() + openDurationMillis);
                 consecutiveFailures.set(0);
             }
         }

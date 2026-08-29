@@ -8,9 +8,16 @@ import com.agentforge.tool.ToolResult;
 import com.agentforge.tool.device.DeviceStatusQueryException;
 import com.agentforge.tool.device.DeviceStatusSnapshot;
 import com.agentforge.tool.device.DeviceStatusTool;
+import com.agentforge.tool.telemetry.OutboundHttpTelemetry;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sun.net.httpserver.HttpServer;
+import java.net.InetSocketAddress;
 import java.net.http.HttpClient;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 class HttpDeviceStatusQueryAdapterTest {
@@ -178,12 +185,103 @@ class HttpDeviceStatusQueryAdapterTest {
         assertFalse(result.message().contains("internal host"));
     }
 
+    @Test
+    void shouldRecordBusinessForbiddenTelemetryWithoutSensitiveDetails() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext(
+                "/",
+                exchange -> {
+                    byte[] body =
+                            "{\"code\":403,\"data\":null,\"msg\":\"sensitive backend message\"}"
+                                    .getBytes(StandardCharsets.UTF_8);
+                    exchange.sendResponseHeaders(200, body.length);
+                    exchange.getResponseBody().write(body);
+                    exchange.close();
+                });
+        server.start();
+
+        try {
+            AtomicReference<OutboundHttpTelemetry> observed = new AtomicReference<>();
+            HttpDeviceStatusQueryAdapter adapter =
+                    newAdapter("http://127.0.0.1:" + server.getAddress().getPort(), 2);
+
+            DeviceStatusQueryException exception =
+                    assertThrows(
+                            DeviceStatusQueryException.class,
+                            () -> adapter.findByDeviceId("367", observed::set));
+
+            assertEquals(DeviceStatusQueryException.Reason.FORBIDDEN, exception.reason());
+            OutboundHttpTelemetry telemetry = observed.get();
+            assertNotNull(telemetry);
+            assertEquals("HTTP", telemetry.protocol());
+            assertEquals("yudao-device-web", telemetry.downstreamSystem());
+            assertEquals(1, telemetry.attempts());
+            assertEquals(200, telemetry.httpStatus());
+            assertEquals(403, telemetry.businessCode());
+            assertEquals("FORBIDDEN", telemetry.outcome());
+            assertTrue(telemetry.downstreamDurationMs() >= 0);
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void shouldRecordRetryAttemptsAndFinalSuccessTelemetry() throws Exception {
+        AtomicInteger requests = new AtomicInteger();
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext(
+                "/",
+                exchange -> {
+                    int attempt = requests.incrementAndGet();
+                    if (attempt == 1) {
+                        byte[] body = "temporary".getBytes(StandardCharsets.UTF_8);
+                        exchange.sendResponseHeaders(503, body.length);
+                        exchange.getResponseBody().write(body);
+                    } else {
+                        byte[] body =
+                                "{\"code\":200,\"data\":{\"deviceId\":367,\"state\":\"在线\",\"lastReceiveTime\":1786772323000},\"msg\":\"\"}"
+                                        .getBytes(StandardCharsets.UTF_8);
+                        exchange.sendResponseHeaders(200, body.length);
+                        exchange.getResponseBody().write(body);
+                    }
+                    exchange.close();
+                });
+        server.start();
+
+        try {
+            AtomicReference<OutboundHttpTelemetry> observed = new AtomicReference<>();
+            HttpDeviceStatusQueryAdapter adapter =
+                    newAdapter("http://127.0.0.1:" + server.getAddress().getPort(), 2);
+
+            DeviceStatusSnapshot snapshot =
+                    adapter.findByDeviceId("367", observed::set).orElseThrow();
+
+            assertEquals("ONLINE", snapshot.status());
+            assertEquals(2, requests.get());
+            OutboundHttpTelemetry telemetry = observed.get();
+            assertNotNull(telemetry);
+            assertEquals(2, telemetry.attempts());
+            assertEquals(200, telemetry.httpStatus());
+            assertEquals(200, telemetry.businessCode());
+            assertEquals("SUCCESS", telemetry.outcome());
+        } finally {
+            server.stop(0);
+        }
+    }
+
     private static HttpDeviceStatusQueryAdapter newAdapter() {
+        return newAdapter("https://iot.example.internal", 2);
+    }
+
+    private static HttpDeviceStatusQueryAdapter newAdapter(
+            String baseUrl, int maxAttempts) {
         IoTDeviceStatusProperties properties = new IoTDeviceStatusProperties();
         properties.setMode(IoTDeviceStatusProperties.Mode.HTTP);
-        properties.setBaseUrl("https://iot.example.internal");
+        properties.setBaseUrl(baseUrl);
         properties.setAccessToken("test-token");
         properties.setTenantId("1");
+        properties.setMaxAttempts(maxAttempts);
+        properties.setRetryBackoff(Duration.ZERO);
 
         return new HttpDeviceStatusQueryAdapter(
                 HttpClient.newHttpClient(),

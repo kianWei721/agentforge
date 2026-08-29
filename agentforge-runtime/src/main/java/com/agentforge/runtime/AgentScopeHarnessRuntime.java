@@ -244,6 +244,27 @@ public final class AgentScopeHarnessRuntime implements AgentRuntime, AutoCloseab
         if (telemetry.blockedByFailureCode() != null) {
             metadata.put("blockedByFailureCode", telemetry.blockedByFailureCode());
         }
+        if (telemetry.outboundProtocol() != null) {
+            metadata.put("outboundProtocol", telemetry.outboundProtocol());
+        }
+        if (telemetry.downstreamSystem() != null) {
+            metadata.put("downstreamSystem", telemetry.downstreamSystem());
+        }
+        if (telemetry.outboundAttempts() != null) {
+            metadata.put("outboundAttempts", telemetry.outboundAttempts());
+        }
+        if (telemetry.httpStatus() != null) {
+            metadata.put("httpStatus", telemetry.httpStatus());
+        }
+        if (telemetry.businessCode() != null) {
+            metadata.put("businessCode", telemetry.businessCode());
+        }
+        if (telemetry.downstreamDurationMs() != null) {
+            metadata.put("downstreamDurationMs", telemetry.downstreamDurationMs());
+        }
+        if (telemetry.outboundOutcome() != null) {
+            metadata.put("outboundOutcome", telemetry.outboundOutcome());
+        }
     }
 
     @Override

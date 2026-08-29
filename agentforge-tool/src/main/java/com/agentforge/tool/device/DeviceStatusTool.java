@@ -58,7 +58,7 @@ public class DeviceStatusTool implements AgentTool {
 
         try {
             return queryPort
-                .findByDeviceId(deviceId)
+                .findByDeviceId(deviceId, context == null ? null : context.telemetry())
                 .map(
                         snapshot -> {
                             Map<String, Object> data = new LinkedHashMap<>();

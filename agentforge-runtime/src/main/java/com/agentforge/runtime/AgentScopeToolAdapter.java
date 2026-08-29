@@ -51,13 +51,15 @@ final class AgentScopeToolAdapter extends ToolBase {
         return Mono.fromCallable(
                         () -> {
                             RuntimeContext runtimeContext = param.getRuntimeContext();
+                            ToolTelemetryBuffer telemetryBuffer = new ToolTelemetryBuffer();
                             ToolInvocationContext context =
                                     new ToolInvocationContext(
                                             agentId,
                                             runtimeContext != null ? runtimeContext.getUserId() : null,
                                             runtimeContext != null
                                                     ? runtimeContext.getSessionId()
-                                                    : null);
+                                                    : null,
+                                            telemetryBuffer);
 
                             String toolCallId =
                                     param.getToolUseBlock() == null
@@ -102,7 +104,8 @@ final class AgentScopeToolAdapter extends ToolBase {
                                             toolCallId,
                                             decision,
                                             result,
-                                            elapsedMillis(startedNanos));
+                                            elapsedMillis(startedNanos),
+                                            telemetryBuffer.latestOutboundHttp());
                                 }
                                 return toToolResultBlock(param, result);
                             } catch (RuntimeException exception) {
@@ -110,7 +113,8 @@ final class AgentScopeToolAdapter extends ToolBase {
                                     governance.recordException(
                                             toolCallId,
                                             decision,
-                                            elapsedMillis(startedNanos));
+                                            elapsedMillis(startedNanos),
+                                            telemetryBuffer.latestOutboundHttp());
                                 }
                                 throw exception;
                             }

@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import com.agentforge.tool.AgentTool;
 import com.agentforge.tool.ToolInvocationContext;
 import com.agentforge.tool.ToolResult;
+import com.agentforge.tool.telemetry.OutboundHttpTelemetry;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.message.ToolUseBlock;
 import io.agentscope.core.tool.ToolCallParam;
@@ -151,6 +152,38 @@ class ToolGovernanceStateTest {
                 second.failureCode());
         assertEquals("call-1", second.blockedByToolCallId());
         assertEquals("FORBIDDEN", second.blockedByFailureCode());
+    }
+
+    @Test
+    void shouldCarrySanitizedOutboundHttpTelemetry() {
+        ToolGovernanceState state =
+                new ToolGovernanceState(new ToolGovernanceOptions(true, true, 32));
+        ToolGovernanceState.ToolGovernanceDecision decision =
+                state.beforeInvocation("call-http", "query_device_status", Map.of("deviceId", "367"));
+
+        state.recordResult(
+                "call-http",
+                decision,
+                ToolResult.success("ok", Map.of()),
+                33L,
+                new OutboundHttpTelemetry(
+                        "HTTP",
+                        "yudao-device-web",
+                        2,
+                        200,
+                        200,
+                        181L,
+                        "SUCCESS"));
+
+        ToolGovernanceState.ToolInvocationTelemetry telemetry = state.telemetry("call-http");
+        assertNotNull(telemetry);
+        assertEquals("HTTP", telemetry.outboundProtocol());
+        assertEquals("yudao-device-web", telemetry.downstreamSystem());
+        assertEquals(2, telemetry.outboundAttempts());
+        assertEquals(200, telemetry.httpStatus());
+        assertEquals(200, telemetry.businessCode());
+        assertEquals(181L, telemetry.downstreamDurationMs());
+        assertEquals("SUCCESS", telemetry.outboundOutcome());
     }
 
     @Test
