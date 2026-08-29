@@ -49,6 +49,10 @@ agentforge:
       retry-backoff: ${AGENTFORGE_IOT_RETRY_BACKOFF:150ms}
       circuit-breaker-failure-threshold: ${AGENTFORGE_IOT_CIRCUIT_FAILURE_THRESHOLD:3}
       circuit-breaker-open-duration: ${AGENTFORGE_IOT_CIRCUIT_OPEN_DURATION:30s}
+  tool-governance:
+    enabled: ${AGENTFORGE_TOOL_GOVERNANCE_ENABLED:true}
+    block-repeated-non-retryable-calls: ${AGENTFORGE_TOOL_GOVERNANCE_BLOCK_REPEATED_NON_RETRYABLE:true}
+    max-recorded-invocations: ${AGENTFORGE_TOOL_GOVERNANCE_MAX_RECORDED_INVOCATIONS:256}
   session-cache:
     enabled: ${AGENTFORGE_SESSION_CACHE_ENABLED:true}
     key-prefix: ${AGENTFORGE_SESSION_CACHE_PREFIX:agentforge:session:}
@@ -60,7 +64,9 @@ agentforge:
     system-prompt: >-
       你是 AgentForge 企业智能体平台中的助手。回答准确、简洁。
       当用户询问设备状态时，必须优先调用 query_device_status 工具获取数据，不要臆测设备状态。
-      当前 V0.3 仅开放 AgentForge 显式注册的业务工具，不开放文件、Shell、动态技能和子 Agent 工具。
+      当工具明确返回 AUTHENTICATION_FAILED、FORBIDDEN、BAD_REQUEST 等不可重试错误时，
+      不要使用完全相同的参数重复调用同一工具。
+      当前 V0.4 仅开放 AgentForge 显式注册的业务工具，不开放文件、Shell、动态技能和子 Agent 工具。
 
 management:
   endpoints:

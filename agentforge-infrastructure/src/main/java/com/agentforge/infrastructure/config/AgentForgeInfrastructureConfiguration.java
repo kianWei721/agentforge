@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Configuration;
     ModelProviderProperties.class,
     AgentRuntimeProperties.class,
     AgentSessionCacheProperties.class,
-    IoTDeviceStatusProperties.class
+    IoTDeviceStatusProperties.class,
+    ToolGovernanceProperties.class
 })
 public class AgentForgeInfrastructureConfiguration {}

@@ -5,6 +5,7 @@ import com.agentforge.core.AgentForgeConstants;
 import com.agentforge.infrastructure.config.AgentRuntimeProperties;
 import com.agentforge.infrastructure.config.AgentSessionCacheProperties;
 import com.agentforge.infrastructure.config.IoTDeviceStatusProperties;
+import com.agentforge.infrastructure.config.ToolGovernanceProperties;
 import com.agentforge.infrastructure.health.InfrastructureStatus;
 import com.agentforge.infrastructure.health.InfrastructureStatusService;
 import com.agentforge.model.ModelGatewayCatalog;
@@ -28,6 +29,7 @@ public class SystemController {
     private final InfrastructureStatusService infrastructureStatusService;
     private final AgentSessionCacheProperties sessionCacheProperties;
     private final IoTDeviceStatusProperties iotDeviceStatusProperties;
+    private final ToolGovernanceProperties toolGovernanceProperties;
 
     public SystemController(
             ModelGatewayCatalog modelGatewayCatalog,
@@ -37,7 +39,8 @@ public class SystemController {
             AgentRuntimeManager runtimeManager,
             InfrastructureStatusService infrastructureStatusService,
             AgentSessionCacheProperties sessionCacheProperties,
-            IoTDeviceStatusProperties iotDeviceStatusProperties) {
+            IoTDeviceStatusProperties iotDeviceStatusProperties,
+            ToolGovernanceProperties toolGovernanceProperties) {
         this.modelGatewayCatalog = modelGatewayCatalog;
         this.agentProperties = agentProperties;
         this.agentService = agentService;
@@ -46,6 +49,7 @@ public class SystemController {
         this.infrastructureStatusService = infrastructureStatusService;
         this.sessionCacheProperties = sessionCacheProperties;
         this.iotDeviceStatusProperties = iotDeviceStatusProperties;
+        this.toolGovernanceProperties = toolGovernanceProperties;
     }
 
     @GetMapping("/health")
@@ -60,7 +64,7 @@ public class SystemController {
         result.put("name", "AgentForge");
         result.put("version", "0.3.0-SNAPSHOT");
         result.put("status", infrastructure.ready() ? "UP" : "DEGRADED");
-        result.put("milestone", "V0.3-real-iot-http-tool-adapter");
+        result.put("milestone", "V0.4-tool-governance-resilience");
         result.put("mysql", infrastructure.mysqlUp() ? "UP" : "DOWN");
         result.put("redis", infrastructure.redisUp() ? "UP" : "DOWN");
         result.put("activeModelProvider", modelGatewayCatalog.activeProvider());
@@ -83,6 +87,13 @@ public class SystemController {
         result.put(
                 "iotDeviceStatusRequestTimeout",
                 iotDeviceStatusProperties.getRequestTimeout().toString());
+        result.put("toolGovernanceEnabled", toolGovernanceProperties.isEnabled());
+        result.put(
+                "blockRepeatedNonRetryableToolCalls",
+                toolGovernanceProperties.isBlockRepeatedNonRetryableCalls());
+        result.put(
+                "toolGovernanceMaxRecordedInvocations",
+                toolGovernanceProperties.getMaxRecordedInvocations());
         return result;
     }
 }

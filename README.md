@@ -2,7 +2,7 @@
 
 AgentForge 是一个基于 Java 的企业级 AI Agent 编排与运行平台练习项目。
 
-当前里程碑：V0.3 — Real IoT HTTP Tool Adapter（已验收）。
+当前里程碑：V0.4 — Tool Governance & Resilience（实施中）。
 
 ## 已完成链路
 
@@ -55,6 +55,10 @@ HTTP / SSE
 - 阻塞 HTTP Tool 执行隔离到 Reactor `boundedElastic`，避免占用响应式事件线程。
 - Tool Error 只向模型暴露安全错误类别，不回显 Token、内部 URL 或后端原始错误正文。
 - 真实环境已验证设备查询 SUCCESS、AUTHENTICATION_FAILED、FORBIDDEN，以及 Tool Result 持久化到 `af_trace_event` 后可通过 Execution Trace API 重放。
+- ToolResult 增加内部 `failureCode/retryable` 机器语义，治理逻辑不再依赖自然语言错误消息。
+- 每次 Agent call 使用独立 `ToolGovernanceState`；相同 Tool + 等价参数在发生不可重试失败后会被 Runtime 阻断，不再次执行业务 Tool。
+- Tool 参数规范化后生成 SHA-256 argument fingerprint，用于重复调用识别。
+- `tool_result_end` Trace 持久化 tool duration、failure code、retryable、governance decision/reason 与 blocked-by 关联字段。
 
 ## Conversation 数据模型
 
@@ -153,7 +157,9 @@ Redis 是 AgentScope Runtime State 的热缓存，不替代 MySQL 的持久化�
 
 ## 设计边界
 
-当前 Real IoT HTTP Tool Adapter 解决的是“Agent 的 Tool Call 不再只命中确定性 demo data，而是通过稳定的 Port / Adapter 边界调用真实 IoT 后端”。
+V0.3 Real IoT HTTP Tool Adapter 已完成真实环境验收。
+
+当前 V0.4 Tool Governance & Resilience 解决的是“Tool 能调用真实系统以后，Runtime 如何约束无效重复调用、保留机器可判定的失败语义，并把治理决策持久化到 Trace”。
 
 V0.3 当前只接入只读设备详情查询。认证使用 AgentForge 侧固定服务凭据与固定租户配置，不做终端用户 Token 透传；因此适合受控单租户/服务身份集成，不等于已经完成多租户用户级 Credential Delegation（凭据委托）。
 
@@ -164,5 +170,6 @@ V0.3 当前只接入只读设备详情查询。认证使用 AgentForge 侧固定
 - `docs/V0.3-execution-tool-trace-persistence.md`
 - `docs/V0.3-redis-session-cache-context-restore.md`
 - `docs/V0.3-real-iot-http-tool-adapter.md`
+- `docs/V0.4-tool-governance-resilience.md`
 - `docs/V0.2-agent-crud-tool-calling.md`
 - `docs/adr/ADR-001-modular-monolith.md`

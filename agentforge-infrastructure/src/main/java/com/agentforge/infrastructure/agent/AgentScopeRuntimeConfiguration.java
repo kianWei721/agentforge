@@ -3,6 +3,7 @@ package com.agentforge.infrastructure.agent;
 import com.agentforge.agent.AgentDefinition;
 import com.agentforge.agent.AgentDefinitionRepository;
 import com.agentforge.conversation.ConversationService;
+import com.agentforge.infrastructure.config.ToolGovernanceProperties;
 import com.agentforge.infrastructure.model.DashScopeModelFactory;
 import com.agentforge.observability.execution.ExecutionService;
 import com.agentforge.runtime.AgentConversationRuntimeService;
@@ -11,6 +12,7 @@ import com.agentforge.runtime.AgentRuntimeFactory;
 import com.agentforge.runtime.AgentRuntimeManager;
 import com.agentforge.runtime.AgentScopeHarnessRuntime;
 import com.agentforge.runtime.SessionContextRestoreService;
+import com.agentforge.runtime.ToolGovernanceOptions;
 import com.agentforge.tool.AgentTool;
 import com.agentforge.tool.ToolRegistry;
 import io.agentscope.core.model.Model;
@@ -25,7 +27,14 @@ public class AgentScopeRuntimeConfiguration {
     @Bean
     public AgentRuntimeFactory agentRuntimeFactory(
             DashScopeModelFactory modelFactory,
-            AgentStateStore stateStore) {
+            AgentStateStore stateStore,
+            ToolGovernanceProperties governanceProperties) {
+        governanceProperties.validate();
+        ToolGovernanceOptions governanceOptions =
+                new ToolGovernanceOptions(
+                        governanceProperties.isEnabled(),
+                        governanceProperties.isBlockRepeatedNonRetryableCalls(),
+                        governanceProperties.getMaxRecordedInvocations());
         return new AgentRuntimeFactory() {
             @Override
             public AgentRuntime create(AgentDefinition definition, List<AgentTool> tools) {
@@ -42,7 +51,8 @@ public class AgentScopeRuntimeConfiguration {
                         definition.systemPrompt(),
                         model,
                         tools,
-                        stateStore);
+                        stateStore,
+                        governanceOptions);
             }
         };
     }
