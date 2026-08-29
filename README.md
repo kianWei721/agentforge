@@ -2,7 +2,7 @@
 
 AgentForge 是一个基于 Java 的企业级 AI Agent 编排与运行平台练习项目。
 
-当前里程碑：V0.3 — Execution / Tool Trace Persistence。
+当前里程碑：V0.3 — Redis Session Cache / Context Restore。
 
 ## 已完成链路
 
@@ -11,6 +11,9 @@ HTTP / SSE
   -> AgentConversationRuntimeService
   -> Conversation Session
   -> persist USER message
+  -> resolve persistent Session
+  -> restore AgentState from Redis cache or MySQL transcript
+  -> persist current USER message
   -> create af_execution
   -> AgentScope HarnessAgent
   -> persist Model / Tool trace events
@@ -38,6 +41,12 @@ HTTP / SSE
 - Model Call End 持久化 input/output/cached tokens 与模型耗时。
 - SSE 首事件暴露 `executionId`，用于关联实时流与后台 Trace。
 - `done` 只在 Assistant Message 与 Execution 成功落库后发出。
+- AgentScope Runtime State 切换为可共享的 `AgentStateStore`。
+- Redis 使用 `agentforge:session:` 命名空间保存热 AgentState，默认滑动 TTL 24 小时。
+- Redis 命中时直接恢复完整 AgentState；Redis miss 时从 MySQL 最近对话记录重建 Context。
+- Redis 异常时降级到 JVM 内存 StateStore，不让缓存故障直接中断 Agent 请求。
+- MySQL 回源默认最多恢复最近 40 条 USER / ASSISTANT Message，避免无限历史一次性灌入上下文。
+- `context_restore` Trace 记录本轮上下文来自 CACHE / MYSQL_TRANSCRIPT / EMPTY。
 
 ## Conversation 数据模型
 
@@ -122,20 +131,21 @@ Docker Compose 仍保留为可选开发方式，但不是 AgentForge 的运行�
 
 ## 数据职责
 
-MySQL 是 Agent Definition、Session、Message 的 Source of Truth（事实数据源）。
+MySQL 是 Agent Definition、Session、Message、Execution / Trace 的 Source of Truth（事实数据源）。
 
-Redis 当前只做基础接入和健康探测。后续 Redis Session Cache 会承担热 Session / Runtime State，但不会替代 MySQL 的持久化事实。
+Redis 是 AgentScope Runtime State 的热缓存，不替代 MySQL 的持久化事实。缓存过期或换到空命名空间后，AgentForge 会从 MySQL Transcript 重建一个有界的 AgentState；Redis 暂时不可用时退化到 JVM 内存状态。
 
 ## 设计边界
 
-当前 Execution / Tool Trace Persistence 解决的是“每次 Agent 执行必须可追踪、可审计、可诊断”。
+当前 Redis Session Cache / Context Restore 解决的是“Runtime State 不再只依赖单 JVM 内存，并且 Redis miss 后仍能从 MySQL 对话事实恢复基本上下文”。
 
-它仍不等于“JVM 重启后模型已经自动恢复全部上下文”。AgentScope 现在仍使用 InMemoryAgentStateStore。下一阶段进入 Redis Session Cache / Context Restore 设计。
+Redis 命中可恢复 AgentScope 完整 AgentState；MySQL fallback 当前只重建 USER / ASSISTANT 文本 Transcript，不承诺恢复过去的 ToolUseBlock、ToolResultBlock、权限上下文或执行中断点。
 
 详细设计见：
 
 - `docs/V0.3-persistence-infrastructure.md`
 - `docs/V0.3-session-message-persistence.md`
 - `docs/V0.3-execution-tool-trace-persistence.md`
+- `docs/V0.3-redis-session-cache-context-restore.md`
 - `docs/V0.2-agent-crud-tool-calling.md`
 - `docs/adr/ADR-001-modular-monolith.md`
