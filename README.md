@@ -2,7 +2,7 @@
 
 AgentForge 是一个基于 Java 的企业级 AI Agent 编排与运行平台练习项目。
 
-当前里程碑：V0.4 — Tool Governance & Resilience（Slice 1/2 已验收，Slice 3A 实施中）。
+当前里程碑：V0.4 — Tool Governance & Resilience（Slice 1/2/3A 已验收，Slice 3B 设计中）。
 
 ## 已完成链路
 
@@ -65,6 +65,7 @@ HTTP / SSE
 - Slice 3A 新增 ToolRiskLevel（LOW/MEDIUM/HIGH）与 ToolExecutionPolicy；默认 Read Tool 低风险、Write Tool 高风险且要求确认。
 - Policy Decision 支持 ALLOW / DENY / REQUIRE_CONFIRMATION；当前确认生命周期尚未实现，因此 REQUIRE_CONFIRMATION 会 fail closed，不执行 Tool。
 - Policy Trace 持久化 tool risk、read-only、policy decision/reason，并以 `outboundAttempts=0` 证明 Policy 阻断未访问下游。
+- Slice 3A 已通过真实 LOW-risk Read Tool 与 Durable Trace 验收：`query_device_status` 记录 `LOW / readOnly=true / policyDecision=ALLOW / baseline_allow`，并正常继续执行真实 HTTP。
 
 ## Conversation 数据模型
 
