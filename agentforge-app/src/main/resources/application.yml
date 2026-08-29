@@ -36,6 +36,19 @@ agentforge:
       api-key: ${DASHSCOPE_API_KEY:}
       base-url: ${DASHSCOPE_BASE_URL:}
       model: ${DASHSCOPE_MODEL:qwen3.8-flash}
+  iot:
+    device-status:
+      mode: ${AGENTFORGE_IOT_DEVICE_STATUS_MODE:demo}
+      base-url: ${AGENTFORGE_IOT_BASE_URL:}
+      detail-path: "${AGENTFORGE_IOT_DEVICE_DETAIL_PATH:/admin-api/device/mini/devices/{deviceId}}"
+      access-token: ${AGENTFORGE_IOT_ACCESS_TOKEN:}
+      tenant-id: ${AGENTFORGE_IOT_TENANT_ID:}
+      connect-timeout: ${AGENTFORGE_IOT_CONNECT_TIMEOUT:2s}
+      request-timeout: ${AGENTFORGE_IOT_REQUEST_TIMEOUT:3s}
+      max-attempts: ${AGENTFORGE_IOT_MAX_ATTEMPTS:2}
+      retry-backoff: ${AGENTFORGE_IOT_RETRY_BACKOFF:150ms}
+      circuit-breaker-failure-threshold: ${AGENTFORGE_IOT_CIRCUIT_FAILURE_THRESHOLD:3}
+      circuit-breaker-open-duration: ${AGENTFORGE_IOT_CIRCUIT_OPEN_DURATION:30s}
   session-cache:
     enabled: ${AGENTFORGE_SESSION_CACHE_ENABLED:true}
     key-prefix: ${AGENTFORGE_SESSION_CACHE_PREFIX:agentforge:session:}

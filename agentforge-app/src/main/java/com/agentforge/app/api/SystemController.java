@@ -4,6 +4,7 @@ import com.agentforge.agent.AgentDefinitionService;
 import com.agentforge.core.AgentForgeConstants;
 import com.agentforge.infrastructure.config.AgentRuntimeProperties;
 import com.agentforge.infrastructure.config.AgentSessionCacheProperties;
+import com.agentforge.infrastructure.config.IoTDeviceStatusProperties;
 import com.agentforge.infrastructure.health.InfrastructureStatus;
 import com.agentforge.infrastructure.health.InfrastructureStatusService;
 import com.agentforge.model.ModelGatewayCatalog;
@@ -26,6 +27,7 @@ public class SystemController {
     private final AgentRuntimeManager runtimeManager;
     private final InfrastructureStatusService infrastructureStatusService;
     private final AgentSessionCacheProperties sessionCacheProperties;
+    private final IoTDeviceStatusProperties iotDeviceStatusProperties;
 
     public SystemController(
             ModelGatewayCatalog modelGatewayCatalog,
@@ -34,7 +36,8 @@ public class SystemController {
             ToolRegistry toolRegistry,
             AgentRuntimeManager runtimeManager,
             InfrastructureStatusService infrastructureStatusService,
-            AgentSessionCacheProperties sessionCacheProperties) {
+            AgentSessionCacheProperties sessionCacheProperties,
+            IoTDeviceStatusProperties iotDeviceStatusProperties) {
         this.modelGatewayCatalog = modelGatewayCatalog;
         this.agentProperties = agentProperties;
         this.agentService = agentService;
@@ -42,6 +45,7 @@ public class SystemController {
         this.runtimeManager = runtimeManager;
         this.infrastructureStatusService = infrastructureStatusService;
         this.sessionCacheProperties = sessionCacheProperties;
+        this.iotDeviceStatusProperties = iotDeviceStatusProperties;
     }
 
     @GetMapping("/health")
@@ -56,7 +60,7 @@ public class SystemController {
         result.put("name", "AgentForge");
         result.put("version", "0.3.0-SNAPSHOT");
         result.put("status", infrastructure.ready() ? "UP" : "DEGRADED");
-        result.put("milestone", "V0.3-redis-session-cache-context-restore");
+        result.put("milestone", "V0.3-real-iot-http-tool-adapter");
         result.put("mysql", infrastructure.mysqlUp() ? "UP" : "DOWN");
         result.put("redis", infrastructure.redisUp() ? "UP" : "DOWN");
         result.put("activeModelProvider", modelGatewayCatalog.activeProvider());
@@ -70,6 +74,15 @@ public class SystemController {
         result.put(
                 "contextRestoreMaxMessages",
                 sessionCacheProperties.getRestoreMaxMessages());
+        result.put(
+                "iotDeviceStatusAdapter",
+                iotDeviceStatusProperties.getMode().name().toLowerCase(java.util.Locale.ROOT));
+        result.put(
+                "iotDeviceStatusConfigured",
+                iotDeviceStatusProperties.isConfigured());
+        result.put(
+                "iotDeviceStatusRequestTimeout",
+                iotDeviceStatusProperties.getRequestTimeout().toString());
         return result;
     }
 }

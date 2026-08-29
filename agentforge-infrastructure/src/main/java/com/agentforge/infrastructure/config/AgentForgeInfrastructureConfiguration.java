@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Configuration;
 @EnableConfigurationProperties({
     ModelProviderProperties.class,
     AgentRuntimeProperties.class,
-    AgentSessionCacheProperties.class
+    AgentSessionCacheProperties.class,
+    IoTDeviceStatusProperties.class
 })
 public class AgentForgeInfrastructureConfiguration {}

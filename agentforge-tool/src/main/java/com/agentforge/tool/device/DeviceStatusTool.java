@@ -25,7 +25,7 @@ public class DeviceStatusTool implements AgentTool {
     @Override
     public String description() {
         return "按 deviceId 查询 IoT 设备当前状态、最后上报时间和基础运行信息。"
-                + "当前 V0.2 使用可替换的 DeviceStatusQueryPort，默认适配器提供演示数据。";
+                + "数据通过 DeviceStatusQueryPort 获取，可切换演示适配器或真实 IoT HTTP 后端。";
     }
 
     @Override
@@ -51,7 +51,12 @@ public class DeviceStatusTool implements AgentTool {
         }
 
         String deviceId = rawDeviceId.toString().trim();
-        return queryPort
+        if (!deviceId.matches("\\d{1,19}")) {
+            return ToolResult.failure("deviceId must be a numeric identifier");
+        }
+
+        try {
+            return queryPort
                 .findByDeviceId(deviceId)
                 .map(
                         snapshot -> {
@@ -64,5 +69,9 @@ public class DeviceStatusTool implements AgentTool {
                             return ToolResult.success("device status queried", data);
                         })
                 .orElseGet(() -> ToolResult.failure("device not found: " + deviceId));
+        } catch (DeviceStatusQueryException exception) {
+            return ToolResult.failure(
+                    "device status query unavailable: " + exception.reason().name());
+        }
     }
 }

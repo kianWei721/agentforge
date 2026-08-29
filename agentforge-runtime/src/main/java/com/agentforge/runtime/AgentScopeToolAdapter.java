@@ -14,6 +14,7 @@ import io.agentscope.core.tool.ToolCallParam;
 import java.util.List;
 import java.util.Map;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 final class AgentScopeToolAdapter extends ToolBase {
 
@@ -68,6 +69,7 @@ final class AgentScopeToolAdapter extends ToolBase {
                                                     ? ToolResultState.SUCCESS
                                                     : ToolResultState.ERROR)
                                     .build();
-                        });
+                        })
+                .subscribeOn(Schedulers.boundedElastic());
     }
 }
