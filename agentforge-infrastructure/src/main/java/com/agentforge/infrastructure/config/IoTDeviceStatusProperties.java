@@ -14,7 +14,7 @@ public class IoTDeviceStatusProperties {
 
     private Mode mode = Mode.DEMO;
     private String baseUrl = "";
-    private String detailPath = "/admin-api/device/mini/devices/{deviceId}";
+    private String detailPath = "/admin-api/device/web/devices/{deviceId}";
     private String accessToken = "";
     private String tenantId = "";
     private Duration connectTimeout = Duration.ofSeconds(2);
