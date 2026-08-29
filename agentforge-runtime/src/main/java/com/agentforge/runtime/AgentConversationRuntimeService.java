@@ -81,7 +81,7 @@ public class AgentConversationRuntimeService {
                             Flux<AgentStreamChunk> persistAssistant =
                                     Flux.defer(
                                                     () -> {
-                                                        if (assistantText.length() > 0) {
+                                                        if (!assistantText.toString().isBlank()) {
                                                             conversationService.appendMessage(
                                                                     session.id(),
                                                                     ConversationRole.ASSISTANT,
