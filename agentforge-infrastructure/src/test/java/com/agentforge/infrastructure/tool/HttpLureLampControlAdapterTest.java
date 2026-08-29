@@ -35,7 +35,7 @@ class HttpLureLampControlAdapterTest {
                     {
                       "propertyId": 169,
                       "identifier": "PeripheralStatus",
-                      "propertyData": "{\"PeripheralStatus\":{\"TrapLight\":1,\"HeatingTube\":0}}",
+                      "propertyData": "{\\\"PeripheralStatus\\\":{\\\"TrapLight\\\":1,\\\"HeatingTube\\\":0}}",
                       "updateTime": "2026-08-29 15:54:33"
                     }
                   ]
