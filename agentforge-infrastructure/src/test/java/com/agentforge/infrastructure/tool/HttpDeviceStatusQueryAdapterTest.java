@@ -100,6 +100,44 @@ class HttpDeviceStatusQueryAdapterTest {
     }
 
     @Test
+    void toolShouldExposeOnlyStatusSafeAttributes() {
+        DeviceStatusTool tool =
+                new DeviceStatusTool(
+                        deviceId ->
+                                Optional.of(
+                                        new DeviceStatusSnapshot(
+                                                deviceId,
+                                                "OFFLINE",
+                                                "2026-08-15T05:38:43Z",
+                                                "yudao-device-web-http",
+                                                java.util.Map.of(
+                                                        "stateRaw", "离线",
+                                                        "deviceNickname", "办公室测报灯",
+                                                        "productId", 25L,
+                                                        "productKey", "secret-like-business-key",
+                                                        "location", "精确位置",
+                                                        "longitude", 120.49,
+                                                        "latitude", 30.32))));
+
+        ToolResult result =
+                tool.execute(
+                        new ToolInvocationContext("default", "user", "session"),
+                        java.util.Map.of("deviceId", "367"));
+
+        assertTrue(result.success());
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> attributes =
+                (java.util.Map<String, Object>) result.data().get("attributes");
+        assertEquals("离线", attributes.get("stateRaw"));
+        assertEquals("办公室测报灯", attributes.get("deviceNickname"));
+        assertEquals(25L, attributes.get("productId"));
+        assertFalse(attributes.containsKey("productKey"));
+        assertFalse(attributes.containsKey("location"));
+        assertFalse(attributes.containsKey("longitude"));
+        assertFalse(attributes.containsKey("latitude"));
+    }
+
+    @Test
     void toolShouldRejectPathLikeDeviceIdBeforeCallingBackend() {
         DeviceStatusTool tool =
                 new DeviceStatusTool(
