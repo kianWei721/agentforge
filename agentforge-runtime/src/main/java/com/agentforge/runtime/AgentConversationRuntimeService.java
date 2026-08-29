@@ -85,6 +85,25 @@ public class AgentConversationRuntimeService {
                                             session.id(),
                                             request.message());
 
+                            Flux<AgentStreamChunk> executionStart =
+                                    Mono.fromCallable(
+                                                    () -> {
+                                                        AgentStreamChunk chunk =
+                                                                AgentStreamChunk.trace(
+                                                                        "execution_start",
+                                                                        "",
+                                                                        "agentforge-runtime",
+                                                                        Map.of(
+                                                                                "executionId",
+                                                                                execution.id()));
+                                                        executionService.appendTrace(
+                                                                execution.id(),
+                                                                toTraceInput(chunk));
+                                                        return chunk;
+                                                    })
+                                            .subscribeOn(Schedulers.boundedElastic())
+                                            .flux();
+
                             Flux<AgentStreamChunk> runtimeStream =
                                     runtimeManager
                                             .stream(agentId, scopedRequest)
@@ -144,7 +163,8 @@ public class AgentConversationRuntimeService {
                                             .subscribeOn(Schedulers.boundedElastic())
                                             .flux();
 
-                            return runtimeStream
+                            return executionStart
+                                    .concatWith(runtimeStream)
                                     .concatWith(successTail)
                                     .onErrorResume(
                                             error ->
