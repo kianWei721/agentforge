@@ -32,7 +32,7 @@ class HttpDeviceStatusQueryAdapterTest {
                     "location": "杭州市",
                     "longitude": 120.12,
                     "latitude": 30.28,
-                    "lastReceiveTime": "2026-08-29 11:22:33"
+                    "lastReceiveTime": 1786772323000
                   },
                   "msg": ""
                 }
@@ -43,11 +43,21 @@ class HttpDeviceStatusQueryAdapterTest {
 
         assertEquals("367", snapshot.deviceId());
         assertEquals("ONLINE", snapshot.status());
-        assertEquals("2026-08-29 11:22:33", snapshot.lastSeenAt());
+        assertEquals("2026-08-15T05:38:43Z", snapshot.lastSeenAt());
+        assertEquals(1786772323000L, snapshot.attributes().get("lastReceiveTimeRaw"));
         assertEquals("yudao-device-web-http", snapshot.source());
         assertEquals("在线", snapshot.attributes().get("stateRaw"));
         assertEquals("办公室测报灯", snapshot.attributes().get("deviceNickname"));
         assertEquals(25L, snapshot.attributes().get("productId"));
+    }
+
+    @Test
+    void shouldKeepStringLastReceiveTimeWhenBackendAlreadyReturnsText() throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        assertEquals(
+                "2026-08-29 11:22:33",
+                HttpDeviceStatusQueryAdapter.normalizeLastSeenAt(
+                        mapper.readTree("\"2026-08-29 11:22:33\"")));
     }
 
     @Test
