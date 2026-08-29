@@ -102,6 +102,9 @@ class JdbcConversationRepositoryTest {
 
         assertNotEquals(a.id(), b.id());
         assertNotEquals(a.id(), c.id());
-        assertEquals(2, repository.findSessions("agent-a", "user-1").size() + 1);
+        assertNotEquals(b.id(), c.id());
+        assertEquals(1, repository.findSessions("agent-a", "user-1").size());
+        assertEquals(1, repository.findSessions("agent-a", "user-2").size());
+        assertEquals(1, repository.findSessions("agent-b", "user-1").size());
     }
 }
