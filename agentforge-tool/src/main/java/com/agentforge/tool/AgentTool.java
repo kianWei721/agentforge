@@ -18,5 +18,9 @@ public interface AgentTool {
         return true;
     }
 
+    default ToolRiskLevel riskLevel() {
+        return readOnly() ? ToolRiskLevel.LOW : ToolRiskLevel.HIGH;
+    }
+
     ToolResult execute(ToolInvocationContext context, Map<String, Object> arguments);
 }

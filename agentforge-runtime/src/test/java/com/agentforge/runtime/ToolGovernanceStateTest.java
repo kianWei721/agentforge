@@ -5,8 +5,10 @@ import static org.junit.jupiter.api.Assertions.*;
 import com.agentforge.tool.AgentTool;
 import com.agentforge.tool.ToolInvocationContext;
 import com.agentforge.tool.ToolResult;
+import com.agentforge.tool.ToolRiskLevel;
 import com.agentforge.tool.telemetry.OutboundHttpTelemetry;
 import io.agentscope.core.agent.RuntimeContext;
+import io.agentscope.core.message.ToolResultBlock;
 import io.agentscope.core.message.ToolUseBlock;
 import io.agentscope.core.tool.ToolCallParam;
 import java.util.LinkedHashMap;
@@ -247,6 +249,91 @@ class ToolGovernanceStateTest {
     }
 
     @Test
+    void lowRiskReadOnlyToolShouldBeAllowedByBaselinePolicy() {
+        AtomicInteger executions = new AtomicInteger();
+        AgentTool tool = policyTestTool(true, ToolRiskLevel.LOW, executions);
+        AgentScopeToolAdapter adapter =
+                new AgentScopeToolAdapter(
+                        "agent",
+                        tool,
+                        new BaselineToolExecutionPolicy(ToolPolicyOptions.defaults()));
+
+        ToolResultBlock result =
+                adapter.callAsync(
+                                param(
+                                        "call-policy-low",
+                                        "policy_test_tool",
+                                        Map.of(),
+                                        runtimeContext(new ToolGovernanceState(
+                                                new ToolGovernanceOptions(true, true, 32)))))
+                        .block();
+
+        assertNotNull(result);
+        assertEquals(1, executions.get());
+    }
+
+    @Test
+    void writeToolShouldRequireConfirmationBeforeDelegateExecution() {
+        AtomicInteger executions = new AtomicInteger();
+        ToolGovernanceState state =
+                new ToolGovernanceState(new ToolGovernanceOptions(true, true, 32));
+        AgentTool tool = policyTestTool(false, ToolRiskLevel.HIGH, executions);
+        AgentScopeToolAdapter adapter =
+                new AgentScopeToolAdapter(
+                        "agent",
+                        tool,
+                        new BaselineToolExecutionPolicy(ToolPolicyOptions.defaults()));
+
+        adapter.callAsync(
+                        param(
+                                "call-policy-write",
+                                "policy_test_tool",
+                                Map.of(),
+                                runtimeContext(state)))
+                .block();
+
+        assertEquals(0, executions.get());
+        ToolGovernanceState.ToolInvocationTelemetry telemetry =
+                state.telemetry("call-policy-write");
+        assertNotNull(telemetry);
+        assertEquals("HIGH", telemetry.toolRiskLevel());
+        assertFalse(telemetry.toolReadOnly());
+        assertEquals("REQUIRE_CONFIRMATION", telemetry.policyDecision());
+        assertEquals("write_tool_requires_confirmation", telemetry.policyReason());
+        assertEquals(0, telemetry.outboundAttempts());
+        assertEquals("CONFIRMATION_REQUIRED", telemetry.outboundOutcome());
+    }
+
+    @Test
+    void customPolicyDenyShouldPreventDelegateExecution() {
+        AtomicInteger executions = new AtomicInteger();
+        ToolGovernanceState state =
+                new ToolGovernanceState(new ToolGovernanceOptions(true, true, 32));
+        AgentTool tool = policyTestTool(true, ToolRiskLevel.MEDIUM, executions);
+        AgentScopeToolAdapter adapter =
+                new AgentScopeToolAdapter(
+                        "agent",
+                        tool,
+                        context -> ToolPolicyEvaluation.deny("test_policy_deny"));
+
+        adapter.callAsync(
+                        param(
+                                "call-policy-deny",
+                                "policy_test_tool",
+                                Map.of(),
+                                runtimeContext(state)))
+                .block();
+
+        assertEquals(0, executions.get());
+        ToolGovernanceState.ToolInvocationTelemetry telemetry =
+                state.telemetry("call-policy-deny");
+        assertNotNull(telemetry);
+        assertEquals("DENY", telemetry.policyDecision());
+        assertEquals("test_policy_deny", telemetry.policyReason());
+        assertEquals("POLICY_DENIED", telemetry.outboundOutcome());
+    }
+
+    @Test
     void stateMustBeIsolatedPerAgentCall() {
         ToolGovernanceState firstState =
                 new ToolGovernanceState(new ToolGovernanceOptions(true, true, 32));
@@ -261,6 +348,51 @@ class ToolGovernanceStateTest {
                 secondState
                         .beforeInvocation("call-2", "test", Map.of("x", 1))
                         .allowed());
+    }
+
+    private static AgentTool policyTestTool(
+            boolean readOnly, ToolRiskLevel riskLevel, AtomicInteger executions) {
+        return new AgentTool() {
+            @Override
+            public String name() {
+                return "policy_test_tool";
+            }
+
+            @Override
+            public String description() {
+                return "policy test";
+            }
+
+            @Override
+            public Map<String, Object> inputSchema() {
+                return Map.of("type", "object", "properties", Map.of());
+            }
+
+            @Override
+            public boolean readOnly() {
+                return readOnly;
+            }
+
+            @Override
+            public ToolRiskLevel riskLevel() {
+                return riskLevel;
+            }
+
+            @Override
+            public ToolResult execute(
+                    ToolInvocationContext context, Map<String, Object> arguments) {
+                executions.incrementAndGet();
+                return ToolResult.success("ok", Map.of());
+            }
+        };
+    }
+
+    private static RuntimeContext runtimeContext(ToolGovernanceState state) {
+        return RuntimeContext.builder()
+                .userId("user")
+                .sessionId("session")
+                .put(ToolGovernanceState.class, state)
+                .build();
     }
 
     private static ToolCallParam param(

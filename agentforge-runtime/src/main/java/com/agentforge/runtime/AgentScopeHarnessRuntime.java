@@ -30,6 +30,7 @@ public final class AgentScopeHarnessRuntime implements AgentRuntime, AutoCloseab
 
     private final HarnessAgent agent;
     private final ToolGovernanceOptions toolGovernanceOptions;
+    private final ToolExecutionPolicy toolExecutionPolicy;
 
     public AgentScopeHarnessRuntime(
             String agentId,
@@ -45,7 +46,8 @@ public final class AgentScopeHarnessRuntime implements AgentRuntime, AutoCloseab
                 model,
                 businessTools,
                 stateStore,
-                ToolGovernanceOptions.defaults());
+                ToolGovernanceOptions.defaults(),
+                new BaselineToolExecutionPolicy(ToolPolicyOptions.defaults()));
     }
 
     public AgentScopeHarnessRuntime(
@@ -56,16 +58,44 @@ public final class AgentScopeHarnessRuntime implements AgentRuntime, AutoCloseab
             List<AgentTool> businessTools,
             AgentStateStore stateStore,
             ToolGovernanceOptions toolGovernanceOptions) {
+        this(
+                agentId,
+                name,
+                systemPrompt,
+                model,
+                businessTools,
+                stateStore,
+                toolGovernanceOptions,
+                new BaselineToolExecutionPolicy(ToolPolicyOptions.defaults()));
+    }
+
+    public AgentScopeHarnessRuntime(
+            String agentId,
+            String name,
+            String systemPrompt,
+            Model model,
+            List<AgentTool> businessTools,
+            AgentStateStore stateStore,
+            ToolGovernanceOptions toolGovernanceOptions,
+            ToolExecutionPolicy toolExecutionPolicy) {
         Objects.requireNonNull(model, "model must not be null");
         Objects.requireNonNull(stateStore, "stateStore must not be null");
         this.toolGovernanceOptions =
                 toolGovernanceOptions == null
                         ? ToolGovernanceOptions.defaults()
                         : toolGovernanceOptions;
+        this.toolExecutionPolicy =
+                toolExecutionPolicy == null
+                        ? new BaselineToolExecutionPolicy(ToolPolicyOptions.defaults())
+                        : toolExecutionPolicy;
 
         Toolkit toolkit = new Toolkit();
         if (businessTools != null) {
-            businessTools.forEach(tool -> toolkit.registerTool(new AgentScopeToolAdapter(agentId, tool)));
+            businessTools.forEach(
+                    tool ->
+                            toolkit.registerTool(
+                                    new AgentScopeToolAdapter(
+                                            agentId, tool, this.toolExecutionPolicy)));
         }
 
         this.agent =
@@ -265,6 +295,10 @@ public final class AgentScopeHarnessRuntime implements AgentRuntime, AutoCloseab
         if (telemetry.outboundOutcome() != null) {
             metadata.put("outboundOutcome", telemetry.outboundOutcome());
         }
+        metadata.put("toolRiskLevel", telemetry.toolRiskLevel());
+        metadata.put("toolReadOnly", telemetry.toolReadOnly());
+        metadata.put("policyDecision", telemetry.policyDecision());
+        metadata.put("policyReason", telemetry.policyReason());
     }
 
     @Override

@@ -22,8 +22,17 @@ final class AgentScopeToolAdapter extends ToolBase {
 
     private final String agentId;
     private final AgentTool delegate;
+    private final ToolExecutionPolicy executionPolicy;
 
     AgentScopeToolAdapter(String agentId, AgentTool delegate) {
+        this(
+                agentId,
+                delegate,
+                new BaselineToolExecutionPolicy(ToolPolicyOptions.defaults()));
+    }
+
+    AgentScopeToolAdapter(
+            String agentId, AgentTool delegate, ToolExecutionPolicy executionPolicy) {
         super(
                 ToolBase.builder()
                         .name(delegate.name())
@@ -33,6 +42,10 @@ final class AgentScopeToolAdapter extends ToolBase {
                         .concurrencySafe(delegate.concurrencySafe()));
         this.agentId = agentId;
         this.delegate = delegate;
+        this.executionPolicy =
+                executionPolicy == null
+                        ? new BaselineToolExecutionPolicy(ToolPolicyOptions.defaults())
+                        : executionPolicy;
     }
 
     @Override
@@ -52,7 +65,7 @@ final class AgentScopeToolAdapter extends ToolBase {
                         () -> {
                             RuntimeContext runtimeContext = param.getRuntimeContext();
                             ToolTelemetryBuffer telemetryBuffer = new ToolTelemetryBuffer();
-                            ToolInvocationContext context =
+                            ToolInvocationContext invocationContext =
                                     new ToolInvocationContext(
                                             agentId,
                                             runtimeContext != null ? runtimeContext.getUserId() : null,
@@ -65,44 +78,53 @@ final class AgentScopeToolAdapter extends ToolBase {
                                     param.getToolUseBlock() == null
                                             ? null
                                             : param.getToolUseBlock().getId();
+                            Map<String, Object> input =
+                                    param.getInput() == null ? Map.of() : param.getInput();
+
+                            ToolPolicyEvaluation policy =
+                                    executionPolicy.evaluate(
+                                            new ToolPolicyContext(
+                                                    agentId,
+                                                    invocationContext.userId(),
+                                                    invocationContext.sessionId(),
+                                                    delegate.name(),
+                                                    delegate.readOnly(),
+                                                    delegate.riskLevel(),
+                                                    input));
+
                             ToolGovernanceState governance =
                                     runtimeContext == null
                                             ? null
                                             : runtimeContext.get(ToolGovernanceState.class);
-                            ToolGovernanceDecision decision =
-                                    governance == null
-                                            ? ToolGovernanceDecision.allow(
-                                                    ToolGovernanceState.fingerprint(
-                                                            delegate.name(), param.getInput()))
-                                            : governance.beforeInvocation(
-                                                    toolCallId,
-                                                    delegate.name(),
-                                                    param.getInput());
+                            String fingerprint =
+                                    ToolGovernanceState.fingerprint(delegate.name(), input);
+                            ToolGovernanceDecision governanceDecision =
+                                    !policy.decision().executable()
+                                            ? ToolGovernanceDecision.skipped(
+                                                    fingerprint, "policy_preempted")
+                                            : governance == null
+                                                    ? ToolGovernanceDecision.allow(fingerprint)
+                                                    : governance.beforeInvocation(
+                                                            toolCallId,
+                                                            delegate.name(),
+                                                            input);
 
                             long startedNanos = System.nanoTime();
                             try {
-                                ToolResult result;
-                                if (!decision.allowed()) {
-                                    String previousCode =
-                                            decision.blockedByFailureCode() == null
-                                                    ? "NON_RETRYABLE_FAILURE"
-                                                    : decision.blockedByFailureCode();
-                                    result =
-                                            ToolResult.failure(
-                                                    "tool invocation blocked by governance: identical arguments already failed with "
-                                                            + previousCode
-                                                            + "; do not retry unchanged arguments",
-                                                    ToolGovernanceState
-                                                            .FAILURE_REPEATED_NON_RETRYABLE_CALL,
-                                                    false);
-                                } else {
-                                    result = delegate.execute(context, param.getInput());
-                                }
+                                ToolResult result =
+                                        decideAndExecute(
+                                                policy,
+                                                governanceDecision,
+                                                invocationContext,
+                                                input);
 
                                 if (governance != null) {
                                     governance.recordResult(
                                             toolCallId,
-                                            decision,
+                                            governanceDecision,
+                                            policy,
+                                            delegate.riskLevel(),
+                                            delegate.readOnly(),
                                             result,
                                             elapsedMillis(startedNanos),
                                             telemetryBuffer.latestOutboundHttp());
@@ -112,7 +134,10 @@ final class AgentScopeToolAdapter extends ToolBase {
                                 if (governance != null) {
                                     governance.recordException(
                                             toolCallId,
-                                            decision,
+                                            governanceDecision,
+                                            policy,
+                                            delegate.riskLevel(),
+                                            delegate.readOnly(),
                                             elapsedMillis(startedNanos),
                                             telemetryBuffer.latestOutboundHttp());
                                 }
@@ -120,6 +145,38 @@ final class AgentScopeToolAdapter extends ToolBase {
                             }
                         })
                 .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    private ToolResult decideAndExecute(
+            ToolPolicyEvaluation policy,
+            ToolGovernanceDecision governanceDecision,
+            ToolInvocationContext context,
+            Map<String, Object> input) {
+        if (policy.decision() == ToolPolicyDecision.DENY) {
+            return ToolResult.failure(
+                    "tool invocation denied by execution policy",
+                    "POLICY_DENIED",
+                    false);
+        }
+        if (policy.decision() == ToolPolicyDecision.REQUIRE_CONFIRMATION) {
+            return ToolResult.failure(
+                    "tool invocation requires user confirmation before execution",
+                    "CONFIRMATION_REQUIRED",
+                    false);
+        }
+        if (!governanceDecision.allowed()) {
+            String previousCode =
+                    governanceDecision.blockedByFailureCode() == null
+                            ? "NON_RETRYABLE_FAILURE"
+                            : governanceDecision.blockedByFailureCode();
+            return ToolResult.failure(
+                    "tool invocation blocked by governance: identical arguments already failed with "
+                            + previousCode
+                            + "; do not retry unchanged arguments",
+                    ToolGovernanceState.FAILURE_REPEATED_NON_RETRYABLE_CALL,
+                    false);
+        }
+        return delegate.execute(context, input);
     }
 
     private ToolResultBlock toToolResultBlock(ToolCallParam param, ToolResult result) {

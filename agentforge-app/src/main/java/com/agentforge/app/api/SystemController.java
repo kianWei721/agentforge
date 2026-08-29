@@ -6,6 +6,7 @@ import com.agentforge.infrastructure.config.AgentRuntimeProperties;
 import com.agentforge.infrastructure.config.AgentSessionCacheProperties;
 import com.agentforge.infrastructure.config.IoTDeviceStatusProperties;
 import com.agentforge.infrastructure.config.ToolGovernanceProperties;
+import com.agentforge.infrastructure.config.ToolPolicyProperties;
 import com.agentforge.infrastructure.health.InfrastructureStatus;
 import com.agentforge.infrastructure.health.InfrastructureStatusService;
 import com.agentforge.model.ModelGatewayCatalog;
@@ -30,6 +31,7 @@ public class SystemController {
     private final AgentSessionCacheProperties sessionCacheProperties;
     private final IoTDeviceStatusProperties iotDeviceStatusProperties;
     private final ToolGovernanceProperties toolGovernanceProperties;
+    private final ToolPolicyProperties toolPolicyProperties;
 
     public SystemController(
             ModelGatewayCatalog modelGatewayCatalog,
@@ -40,7 +42,8 @@ public class SystemController {
             InfrastructureStatusService infrastructureStatusService,
             AgentSessionCacheProperties sessionCacheProperties,
             IoTDeviceStatusProperties iotDeviceStatusProperties,
-            ToolGovernanceProperties toolGovernanceProperties) {
+            ToolGovernanceProperties toolGovernanceProperties,
+            ToolPolicyProperties toolPolicyProperties) {
         this.modelGatewayCatalog = modelGatewayCatalog;
         this.agentProperties = agentProperties;
         this.agentService = agentService;
@@ -50,6 +53,7 @@ public class SystemController {
         this.sessionCacheProperties = sessionCacheProperties;
         this.iotDeviceStatusProperties = iotDeviceStatusProperties;
         this.toolGovernanceProperties = toolGovernanceProperties;
+        this.toolPolicyProperties = toolPolicyProperties;
     }
 
     @GetMapping("/health")
@@ -94,6 +98,13 @@ public class SystemController {
         result.put(
                 "toolGovernanceMaxRecordedInvocations",
                 toolGovernanceProperties.getMaxRecordedInvocations());
+        result.put("toolPolicyEnabled", toolPolicyProperties.isEnabled());
+        result.put(
+                "toolPolicyConfirmWriteTools",
+                toolPolicyProperties.isRequireConfirmationForWriteTools());
+        result.put(
+                "toolPolicyConfirmHighRiskReadOnly",
+                toolPolicyProperties.isRequireConfirmationForHighRiskReadOnly());
         return result;
     }
 }

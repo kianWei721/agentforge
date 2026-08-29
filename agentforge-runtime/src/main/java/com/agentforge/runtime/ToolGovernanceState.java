@@ -1,6 +1,7 @@
 package com.agentforge.runtime;
 
 import com.agentforge.tool.ToolResult;
+import com.agentforge.tool.ToolRiskLevel;
 import com.agentforge.tool.telemetry.OutboundHttpTelemetry;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -56,12 +57,40 @@ final class ToolGovernanceState {
             ToolGovernanceDecision decision,
             ToolResult result,
             long durationMs) {
-        recordResult(toolCallId, decision, result, durationMs, null);
+        recordResult(
+                toolCallId,
+                decision,
+                ToolPolicyEvaluation.allow("legacy_allow"),
+                ToolRiskLevel.LOW,
+                true,
+                result,
+                durationMs,
+                null);
     }
 
     void recordResult(
             String toolCallId,
             ToolGovernanceDecision decision,
+            ToolResult result,
+            long durationMs,
+            OutboundHttpTelemetry outbound) {
+        recordResult(
+                toolCallId,
+                decision,
+                ToolPolicyEvaluation.allow("legacy_allow"),
+                ToolRiskLevel.LOW,
+                true,
+                result,
+                durationMs,
+                outbound);
+    }
+
+    void recordResult(
+            String toolCallId,
+            ToolGovernanceDecision decision,
+            ToolPolicyEvaluation policy,
+            ToolRiskLevel riskLevel,
+            boolean readOnly,
             ToolResult result,
             long durationMs,
             OutboundHttpTelemetry outbound) {
@@ -72,14 +101,27 @@ final class ToolGovernanceState {
             return;
         }
 
-        Integer outboundAttempts =
-                decision.allowed()
-                        ? (outbound == null ? null : Integer.valueOf(outbound.attempts()))
-                        : Integer.valueOf(0);
-        String outboundOutcome =
-                decision.allowed()
-                        ? (outbound == null ? null : outbound.outcome())
-                        : "GOVERNANCE_BLOCKED";
+        ToolPolicyEvaluation effectivePolicy =
+                policy == null ? ToolPolicyEvaluation.allow("unspecified") : policy;
+        boolean policyAllowsExecution =
+                effectivePolicy.decision() == ToolPolicyDecision.ALLOW;
+
+        Integer outboundAttempts;
+        String outboundOutcome;
+        if (!policyAllowsExecution) {
+            outboundAttempts = Integer.valueOf(0);
+            outboundOutcome =
+                    effectivePolicy.decision() == ToolPolicyDecision.DENY
+                            ? "POLICY_DENIED"
+                            : "CONFIRMATION_REQUIRED";
+        } else if (!decision.allowed()) {
+            outboundAttempts = Integer.valueOf(0);
+            outboundOutcome = "GOVERNANCE_BLOCKED";
+        } else {
+            outboundAttempts =
+                    outbound == null ? null : Integer.valueOf(outbound.attempts());
+            outboundOutcome = outbound == null ? null : outbound.outcome();
+        }
 
         telemetryByCallId.put(
                 toolCallId,
@@ -98,9 +140,15 @@ final class ToolGovernanceState {
                         outbound == null ? null : outbound.httpStatus(),
                         outbound == null ? null : outbound.businessCode(),
                         outbound == null ? null : outbound.downstreamDurationMs(),
-                        outboundOutcome));
+                        outboundOutcome,
+                        riskLevel == null ? ToolRiskLevel.HIGH.name() : riskLevel.name(),
+                        readOnly,
+                        effectivePolicy.decision().name(),
+                        effectivePolicy.reason()));
 
-        if (options.enabled()
+        if (policyAllowsExecution
+                && decision.allowed()
+                && options.enabled()
                 && options.blockRepeatedNonRetryableCalls()
                 && !result.success()
                 && !result.retryable()
@@ -115,12 +163,37 @@ final class ToolGovernanceState {
             String toolCallId,
             ToolGovernanceDecision decision,
             long durationMs) {
-        recordException(toolCallId, decision, durationMs, null);
+        recordException(
+                toolCallId,
+                decision,
+                ToolPolicyEvaluation.allow("legacy_allow"),
+                ToolRiskLevel.LOW,
+                true,
+                durationMs,
+                null);
     }
 
     void recordException(
             String toolCallId,
             ToolGovernanceDecision decision,
+            long durationMs,
+            OutboundHttpTelemetry outbound) {
+        recordException(
+                toolCallId,
+                decision,
+                ToolPolicyEvaluation.allow("legacy_allow"),
+                ToolRiskLevel.LOW,
+                true,
+                durationMs,
+                outbound);
+    }
+
+    void recordException(
+            String toolCallId,
+            ToolGovernanceDecision decision,
+            ToolPolicyEvaluation policy,
+            ToolRiskLevel riskLevel,
+            boolean readOnly,
             long durationMs,
             OutboundHttpTelemetry outbound) {
         if (toolCallId == null || toolCallId.isBlank()) {
@@ -129,6 +202,8 @@ final class ToolGovernanceState {
         if (recordedInvocations.incrementAndGet() > options.maxRecordedInvocations()) {
             return;
         }
+        ToolPolicyEvaluation effectivePolicy =
+                policy == null ? ToolPolicyEvaluation.allow("unspecified") : policy;
         telemetryByCallId.put(
                 toolCallId,
                 new ToolInvocationTelemetry(
@@ -146,7 +221,11 @@ final class ToolGovernanceState {
                         outbound == null ? null : outbound.httpStatus(),
                         outbound == null ? null : outbound.businessCode(),
                         outbound == null ? null : outbound.downstreamDurationMs(),
-                        outbound == null ? null : outbound.outcome()));
+                        outbound == null ? null : outbound.outcome(),
+                        riskLevel == null ? ToolRiskLevel.HIGH.name() : riskLevel.name(),
+                        readOnly,
+                        effectivePolicy.decision().name(),
+                        effectivePolicy.reason()));
     }
 
     ToolInvocationTelemetry telemetry(String toolCallId) {
@@ -249,6 +328,11 @@ final class ToolGovernanceState {
                     blockedByToolCallId,
                     blockedByFailureCode);
         }
+
+        static ToolGovernanceDecision skipped(String fingerprint, String reason) {
+            return new ToolGovernanceDecision(
+                    true, "SKIP", reason, fingerprint, null, null);
+        }
     }
 
     record ToolInvocationTelemetry(
@@ -266,7 +350,11 @@ final class ToolGovernanceState {
             Integer httpStatus,
             Integer businessCode,
             Long downstreamDurationMs,
-            String outboundOutcome) {}
+            String outboundOutcome,
+            String toolRiskLevel,
+            boolean toolReadOnly,
+            String policyDecision,
+            String policyReason) {}
 
     private record PriorFailure(String toolCallId, String failureCode) {}
 }

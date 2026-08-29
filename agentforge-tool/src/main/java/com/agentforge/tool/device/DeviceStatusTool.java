@@ -3,6 +3,7 @@ package com.agentforge.tool.device;
 import com.agentforge.tool.AgentTool;
 import com.agentforge.tool.ToolInvocationContext;
 import com.agentforge.tool.ToolResult;
+import com.agentforge.tool.ToolRiskLevel;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +41,11 @@ public class DeviceStatusTool implements AgentTool {
                                         "description", "设备唯一标识，例如 367")),
                 "required", List.of("deviceId"),
                 "additionalProperties", false);
+    }
+
+    @Override
+    public ToolRiskLevel riskLevel() {
+        return ToolRiskLevel.LOW;
     }
 
     @Override

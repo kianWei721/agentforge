@@ -7,7 +7,8 @@ public record ToolDescriptor(
         String description,
         Map<String, Object> inputSchema,
         boolean readOnly,
-        boolean concurrencySafe) {
+        boolean concurrencySafe,
+        ToolRiskLevel riskLevel) {
 
     public static ToolDescriptor from(AgentTool tool) {
         return new ToolDescriptor(
@@ -15,6 +16,7 @@ public record ToolDescriptor(
                 tool.description(),
                 tool.inputSchema(),
                 tool.readOnly(),
-                tool.concurrencySafe());
+                tool.concurrencySafe(),
+                tool.riskLevel());
     }
 }
