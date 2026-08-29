@@ -10,9 +10,11 @@ import com.agentforge.runtime.AgentRuntime;
 import com.agentforge.runtime.AgentRuntimeFactory;
 import com.agentforge.runtime.AgentRuntimeManager;
 import com.agentforge.runtime.AgentScopeHarnessRuntime;
+import com.agentforge.runtime.SessionContextRestoreService;
 import com.agentforge.tool.AgentTool;
 import com.agentforge.tool.ToolRegistry;
 import io.agentscope.core.model.Model;
+import io.agentscope.core.state.AgentStateStore;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -21,7 +23,9 @@ import org.springframework.context.annotation.Configuration;
 public class AgentScopeRuntimeConfiguration {
 
     @Bean
-    public AgentRuntimeFactory agentRuntimeFactory(DashScopeModelFactory modelFactory) {
+    public AgentRuntimeFactory agentRuntimeFactory(
+            DashScopeModelFactory modelFactory,
+            AgentStateStore stateStore) {
         return new AgentRuntimeFactory() {
             @Override
             public AgentRuntime create(AgentDefinition definition, List<AgentTool> tools) {
@@ -37,7 +41,8 @@ public class AgentScopeRuntimeConfiguration {
                         definition.name(),
                         definition.systemPrompt(),
                         model,
-                        tools);
+                        tools,
+                        stateStore);
             }
         };
     }
@@ -55,8 +60,13 @@ public class AgentScopeRuntimeConfiguration {
             AgentDefinitionRepository agentRepository,
             ConversationService conversationService,
             AgentRuntimeManager runtimeManager,
-            ExecutionService executionService) {
+            ExecutionService executionService,
+            SessionContextRestoreService contextRestoreService) {
         return new AgentConversationRuntimeService(
-                agentRepository, conversationService, runtimeManager, executionService);
+                agentRepository,
+                conversationService,
+                runtimeManager,
+                executionService,
+                contextRestoreService);
     }
 }

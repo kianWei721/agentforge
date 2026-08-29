@@ -92,6 +92,25 @@ class JdbcConversationRepositoryTest {
     }
 
     @Test
+    void shouldReadRecentMessagesInChronologicalOrder() {
+        ConversationSession session =
+                repository.getOrCreateSession("default", "user-1", "recent");
+
+        repository.appendMessage(session.id(), ConversationRole.USER, "one", "api");
+        repository.appendMessage(session.id(), ConversationRole.ASSISTANT, "two", "runtime");
+        repository.appendMessage(session.id(), ConversationRole.USER, "three", "api");
+        repository.appendMessage(session.id(), ConversationRole.ASSISTANT, "four", "runtime");
+
+        List<ConversationMessage> recent = repository.findRecentMessages(session.id(), 3);
+
+        assertEquals(3, recent.size());
+        assertEquals(2L, recent.get(0).sequenceNo());
+        assertEquals("two", recent.get(0).content());
+        assertEquals(4L, recent.get(2).sequenceNo());
+        assertEquals("four", recent.get(2).content());
+    }
+
+    @Test
     void shouldIsolateSameSessionKeyAcrossUsersAndAgents() {
         ConversationSession a =
                 repository.getOrCreateSession("agent-a", "user-1", "same");

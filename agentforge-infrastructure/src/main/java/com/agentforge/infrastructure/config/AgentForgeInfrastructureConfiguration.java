@@ -4,5 +4,9 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@EnableConfigurationProperties({ModelProviderProperties.class, AgentRuntimeProperties.class})
+@EnableConfigurationProperties({
+    ModelProviderProperties.class,
+    AgentRuntimeProperties.class,
+    AgentSessionCacheProperties.class
+})
 public class AgentForgeInfrastructureConfiguration {}

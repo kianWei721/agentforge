@@ -165,6 +165,24 @@ public class JdbcConversationRepository implements ConversationRepository {
                 sessionId);
     }
 
+    @Override
+    public List<ConversationMessage> findRecentMessages(String sessionId, int limit) {
+        List<ConversationMessage> rows =
+                jdbcTemplate.query(
+                        """
+                        SELECT id, session_id, sequence_no, role, content, source, created_at
+                        FROM af_message
+                        WHERE session_id = ?
+                        ORDER BY sequence_no DESC
+                        LIMIT ?
+                        """,
+                        MESSAGE_ROW_MAPPER,
+                        sessionId,
+                        limit);
+        java.util.Collections.reverse(rows);
+        return rows;
+    }
+
     private static ConversationSession mapSession(ResultSet rs) throws SQLException {
         return new ConversationSession(
                 rs.getString("id"),

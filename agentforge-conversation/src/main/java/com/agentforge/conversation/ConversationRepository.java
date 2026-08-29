@@ -15,4 +15,6 @@ public interface ConversationRepository {
             String sessionId, ConversationRole role, String content, String source);
 
     List<ConversationMessage> findMessages(String sessionId);
+
+    List<ConversationMessage> findRecentMessages(String sessionId, int limit);
 }

@@ -26,16 +26,19 @@ public class AgentConversationRuntimeService {
     private final ConversationService conversationService;
     private final AgentRuntimeManager runtimeManager;
     private final ExecutionService executionService;
+    private final SessionContextRestoreService contextRestoreService;
 
     public AgentConversationRuntimeService(
             AgentDefinitionRepository agentRepository,
             ConversationService conversationService,
             AgentRuntimeManager runtimeManager,
-            ExecutionService executionService) {
+            ExecutionService executionService,
+            SessionContextRestoreService contextRestoreService) {
         this.agentRepository = agentRepository;
         this.conversationService = conversationService;
         this.runtimeManager = runtimeManager;
         this.executionService = executionService;
+        this.contextRestoreService = contextRestoreService;
     }
 
     public Flux<AgentStreamChunk> stream(String agentId, AgentRuntimeRequest request) {
@@ -56,6 +59,8 @@ public class AgentConversationRuntimeService {
                                     conversationService.normalizeSessionKey(request.sessionId());
                             ConversationSession session =
                                     conversationService.openSession(agentId, userId, sessionKey);
+
+                            contextRestoreService.ensureContext(userId, session.id());
 
                             ConversationMessage userMessage =
                                     conversationService.appendMessage(

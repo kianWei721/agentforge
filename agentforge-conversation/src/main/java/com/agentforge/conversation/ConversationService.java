@@ -55,6 +55,14 @@ public class ConversationService {
         return repository.findMessages(session.id());
     }
 
+    public List<ConversationMessage> listRecentMessagesBySessionId(
+            String sessionId, int limit) {
+        if (limit < 1) {
+            throw new IllegalArgumentException("limit must be greater than zero");
+        }
+        return repository.findRecentMessages(required(sessionId, "sessionId"), limit);
+    }
+
     public String normalizeUserId(String userId) {
         String value = normalize(userId, DEFAULT_USER_ID);
         if (value.length() > MAX_USER_ID_LENGTH) {

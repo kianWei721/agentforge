@@ -15,7 +15,7 @@ import io.agentscope.core.event.ToolResultStartEvent;
 import io.agentscope.core.event.ToolResultTextDeltaEvent;
 import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.core.model.Model;
-import io.agentscope.core.state.InMemoryAgentStateStore;
+import io.agentscope.core.state.AgentStateStore;
 import io.agentscope.core.tool.Toolkit;
 import io.agentscope.harness.agent.HarnessAgent;
 import java.util.LinkedHashMap;
@@ -35,8 +35,10 @@ public final class AgentScopeHarnessRuntime implements AgentRuntime, AutoCloseab
             String name,
             String systemPrompt,
             Model model,
-            List<AgentTool> businessTools) {
+            List<AgentTool> businessTools,
+            AgentStateStore stateStore) {
         Objects.requireNonNull(model, "model must not be null");
+        Objects.requireNonNull(stateStore, "stateStore must not be null");
 
         Toolkit toolkit = new Toolkit();
         if (businessTools != null) {
@@ -50,7 +52,7 @@ public final class AgentScopeHarnessRuntime implements AgentRuntime, AutoCloseab
                         .model(model)
                         .toolkit(toolkit)
                         .generateOptions(GenerateOptions.builder().build())
-                        .stateStore(new InMemoryAgentStateStore())
+                        .stateStore(stateStore)
                         .disableFilesystemTools()
                         .disableShellTool()
                         .disableDynamicSkills()
