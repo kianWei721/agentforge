@@ -137,6 +137,10 @@ public class JdbcExecutionRepository implements ExecutionRepository {
                         input.businessCode(),
                         input.downstreamDurationMs(),
                         input.outboundOutcome(),
+                        input.toolRiskLevel(),
+                        input.toolReadOnly(),
+                        input.policyDecision(),
+                        input.policyReason(),
                         Instant.now());
 
         jdbcTemplate.update(
@@ -149,8 +153,9 @@ public class JdbcExecutionRepository implements ExecutionRepository {
                     governance_reason, argument_fingerprint, blocked_by_tool_call_id,
                     blocked_by_failure_code, outbound_protocol, downstream_system,
                     outbound_attempts, http_status, business_code, downstream_duration_ms,
-                    outbound_outcome, occurred_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    outbound_outcome, tool_risk_level, tool_read_only, policy_decision,
+                    policy_reason, occurred_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 event.id(),
                 event.executionId(),
@@ -182,6 +187,10 @@ public class JdbcExecutionRepository implements ExecutionRepository {
                 event.businessCode(),
                 event.downstreamDurationMs(),
                 event.outboundOutcome(),
+                event.toolRiskLevel(),
+                event.toolReadOnly(),
+                event.policyDecision(),
+                event.policyReason(),
                 Timestamp.from(event.occurredAt()));
 
         jdbcTemplate.update(
@@ -203,7 +212,8 @@ public class JdbcExecutionRepository implements ExecutionRepository {
                        governance_reason, argument_fingerprint, blocked_by_tool_call_id,
                        blocked_by_failure_code, outbound_protocol, downstream_system,
                        outbound_attempts, http_status, business_code, downstream_duration_ms,
-                       outbound_outcome, occurred_at
+                       outbound_outcome, tool_risk_level, tool_read_only, policy_decision,
+                       policy_reason, occurred_at
                 FROM af_trace_event
                 WHERE execution_id = ?
                 ORDER BY sequence_no
@@ -348,6 +358,10 @@ public class JdbcExecutionRepository implements ExecutionRepository {
                 nullableInteger(rs, "business_code"),
                 nullableLong(rs, "downstream_duration_ms"),
                 rs.getString("outbound_outcome"),
+                rs.getString("tool_risk_level"),
+                nullableBoolean(rs, "tool_read_only"),
+                rs.getString("policy_decision"),
+                rs.getString("policy_reason"),
                 toInstant(rs.getTimestamp("occurred_at")));
     }
 

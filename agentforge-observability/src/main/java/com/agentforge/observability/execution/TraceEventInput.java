@@ -27,7 +27,11 @@ public record TraceEventInput(
         Integer httpStatus,
         Integer businessCode,
         Long downstreamDurationMs,
-        String outboundOutcome) {
+        String outboundOutcome,
+        String toolRiskLevel,
+        Boolean toolReadOnly,
+        String policyDecision,
+        String policyReason) {
 
     public TraceEventInput(
             String eventType,
@@ -55,6 +59,10 @@ public record TraceEventInput(
                 outputTokens,
                 cachedTokens,
                 modelTimeMs,
+                null,
+                null,
+                null,
+                null,
                 null,
                 null,
                 null,

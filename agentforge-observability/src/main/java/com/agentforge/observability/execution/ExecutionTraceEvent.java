@@ -34,6 +34,10 @@ public record ExecutionTraceEvent(
         Integer businessCode,
         Long downstreamDurationMs,
         String outboundOutcome,
+        String toolRiskLevel,
+        Boolean toolReadOnly,
+        String policyDecision,
+        String policyReason,
         Instant occurredAt) {
 
     public ExecutionTraceEvent {

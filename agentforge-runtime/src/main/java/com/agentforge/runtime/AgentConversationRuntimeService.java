@@ -260,7 +260,11 @@ public class AgentConversationRuntimeService {
                 integerMetadata(metadata, "httpStatus"),
                 integerMetadata(metadata, "businessCode"),
                 longMetadata(metadata, "downstreamDurationMs"),
-                stringMetadata(metadata, "outboundOutcome"));
+                stringMetadata(metadata, "outboundOutcome"),
+                stringMetadata(metadata, "toolRiskLevel"),
+                booleanMetadata(metadata, "toolReadOnly"),
+                stringMetadata(metadata, "policyDecision"),
+                stringMetadata(metadata, "policyReason"));
     }
 
     private static String stringMetadata(Map<String, Object> metadata, String key) {

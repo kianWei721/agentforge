@@ -81,6 +81,10 @@ class JdbcExecutionRepositoryTest {
                     business_code INT,
                     downstream_duration_ms BIGINT,
                     outbound_outcome VARCHAR(64),
+                    tool_risk_level VARCHAR(16),
+                    tool_read_only BOOLEAN,
+                    policy_decision VARCHAR(32),
+                    policy_reason VARCHAR(128),
                     occurred_at TIMESTAMP(6) NOT NULL,
                     UNIQUE (execution_id, sequence_no)
                 )
@@ -182,7 +186,11 @@ class JdbcExecutionRepositoryTest {
                                 200,
                                 403,
                                 148L,
-                                "FORBIDDEN"));
+                                "FORBIDDEN",
+                                "HIGH",
+                                false,
+                                "REQUIRE_CONFIRMATION",
+                                "write_tool_requires_confirmation"));
 
         assertEquals(1L, first.sequenceNo());
         assertEquals(2L, second.sequenceNo());
@@ -219,6 +227,10 @@ class JdbcExecutionRepositoryTest {
         assertEquals(403, traces.get(3).businessCode());
         assertEquals(148L, traces.get(3).downstreamDurationMs());
         assertEquals("FORBIDDEN", traces.get(3).outboundOutcome());
+        assertEquals("HIGH", traces.get(3).toolRiskLevel());
+        assertFalse(traces.get(3).toolReadOnly());
+        assertEquals("REQUIRE_CONFIRMATION", traces.get(3).policyDecision());
+        assertEquals("write_tool_requires_confirmation", traces.get(3).policyReason());
     }
 
     @Test
