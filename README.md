@@ -46,7 +46,7 @@ HTTP / SSE
 - MySQL 回源默认最多恢复最近 40 条 USER / ASSISTANT Message，避免无限历史一次性灌入上下文。
 - `context_restore` Trace 记录本轮上下文来自 CACHE / MYSQL_TRANSCRIPT / EMPTY。
 - `query_device_status` 支持 `demo` / `http` 两种 DeviceStatusQueryPort 适配器。
-- HTTP 模式真实调用 yudao Device Mini API：`GET /admin-api/device/mini/devices/{deviceId}`。
+- HTTP 模式真实调用 yudao Device Web API：`GET /admin-api/device/web/devices/{deviceId}`。
 - 后端认证固定由 AgentForge 配置注入 `Authorization: Bearer ...` 与 `tenant-id`，LLM 无法控制目标地址或凭据。
 - 真实后端中文状态统一归一化为 ONLINE / OFFLINE / SLEEP / INACTIVE。
 - HTTP Tool 调用配置 connect/request timeout、只读安全重试和简单 Circuit Breaker（熔断器）。
