@@ -1,6 +1,10 @@
 package com.agentforge.runtime;
 
 import com.agentforge.runtime.ToolGovernanceState.ToolGovernanceDecision;
+import com.agentforge.runtime.confirmation.ToolConfirmation;
+import com.agentforge.runtime.confirmation.ToolConfirmationBinding;
+import com.agentforge.runtime.confirmation.ToolConfirmationResolution;
+import com.agentforge.runtime.confirmation.ToolConfirmationService;
 import com.agentforge.tool.AgentTool;
 import com.agentforge.tool.ToolInvocationContext;
 import com.agentforge.tool.ToolResult;
@@ -12,6 +16,7 @@ import io.agentscope.core.permission.PermissionContextState;
 import io.agentscope.core.permission.PermissionDecision;
 import io.agentscope.core.tool.ToolBase;
 import io.agentscope.core.tool.ToolCallParam;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -23,16 +28,21 @@ final class AgentScopeToolAdapter extends ToolBase {
     private final String agentId;
     private final AgentTool delegate;
     private final ToolExecutionPolicy executionPolicy;
+    private final ToolConfirmationService confirmationService;
 
     AgentScopeToolAdapter(String agentId, AgentTool delegate) {
-        this(
-                agentId,
-                delegate,
-                new BaselineToolExecutionPolicy(ToolPolicyOptions.defaults()));
+        this(agentId, delegate, new BaselineToolExecutionPolicy(ToolPolicyOptions.defaults()), null);
+    }
+
+    AgentScopeToolAdapter(String agentId, AgentTool delegate, ToolExecutionPolicy executionPolicy) {
+        this(agentId, delegate, executionPolicy, null);
     }
 
     AgentScopeToolAdapter(
-            String agentId, AgentTool delegate, ToolExecutionPolicy executionPolicy) {
+            String agentId,
+            AgentTool delegate,
+            ToolExecutionPolicy executionPolicy,
+            ToolConfirmationService confirmationService) {
         super(
                 ToolBase.builder()
                         .name(delegate.name())
@@ -46,6 +56,7 @@ final class AgentScopeToolAdapter extends ToolBase {
                 executionPolicy == null
                         ? new BaselineToolExecutionPolicy(ToolPolicyOptions.defaults())
                         : executionPolicy;
+        this.confirmationService = confirmationService;
     }
 
     @Override
@@ -69,19 +80,16 @@ final class AgentScopeToolAdapter extends ToolBase {
                                     new ToolInvocationContext(
                                             agentId,
                                             runtimeContext != null ? runtimeContext.getUserId() : null,
-                                            runtimeContext != null
-                                                    ? runtimeContext.getSessionId()
-                                                    : null,
+                                            runtimeContext != null ? runtimeContext.getSessionId() : null,
                                             telemetryBuffer);
 
                             String toolCallId =
-                                    param.getToolUseBlock() == null
-                                            ? null
-                                            : param.getToolUseBlock().getId();
+                                    param.getToolUseBlock() == null ? null : param.getToolUseBlock().getId();
                             Map<String, Object> input =
                                     param.getInput() == null ? Map.of() : param.getInput();
+                            String fingerprint = ToolGovernanceState.fingerprint(delegate.name(), input);
 
-                            ToolPolicyEvaluation policy =
+                            ToolPolicyEvaluation baselinePolicy =
                                     executionPolicy.evaluate(
                                             new ToolPolicyContext(
                                                     agentId,
@@ -92,29 +100,35 @@ final class AgentScopeToolAdapter extends ToolBase {
                                                     delegate.riskLevel(),
                                                     input));
 
+                            ConfirmationDecision confirmationDecision =
+                                    resolveConfirmation(
+                                            baselinePolicy,
+                                            runtimeContext,
+                                            toolCallId,
+                                            invocationContext,
+                                            fingerprint,
+                                            input);
+                            ToolPolicyEvaluation effectivePolicy = confirmationDecision.effectivePolicy();
+
                             ToolGovernanceState governance =
                                     runtimeContext == null
                                             ? null
                                             : runtimeContext.get(ToolGovernanceState.class);
-                            String fingerprint =
-                                    ToolGovernanceState.fingerprint(delegate.name(), input);
                             ToolGovernanceDecision governanceDecision =
-                                    !policy.decision().executable()
-                                            ? ToolGovernanceDecision.skipped(
-                                                    fingerprint, "policy_preempted")
+                                    !effectivePolicy.decision().executable()
+                                            ? ToolGovernanceDecision.skipped(fingerprint, "policy_preempted")
                                             : governance == null
                                                     ? ToolGovernanceDecision.allow(fingerprint)
                                                     : governance.beforeInvocation(
-                                                            toolCallId,
-                                                            delegate.name(),
-                                                            input);
+                                                            toolCallId, delegate.name(), input);
 
                             long startedNanos = System.nanoTime();
                             try {
                                 ToolResult result =
                                         decideAndExecute(
-                                                policy,
+                                                effectivePolicy,
                                                 governanceDecision,
+                                                confirmationDecision.confirmation(),
                                                 invocationContext,
                                                 input);
 
@@ -122,12 +136,13 @@ final class AgentScopeToolAdapter extends ToolBase {
                                     governance.recordResult(
                                             toolCallId,
                                             governanceDecision,
-                                            policy,
+                                            effectivePolicy,
                                             delegate.riskLevel(),
                                             delegate.readOnly(),
                                             result,
                                             elapsedMillis(startedNanos),
-                                            telemetryBuffer.latestOutboundHttp());
+                                            telemetryBuffer.latestOutboundHttp(),
+                                            confirmationDecision.confirmation());
                                 }
                                 return toToolResultBlock(param, result);
                             } catch (RuntimeException exception) {
@@ -135,11 +150,12 @@ final class AgentScopeToolAdapter extends ToolBase {
                                     governance.recordException(
                                             toolCallId,
                                             governanceDecision,
-                                            policy,
+                                            effectivePolicy,
                                             delegate.riskLevel(),
                                             delegate.readOnly(),
                                             elapsedMillis(startedNanos),
-                                            telemetryBuffer.latestOutboundHttp());
+                                            telemetryBuffer.latestOutboundHttp(),
+                                            confirmationDecision.confirmation());
                                 }
                                 throw exception;
                             }
@@ -147,20 +163,72 @@ final class AgentScopeToolAdapter extends ToolBase {
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
+    private ConfirmationDecision resolveConfirmation(
+            ToolPolicyEvaluation baselinePolicy,
+            RuntimeContext runtimeContext,
+            String toolCallId,
+            ToolInvocationContext invocationContext,
+            String fingerprint,
+            Map<String, Object> input) {
+        if (baselinePolicy.decision() != ToolPolicyDecision.REQUIRE_CONFIRMATION) {
+            return new ConfirmationDecision(baselinePolicy, null);
+        }
+        if (confirmationService == null
+                || runtimeContext == null
+                || toolCallId == null
+                || toolCallId.isBlank()) {
+            return new ConfirmationDecision(baselinePolicy, null);
+        }
+        ToolExecutionIdentity identity = runtimeContext.get(ToolExecutionIdentity.class);
+        if (identity == null) {
+            return new ConfirmationDecision(baselinePolicy, null);
+        }
+
+        ToolConfirmationResolution resolution =
+                confirmationService.resolve(
+                        identity.executionId(),
+                        toolCallId,
+                        new ToolConfirmationBinding(
+                                agentId,
+                                invocationContext.userId(),
+                                invocationContext.sessionId(),
+                                delegate.name(),
+                                fingerprint),
+                        delegate.confirmationSummary(input));
+        if (resolution.authorized()) {
+            return new ConfirmationDecision(
+                    ToolPolicyEvaluation.allow("approved_confirmation"),
+                    resolution.confirmation());
+        }
+        return new ConfirmationDecision(baselinePolicy, resolution.confirmation());
+    }
+
     private ToolResult decideAndExecute(
-            ToolPolicyEvaluation policy,
+            ToolPolicyEvaluation effectivePolicy,
             ToolGovernanceDecision governanceDecision,
+            ToolConfirmation confirmation,
             ToolInvocationContext context,
             Map<String, Object> input) {
-        if (policy.decision() == ToolPolicyDecision.DENY) {
+        if (effectivePolicy.decision() == ToolPolicyDecision.DENY) {
             return ToolResult.failure(
-                    "tool invocation denied by execution policy",
-                    "POLICY_DENIED",
-                    false);
+                    "tool invocation denied by execution policy", "POLICY_DENIED", false);
         }
-        if (policy.decision() == ToolPolicyDecision.REQUIRE_CONFIRMATION) {
+        if (effectivePolicy.decision() == ToolPolicyDecision.REQUIRE_CONFIRMATION) {
+            if (confirmation == null) {
+                return ToolResult.failure(
+                        "tool invocation requires confirmation, but durable confirmation is unavailable",
+                        "CONFIRMATION_UNAVAILABLE",
+                        false);
+            }
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("confirmationId", confirmation.id());
+            data.put("status", confirmation.status().name());
+            data.put("expiresAt", confirmation.expiresAt().toString());
+            data.put("toolName", confirmation.toolName());
+            data.put("summary", confirmation.summary());
             return ToolResult.failure(
                     "tool invocation requires user confirmation before execution",
+                    data,
                     "CONFIRMATION_REQUIRED",
                     false);
         }
@@ -189,8 +257,10 @@ final class AgentScopeToolAdapter extends ToolBase {
     }
 
     private static long elapsedMillis(long startedNanos) {
-        return Math.max(
-                0L,
-                TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedNanos));
+        return Math.max(0L, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedNanos));
     }
+
+    private record ConfirmationDecision(
+            ToolPolicyEvaluation effectivePolicy,
+            ToolConfirmation confirmation) {}
 }

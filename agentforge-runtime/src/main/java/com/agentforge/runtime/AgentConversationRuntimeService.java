@@ -89,7 +89,8 @@ public class AgentConversationRuntimeService {
                                     new AgentRuntimeRequest(
                                             userId,
                                             session.id(),
-                                            request.message());
+                                            request.message(),
+                                            execution.id());
 
                             Flux<AgentStreamChunk> executionStart =
                                     Flux.fromIterable(

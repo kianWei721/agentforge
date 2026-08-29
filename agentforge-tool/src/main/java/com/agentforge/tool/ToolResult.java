@@ -37,7 +37,15 @@ public record ToolResult(
     }
 
     public static ToolResult failure(String message, String failureCode, boolean retryable) {
-        return new ToolResult(false, message, Map.of(), failureCode, retryable);
+        return failure(message, Map.of(), failureCode, retryable);
+    }
+
+    public static ToolResult failure(
+            String message,
+            Map<String, Object> data,
+            String failureCode,
+            boolean retryable) {
+        return new ToolResult(false, message, data, failureCode, retryable);
     }
 
     public String toModelText() {

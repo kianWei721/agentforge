@@ -17,6 +17,7 @@ import com.agentforge.runtime.SessionContextRestoreService;
 import com.agentforge.runtime.ToolGovernanceOptions;
 import com.agentforge.runtime.ToolExecutionPolicy;
 import com.agentforge.runtime.ToolPolicyOptions;
+import com.agentforge.runtime.confirmation.ToolConfirmationService;
 import com.agentforge.tool.AgentTool;
 import com.agentforge.tool.ToolRegistry;
 import io.agentscope.core.model.Model;
@@ -33,7 +34,8 @@ public class AgentScopeRuntimeConfiguration {
             DashScopeModelFactory modelFactory,
             AgentStateStore stateStore,
             ToolGovernanceProperties governanceProperties,
-            ToolPolicyProperties policyProperties) {
+            ToolPolicyProperties policyProperties,
+            ToolConfirmationService confirmationService) {
         governanceProperties.validate();
         ToolGovernanceOptions governanceOptions =
                 new ToolGovernanceOptions(
@@ -64,7 +66,8 @@ public class AgentScopeRuntimeConfiguration {
                         tools,
                         stateStore,
                         governanceOptions,
-                        executionPolicy);
+                        executionPolicy,
+                        confirmationService);
             }
         };
     }

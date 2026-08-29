@@ -1,5 +1,6 @@
 package com.agentforge.runtime;
 
+import com.agentforge.runtime.confirmation.ToolConfirmation;
 import com.agentforge.tool.ToolResult;
 import com.agentforge.tool.ToolRiskLevel;
 import com.agentforge.tool.telemetry.OutboundHttpTelemetry;
@@ -94,6 +95,19 @@ final class ToolGovernanceState {
             ToolResult result,
             long durationMs,
             OutboundHttpTelemetry outbound) {
+        recordResult(toolCallId, decision, policy, riskLevel, readOnly, result, durationMs, outbound, null);
+    }
+
+    void recordResult(
+            String toolCallId,
+            ToolGovernanceDecision decision,
+            ToolPolicyEvaluation policy,
+            ToolRiskLevel riskLevel,
+            boolean readOnly,
+            ToolResult result,
+            long durationMs,
+            OutboundHttpTelemetry outbound,
+            ToolConfirmation confirmation) {
         if (toolCallId == null || toolCallId.isBlank() || result == null) {
             return;
         }
@@ -144,7 +158,9 @@ final class ToolGovernanceState {
                         riskLevel == null ? ToolRiskLevel.HIGH.name() : riskLevel.name(),
                         readOnly,
                         effectivePolicy.decision().name(),
-                        effectivePolicy.reason()));
+                        effectivePolicy.reason(),
+                        confirmation == null ? null : confirmation.id(),
+                        confirmation == null ? null : confirmation.status().name()));
 
         if (policyAllowsExecution
                 && decision.allowed()
@@ -196,6 +212,18 @@ final class ToolGovernanceState {
             boolean readOnly,
             long durationMs,
             OutboundHttpTelemetry outbound) {
+        recordException(toolCallId, decision, policy, riskLevel, readOnly, durationMs, outbound, null);
+    }
+
+    void recordException(
+            String toolCallId,
+            ToolGovernanceDecision decision,
+            ToolPolicyEvaluation policy,
+            ToolRiskLevel riskLevel,
+            boolean readOnly,
+            long durationMs,
+            OutboundHttpTelemetry outbound,
+            ToolConfirmation confirmation) {
         if (toolCallId == null || toolCallId.isBlank()) {
             return;
         }
@@ -225,7 +253,9 @@ final class ToolGovernanceState {
                         riskLevel == null ? ToolRiskLevel.HIGH.name() : riskLevel.name(),
                         readOnly,
                         effectivePolicy.decision().name(),
-                        effectivePolicy.reason()));
+                        effectivePolicy.reason(),
+                        confirmation == null ? null : confirmation.id(),
+                        confirmation == null ? null : confirmation.status().name()));
     }
 
     ToolInvocationTelemetry telemetry(String toolCallId) {
@@ -354,7 +384,9 @@ final class ToolGovernanceState {
             String toolRiskLevel,
             boolean toolReadOnly,
             String policyDecision,
-            String policyReason) {}
+            String policyReason,
+            String confirmationId,
+            String confirmationStatus) {}
 
     private record PriorFailure(String toolCallId, String failureCode) {}
 }

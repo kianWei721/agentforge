@@ -1,5 +1,6 @@
 package com.agentforge.runtime;
 
+import com.agentforge.runtime.confirmation.ToolConfirmationService;
 import com.agentforge.tool.AgentTool;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEvent;
@@ -31,6 +32,7 @@ public final class AgentScopeHarnessRuntime implements AgentRuntime, AutoCloseab
     private final HarnessAgent agent;
     private final ToolGovernanceOptions toolGovernanceOptions;
     private final ToolExecutionPolicy toolExecutionPolicy;
+    private final ToolConfirmationService toolConfirmationService;
 
     public AgentScopeHarnessRuntime(
             String agentId,
@@ -47,7 +49,8 @@ public final class AgentScopeHarnessRuntime implements AgentRuntime, AutoCloseab
                 businessTools,
                 stateStore,
                 ToolGovernanceOptions.defaults(),
-                new BaselineToolExecutionPolicy(ToolPolicyOptions.defaults()));
+                new BaselineToolExecutionPolicy(ToolPolicyOptions.defaults()),
+                null);
     }
 
     public AgentScopeHarnessRuntime(
@@ -78,6 +81,28 @@ public final class AgentScopeHarnessRuntime implements AgentRuntime, AutoCloseab
             AgentStateStore stateStore,
             ToolGovernanceOptions toolGovernanceOptions,
             ToolExecutionPolicy toolExecutionPolicy) {
+        this(
+                agentId,
+                name,
+                systemPrompt,
+                model,
+                businessTools,
+                stateStore,
+                toolGovernanceOptions,
+                toolExecutionPolicy,
+                null);
+    }
+
+    public AgentScopeHarnessRuntime(
+            String agentId,
+            String name,
+            String systemPrompt,
+            Model model,
+            List<AgentTool> businessTools,
+            AgentStateStore stateStore,
+            ToolGovernanceOptions toolGovernanceOptions,
+            ToolExecutionPolicy toolExecutionPolicy,
+            ToolConfirmationService toolConfirmationService) {
         Objects.requireNonNull(model, "model must not be null");
         Objects.requireNonNull(stateStore, "stateStore must not be null");
         this.toolGovernanceOptions =
@@ -88,6 +113,7 @@ public final class AgentScopeHarnessRuntime implements AgentRuntime, AutoCloseab
                 toolExecutionPolicy == null
                         ? new BaselineToolExecutionPolicy(ToolPolicyOptions.defaults())
                         : toolExecutionPolicy;
+        this.toolConfirmationService = toolConfirmationService;
 
         Toolkit toolkit = new Toolkit();
         if (businessTools != null) {
@@ -95,7 +121,10 @@ public final class AgentScopeHarnessRuntime implements AgentRuntime, AutoCloseab
                     tool ->
                             toolkit.registerTool(
                                     new AgentScopeToolAdapter(
-                                            agentId, tool, this.toolExecutionPolicy)));
+                                            agentId,
+                                            tool,
+                                            this.toolExecutionPolicy,
+                                            this.toolConfirmationService)));
         }
 
         this.agent =
@@ -122,12 +151,17 @@ public final class AgentScopeHarnessRuntime implements AgentRuntime, AutoCloseab
     @Override
     public Flux<AgentStreamChunk> stream(AgentRuntimeRequest request) {
         ToolGovernanceState governanceState = new ToolGovernanceState(toolGovernanceOptions);
-        RuntimeContext context =
+        RuntimeContext.Builder contextBuilder =
                 RuntimeContext.builder()
                         .userId(normalizeId(request.userId(), "anonymous"))
                         .sessionId(normalizeId(request.sessionId(), "default"))
-                        .put(ToolGovernanceState.class, governanceState)
-                        .build();
+                        .put(ToolGovernanceState.class, governanceState);
+        if (request.executionId() != null && !request.executionId().isBlank()) {
+            contextBuilder.put(
+                    ToolExecutionIdentity.class,
+                    new ToolExecutionIdentity(request.executionId()));
+        }
+        RuntimeContext context = contextBuilder.build();
 
         Flux<AgentStreamChunk> events =
                 agent.streamEvents(request.message(), context)
@@ -299,6 +333,12 @@ public final class AgentScopeHarnessRuntime implements AgentRuntime, AutoCloseab
         metadata.put("toolReadOnly", telemetry.toolReadOnly());
         metadata.put("policyDecision", telemetry.policyDecision());
         metadata.put("policyReason", telemetry.policyReason());
+        if (telemetry.confirmationId() != null) {
+            metadata.put("confirmationId", telemetry.confirmationId());
+        }
+        if (telemetry.confirmationStatus() != null) {
+            metadata.put("confirmationStatus", telemetry.confirmationStatus());
+        }
     }
 
     @Override
