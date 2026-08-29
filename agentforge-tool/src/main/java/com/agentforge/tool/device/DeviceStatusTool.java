@@ -65,13 +65,28 @@ public class DeviceStatusTool implements AgentTool {
                             data.put("status", snapshot.status());
                             data.put("lastSeenAt", snapshot.lastSeenAt());
                             data.put("source", snapshot.source());
-                            data.put("attributes", snapshot.attributes());
+
+                            Map<String, Object> safeAttributes = new LinkedHashMap<>();
+                            copyIfPresent(snapshot.attributes(), safeAttributes, "stateRaw");
+                            copyIfPresent(snapshot.attributes(), safeAttributes, "deviceNickname");
+                            copyIfPresent(snapshot.attributes(), safeAttributes, "productId");
+                            if (!safeAttributes.isEmpty()) {
+                                data.put("attributes", safeAttributes);
+                            }
                             return ToolResult.success("device status queried", data);
                         })
                 .orElseGet(() -> ToolResult.failure("device not found: " + deviceId));
         } catch (DeviceStatusQueryException exception) {
             return ToolResult.failure(
                     "device status query unavailable: " + exception.reason().name());
+        }
+    }
+
+    private static void copyIfPresent(
+            Map<String, Object> source, Map<String, Object> target, String key) {
+        Object value = source.get(key);
+        if (value != null) {
+            target.put(key, value);
         }
     }
 }
