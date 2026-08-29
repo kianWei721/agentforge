@@ -9,6 +9,7 @@ import org.springframework.context.annotation.Configuration;
     AgentRuntimeProperties.class,
     AgentSessionCacheProperties.class,
     IoTDeviceStatusProperties.class,
+    IoTLureLampControlProperties.class,
     ToolGovernanceProperties.class,
     ToolPolicyProperties.class,
     ToolConfirmationProperties.class

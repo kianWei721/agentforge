@@ -5,6 +5,7 @@ import com.agentforge.core.AgentForgeConstants;
 import com.agentforge.infrastructure.config.AgentRuntimeProperties;
 import com.agentforge.infrastructure.config.AgentSessionCacheProperties;
 import com.agentforge.infrastructure.config.IoTDeviceStatusProperties;
+import com.agentforge.infrastructure.config.IoTLureLampControlProperties;
 import com.agentforge.infrastructure.config.ToolConfirmationProperties;
 import com.agentforge.infrastructure.config.ToolGovernanceProperties;
 import com.agentforge.infrastructure.config.ToolPolicyProperties;
@@ -31,6 +32,7 @@ public class SystemController {
     private final InfrastructureStatusService infrastructureStatusService;
     private final AgentSessionCacheProperties sessionCacheProperties;
     private final IoTDeviceStatusProperties iotDeviceStatusProperties;
+    private final IoTLureLampControlProperties iotLureLampControlProperties;
     private final ToolGovernanceProperties toolGovernanceProperties;
     private final ToolPolicyProperties toolPolicyProperties;
     private final ToolConfirmationProperties toolConfirmationProperties;
@@ -44,6 +46,7 @@ public class SystemController {
             InfrastructureStatusService infrastructureStatusService,
             AgentSessionCacheProperties sessionCacheProperties,
             IoTDeviceStatusProperties iotDeviceStatusProperties,
+            IoTLureLampControlProperties iotLureLampControlProperties,
             ToolGovernanceProperties toolGovernanceProperties,
             ToolPolicyProperties toolPolicyProperties,
             ToolConfirmationProperties toolConfirmationProperties) {
@@ -55,6 +58,7 @@ public class SystemController {
         this.infrastructureStatusService = infrastructureStatusService;
         this.sessionCacheProperties = sessionCacheProperties;
         this.iotDeviceStatusProperties = iotDeviceStatusProperties;
+        this.iotLureLampControlProperties = iotLureLampControlProperties;
         this.toolGovernanceProperties = toolGovernanceProperties;
         this.toolPolicyProperties = toolPolicyProperties;
         this.toolConfirmationProperties = toolConfirmationProperties;
@@ -95,6 +99,12 @@ public class SystemController {
         result.put(
                 "iotDeviceStatusRequestTimeout",
                 iotDeviceStatusProperties.getRequestTimeout().toString());
+        result.put(
+                "iotLureLampControlEnabled",
+                iotLureLampControlProperties.isEnabled());
+        result.put(
+                "iotLureLampControlVerifyAttempts",
+                iotLureLampControlProperties.getVerifyAttempts());
         result.put("toolGovernanceEnabled", toolGovernanceProperties.isEnabled());
         result.put(
                 "blockRepeatedNonRetryableToolCalls",

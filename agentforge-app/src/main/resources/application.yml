@@ -37,6 +37,13 @@ agentforge:
       base-url: ${DASHSCOPE_BASE_URL:}
       model: ${DASHSCOPE_MODEL:qwen3.8-flash}
   iot:
+    lure-lamp-control:
+      enabled: ${AGENTFORGE_IOT_LURE_LAMP_CONTROL_ENABLED:false}
+      latest-properties-path: "${AGENTFORGE_IOT_LURE_LAMP_LATEST_PROPERTIES_PATH:/admin-api/device/web/devices/{deviceId}/properties/latest}"
+      command-path: "${AGENTFORGE_IOT_LURE_LAMP_COMMAND_PATH:/admin-api/device/web/devices/command/send}"
+      request-timeout: ${AGENTFORGE_IOT_LURE_LAMP_REQUEST_TIMEOUT:3s}
+      verify-attempts: ${AGENTFORGE_IOT_LURE_LAMP_VERIFY_ATTEMPTS:10}
+      verify-interval: ${AGENTFORGE_IOT_LURE_LAMP_VERIFY_INTERVAL:500ms}
     device-status:
       mode: ${AGENTFORGE_IOT_DEVICE_STATUS_MODE:demo}
       base-url: ${AGENTFORGE_IOT_BASE_URL:}
