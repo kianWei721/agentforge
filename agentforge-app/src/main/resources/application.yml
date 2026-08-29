@@ -40,7 +40,7 @@ agentforge:
     device-status:
       mode: ${AGENTFORGE_IOT_DEVICE_STATUS_MODE:demo}
       base-url: ${AGENTFORGE_IOT_BASE_URL:}
-      detail-path: "${AGENTFORGE_IOT_DEVICE_DETAIL_PATH:/admin-api/device/mini/devices/{deviceId}}"
+      detail-path: "${AGENTFORGE_IOT_DEVICE_DETAIL_PATH:/admin-api/device/web/devices/{deviceId}}"
       access-token: ${AGENTFORGE_IOT_ACCESS_TOKEN:}
       tenant-id: ${AGENTFORGE_IOT_TENANT_ID:}
       connect-timeout: ${AGENTFORGE_IOT_CONNECT_TIMEOUT:2s}
