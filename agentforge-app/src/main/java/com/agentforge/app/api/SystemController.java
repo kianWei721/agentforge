@@ -3,6 +3,7 @@ package com.agentforge.app.api;
 import com.agentforge.agent.AgentDefinitionService;
 import com.agentforge.core.AgentForgeConstants;
 import com.agentforge.infrastructure.config.AgentRuntimeProperties;
+import com.agentforge.infrastructure.config.AgentSessionCacheProperties;
 import com.agentforge.infrastructure.health.InfrastructureStatus;
 import com.agentforge.infrastructure.health.InfrastructureStatusService;
 import com.agentforge.model.ModelGatewayCatalog;
@@ -24,6 +25,7 @@ public class SystemController {
     private final ToolRegistry toolRegistry;
     private final AgentRuntimeManager runtimeManager;
     private final InfrastructureStatusService infrastructureStatusService;
+    private final AgentSessionCacheProperties sessionCacheProperties;
 
     public SystemController(
             ModelGatewayCatalog modelGatewayCatalog,
@@ -31,13 +33,15 @@ public class SystemController {
             AgentDefinitionService agentService,
             ToolRegistry toolRegistry,
             AgentRuntimeManager runtimeManager,
-            InfrastructureStatusService infrastructureStatusService) {
+            InfrastructureStatusService infrastructureStatusService,
+            AgentSessionCacheProperties sessionCacheProperties) {
         this.modelGatewayCatalog = modelGatewayCatalog;
         this.agentProperties = agentProperties;
         this.agentService = agentService;
         this.toolRegistry = toolRegistry;
         this.runtimeManager = runtimeManager;
         this.infrastructureStatusService = infrastructureStatusService;
+        this.sessionCacheProperties = sessionCacheProperties;
     }
 
     @GetMapping("/health")
@@ -61,6 +65,11 @@ public class SystemController {
         result.put("agentDefinitions", agentService.list().size());
         result.put("registeredTools", toolRegistry.descriptors().size());
         result.put("cachedAgentRuntimes", runtimeManager.cachedRuntimeCount());
+        result.put("sessionCacheEnabled", sessionCacheProperties.isEnabled());
+        result.put("sessionCacheTtl", sessionCacheProperties.getTtl().toString());
+        result.put(
+                "contextRestoreMaxMessages",
+                sessionCacheProperties.getRestoreMaxMessages());
         return result;
     }
 }
