@@ -190,8 +190,10 @@ public class HttpDeviceStatusQueryAdapter implements DeviceStatusQueryPort {
         Map<String, Object> attributes = new LinkedHashMap<>();
         put(attributes, "stateRaw", rawState);
         put(attributes, "deviceName", text(data, "deviceName"));
+        put(attributes, "deviceAlias", text(data, "deviceAlias"));
         put(attributes, "deviceNickname", text(data, "deviceNickname"));
         put(attributes, "productId", scalar(data.get("productId")));
+        put(attributes, "productKey", text(data, "productKey"));
         put(attributes, "location", text(data, "location"));
         put(attributes, "province", text(data, "province"));
         put(attributes, "city", text(data, "city"));
@@ -206,7 +208,7 @@ public class HttpDeviceStatusQueryAdapter implements DeviceStatusQueryPort {
                         responseDeviceId,
                         normalizedState,
                         lastSeenAt,
-                        "yudao-device-mini-http",
+                        "yudao-device-web-http",
                         attributes));
     }
 
