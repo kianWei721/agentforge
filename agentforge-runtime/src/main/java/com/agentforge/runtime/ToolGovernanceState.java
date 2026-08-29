@@ -72,6 +72,15 @@ final class ToolGovernanceState {
             return;
         }
 
+        Integer outboundAttempts =
+                decision.allowed()
+                        ? (outbound == null ? null : Integer.valueOf(outbound.attempts()))
+                        : Integer.valueOf(0);
+        String outboundOutcome =
+                decision.allowed()
+                        ? (outbound == null ? null : outbound.outcome())
+                        : "GOVERNANCE_BLOCKED";
+
         telemetryByCallId.put(
                 toolCallId,
                 new ToolInvocationTelemetry(
@@ -85,15 +94,11 @@ final class ToolGovernanceState {
                         decision.blockedByFailureCode(),
                         outbound == null ? null : outbound.protocol(),
                         outbound == null ? null : outbound.downstreamSystem(),
-                        decision.allowed()
-                                ? (outbound == null ? null : outbound.attempts())
-                                : 0,
+                        outboundAttempts,
                         outbound == null ? null : outbound.httpStatus(),
                         outbound == null ? null : outbound.businessCode(),
                         outbound == null ? null : outbound.downstreamDurationMs(),
-                        decision.allowed()
-                                ? (outbound == null ? null : outbound.outcome())
-                                : "GOVERNANCE_BLOCKED"));
+                        outboundOutcome));
 
         if (options.enabled()
                 && options.blockRepeatedNonRetryableCalls()
