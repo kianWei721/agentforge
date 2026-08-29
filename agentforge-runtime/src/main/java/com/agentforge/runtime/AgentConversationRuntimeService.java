@@ -253,7 +253,14 @@ public class AgentConversationRuntimeService {
                 stringMetadata(metadata, "governanceReason"),
                 stringMetadata(metadata, "argumentFingerprint"),
                 stringMetadata(metadata, "blockedByToolCallId"),
-                stringMetadata(metadata, "blockedByFailureCode"));
+                stringMetadata(metadata, "blockedByFailureCode"),
+                stringMetadata(metadata, "outboundProtocol"),
+                stringMetadata(metadata, "downstreamSystem"),
+                integerMetadata(metadata, "outboundAttempts"),
+                integerMetadata(metadata, "httpStatus"),
+                integerMetadata(metadata, "businessCode"),
+                longMetadata(metadata, "downstreamDurationMs"),
+                stringMetadata(metadata, "outboundOutcome"));
     }
 
     private static String stringMetadata(Map<String, Object> metadata, String key) {

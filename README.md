@@ -59,6 +59,7 @@ HTTP / SSE
 - 每次 Agent call 使用独立 `ToolGovernanceState`；相同 Tool + 等价参数在发生不可重试失败后会被 Runtime 阻断，不再次执行业务 Tool。
 - Tool 参数规范化后生成 SHA-256 argument fingerprint，用于重复调用识别。
 - `tool_result_end` Trace 持久化 tool duration、failure code、retryable、governance decision/reason 与 blocked-by 关联字段。
+- Slice 2 增加结构化 Outbound HTTP Telemetry：protocol、downstream system、attempts、HTTP status、business code、downstream duration 与 outcome；不记录 URL、Token、tenant-id 或 response body。
 - Slice 1 已通过真实 Runtime 与 Durable Trace 验收：第一次 FORBIDDEN 正常执行，第二次相同不可重试调用由治理层 BLOCK，未再次进入业务 Tool。
 
 ## Conversation 数据模型

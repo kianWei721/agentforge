@@ -130,6 +130,13 @@ public class JdbcExecutionRepository implements ExecutionRepository {
                         input.argumentFingerprint(),
                         input.blockedByToolCallId(),
                         input.blockedByFailureCode(),
+                        input.outboundProtocol(),
+                        input.downstreamSystem(),
+                        input.outboundAttempts(),
+                        input.httpStatus(),
+                        input.businessCode(),
+                        input.downstreamDurationMs(),
+                        input.outboundOutcome(),
                         Instant.now());
 
         jdbcTemplate.update(
@@ -140,8 +147,10 @@ public class JdbcExecutionRepository implements ExecutionRepository {
                     input_tokens, output_tokens, cached_tokens, model_time_ms,
                     tool_duration_ms, failure_code, retryable, governance_decision,
                     governance_reason, argument_fingerprint, blocked_by_tool_call_id,
-                    blocked_by_failure_code, occurred_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    blocked_by_failure_code, outbound_protocol, downstream_system,
+                    outbound_attempts, http_status, business_code, downstream_duration_ms,
+                    outbound_outcome, occurred_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 event.id(),
                 event.executionId(),
@@ -166,6 +175,13 @@ public class JdbcExecutionRepository implements ExecutionRepository {
                 event.argumentFingerprint(),
                 event.blockedByToolCallId(),
                 event.blockedByFailureCode(),
+                event.outboundProtocol(),
+                event.downstreamSystem(),
+                event.outboundAttempts(),
+                event.httpStatus(),
+                event.businessCode(),
+                event.downstreamDurationMs(),
+                event.outboundOutcome(),
                 Timestamp.from(event.occurredAt()));
 
         jdbcTemplate.update(
@@ -185,7 +201,9 @@ public class JdbcExecutionRepository implements ExecutionRepository {
                        input_tokens, output_tokens, cached_tokens, model_time_ms,
                        tool_duration_ms, failure_code, retryable, governance_decision,
                        governance_reason, argument_fingerprint, blocked_by_tool_call_id,
-                       blocked_by_failure_code, occurred_at
+                       blocked_by_failure_code, outbound_protocol, downstream_system,
+                       outbound_attempts, http_status, business_code, downstream_duration_ms,
+                       outbound_outcome, occurred_at
                 FROM af_trace_event
                 WHERE execution_id = ?
                 ORDER BY sequence_no
@@ -323,6 +341,13 @@ public class JdbcExecutionRepository implements ExecutionRepository {
                 rs.getString("argument_fingerprint"),
                 rs.getString("blocked_by_tool_call_id"),
                 rs.getString("blocked_by_failure_code"),
+                rs.getString("outbound_protocol"),
+                rs.getString("downstream_system"),
+                nullableInteger(rs, "outbound_attempts"),
+                nullableInteger(rs, "http_status"),
+                nullableInteger(rs, "business_code"),
+                nullableLong(rs, "downstream_duration_ms"),
+                rs.getString("outbound_outcome"),
                 toInstant(rs.getTimestamp("occurred_at")));
     }
 

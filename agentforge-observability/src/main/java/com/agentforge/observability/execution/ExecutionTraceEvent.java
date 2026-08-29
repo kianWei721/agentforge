@@ -27,6 +27,13 @@ public record ExecutionTraceEvent(
         String argumentFingerprint,
         String blockedByToolCallId,
         String blockedByFailureCode,
+        String outboundProtocol,
+        String downstreamSystem,
+        Integer outboundAttempts,
+        Integer httpStatus,
+        Integer businessCode,
+        Long downstreamDurationMs,
+        String outboundOutcome,
         Instant occurredAt) {
 
     public ExecutionTraceEvent {

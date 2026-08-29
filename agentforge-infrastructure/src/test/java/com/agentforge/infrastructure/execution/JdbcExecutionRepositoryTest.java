@@ -74,6 +74,13 @@ class JdbcExecutionRepositoryTest {
                     argument_fingerprint VARCHAR(64),
                     blocked_by_tool_call_id VARCHAR(128),
                     blocked_by_failure_code VARCHAR(64),
+                    outbound_protocol VARCHAR(32),
+                    downstream_system VARCHAR(64),
+                    outbound_attempts INT,
+                    http_status INT,
+                    business_code INT,
+                    downstream_duration_ms BIGINT,
+                    outbound_outcome VARCHAR(64),
                     occurred_at TIMESTAMP(6) NOT NULL,
                     UNIQUE (execution_id, sequence_no)
                 )
@@ -168,6 +175,13 @@ class JdbcExecutionRepositoryTest {
                                 "repeated_non_retryable_failure",
                                 "abc123",
                                 "tool-call-0",
+                                "FORBIDDEN",
+                                "HTTP",
+                                "yudao-device-web",
+                                1,
+                                200,
+                                403,
+                                148L,
                                 "FORBIDDEN"));
 
         assertEquals(1L, first.sequenceNo());
@@ -198,6 +212,13 @@ class JdbcExecutionRepositoryTest {
         assertEquals("abc123", traces.get(3).argumentFingerprint());
         assertEquals("tool-call-0", traces.get(3).blockedByToolCallId());
         assertEquals("FORBIDDEN", traces.get(3).blockedByFailureCode());
+        assertEquals("HTTP", traces.get(3).outboundProtocol());
+        assertEquals("yudao-device-web", traces.get(3).downstreamSystem());
+        assertEquals(1, traces.get(3).outboundAttempts());
+        assertEquals(200, traces.get(3).httpStatus());
+        assertEquals(403, traces.get(3).businessCode());
+        assertEquals(148L, traces.get(3).downstreamDurationMs());
+        assertEquals("FORBIDDEN", traces.get(3).outboundOutcome());
     }
 
     @Test

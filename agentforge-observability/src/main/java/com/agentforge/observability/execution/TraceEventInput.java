@@ -20,7 +20,14 @@ public record TraceEventInput(
         String governanceReason,
         String argumentFingerprint,
         String blockedByToolCallId,
-        String blockedByFailureCode) {
+        String blockedByFailureCode,
+        String outboundProtocol,
+        String downstreamSystem,
+        Integer outboundAttempts,
+        Integer httpStatus,
+        Integer businessCode,
+        Long downstreamDurationMs,
+        String outboundOutcome) {
 
     public TraceEventInput(
             String eventType,
@@ -48,6 +55,13 @@ public record TraceEventInput(
                 outputTokens,
                 cachedTokens,
                 modelTimeMs,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
                 null,
                 null,
                 null,
