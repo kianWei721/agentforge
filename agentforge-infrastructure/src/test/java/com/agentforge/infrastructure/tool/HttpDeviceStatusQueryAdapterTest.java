@@ -44,7 +44,7 @@ class HttpDeviceStatusQueryAdapterTest {
         assertEquals("367", snapshot.deviceId());
         assertEquals("ONLINE", snapshot.status());
         assertEquals("2026-08-29 11:22:33", snapshot.lastSeenAt());
-        assertEquals("yudao-device-mini-http", snapshot.source());
+        assertEquals("yudao-device-web-http", snapshot.source());
         assertEquals("在线", snapshot.attributes().get("stateRaw"));
         assertEquals("办公室测报灯", snapshot.attributes().get("deviceNickname"));
         assertEquals(25L, snapshot.attributes().get("productId"));
