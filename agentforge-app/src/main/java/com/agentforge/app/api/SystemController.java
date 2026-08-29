@@ -52,7 +52,7 @@ public class SystemController {
         result.put("name", "AgentForge");
         result.put("version", "0.3.0-SNAPSHOT");
         result.put("status", infrastructure.ready() ? "UP" : "DEGRADED");
-        result.put("milestone", "V0.3-session-message-persistence");
+        result.put("milestone", "V0.3-execution-tool-trace-persistence");
         result.put("mysql", infrastructure.mysqlUp() ? "UP" : "DOWN");
         result.put("redis", infrastructure.redisUp() ? "UP" : "DOWN");
         result.put("activeModelProvider", modelGatewayCatalog.activeProvider());

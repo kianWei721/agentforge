@@ -4,6 +4,7 @@ import com.agentforge.agent.AgentDefinition;
 import com.agentforge.agent.AgentDefinitionRepository;
 import com.agentforge.conversation.ConversationService;
 import com.agentforge.infrastructure.model.DashScopeModelFactory;
+import com.agentforge.observability.execution.ExecutionService;
 import com.agentforge.runtime.AgentConversationRuntimeService;
 import com.agentforge.runtime.AgentRuntime;
 import com.agentforge.runtime.AgentRuntimeFactory;
@@ -53,8 +54,9 @@ public class AgentScopeRuntimeConfiguration {
     public AgentConversationRuntimeService agentConversationRuntimeService(
             AgentDefinitionRepository agentRepository,
             ConversationService conversationService,
-            AgentRuntimeManager runtimeManager) {
+            AgentRuntimeManager runtimeManager,
+            ExecutionService executionService) {
         return new AgentConversationRuntimeService(
-                agentRepository, conversationService, runtimeManager);
+                agentRepository, conversationService, runtimeManager, executionService);
     }
 }
