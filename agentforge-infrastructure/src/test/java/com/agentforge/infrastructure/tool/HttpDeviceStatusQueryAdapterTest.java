@@ -173,6 +173,8 @@ class HttpDeviceStatusQueryAdapterTest {
 
         assertFalse(result.success());
         assertEquals("device status query unavailable: TIMEOUT", result.message());
+        assertEquals("TIMEOUT", result.failureCode());
+        assertTrue(result.retryable());
         assertFalse(result.message().contains("internal host"));
     }
 

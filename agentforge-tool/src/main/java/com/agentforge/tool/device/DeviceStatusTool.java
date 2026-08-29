@@ -47,12 +47,13 @@ public class DeviceStatusTool implements AgentTool {
             ToolInvocationContext context, Map<String, Object> arguments) {
         Object rawDeviceId = arguments.get("deviceId");
         if (rawDeviceId == null || rawDeviceId.toString().isBlank()) {
-            return ToolResult.failure("deviceId is required");
+            return ToolResult.failure("deviceId is required", "INVALID_ARGUMENT", false);
         }
 
         String deviceId = rawDeviceId.toString().trim();
         if (!deviceId.matches("\\d{1,19}")) {
-            return ToolResult.failure("deviceId must be a numeric identifier");
+            return ToolResult.failure(
+                    "deviceId must be a numeric identifier", "INVALID_ARGUMENT", false);
         }
 
         try {
@@ -75,10 +76,17 @@ public class DeviceStatusTool implements AgentTool {
                             }
                             return ToolResult.success("device status queried", data);
                         })
-                .orElseGet(() -> ToolResult.failure("device not found: " + deviceId));
+                .orElseGet(
+                        () ->
+                                ToolResult.failure(
+                                        "device not found: " + deviceId,
+                                        "NOT_FOUND",
+                                        false));
         } catch (DeviceStatusQueryException exception) {
             return ToolResult.failure(
-                    "device status query unavailable: " + exception.reason().name());
+                    "device status query unavailable: " + exception.reason().name(),
+                    exception.reason().name(),
+                    exception.retryable());
         }
     }
 

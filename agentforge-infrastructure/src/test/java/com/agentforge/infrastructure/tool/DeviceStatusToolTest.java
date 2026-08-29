@@ -35,5 +35,7 @@ class DeviceStatusToolTest {
 
         assertFalse(result.success());
         assertTrue(result.message().contains("999"));
+        assertEquals("NOT_FOUND", result.failureCode());
+        assertFalse(result.retryable());
     }
 }
