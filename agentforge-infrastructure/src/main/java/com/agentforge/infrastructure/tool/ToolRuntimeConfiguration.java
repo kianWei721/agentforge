@@ -2,6 +2,7 @@ package com.agentforge.infrastructure.tool;
 
 import com.agentforge.infrastructure.config.IoTDeviceStatusProperties;
 import com.agentforge.infrastructure.config.IoTLureLampControlProperties;
+import com.agentforge.rag.KnowledgeRetriever;
 import com.agentforge.tool.AgentTool;
 import com.agentforge.tool.DefaultToolRegistry;
 import com.agentforge.tool.ToolRegistry;
@@ -13,6 +14,7 @@ import com.agentforge.tool.device.DeviceStatusQueryPort;
 import com.agentforge.tool.device.DeviceStatusTool;
 import com.agentforge.tool.device.LureLampControlPort;
 import com.agentforge.tool.device.LureLampControlTool;
+import com.agentforge.tool.knowledge.KnowledgeSearchTool;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.http.HttpClient;
 import java.util.List;
@@ -121,6 +123,11 @@ public class ToolRuntimeConfiguration {
                 .connectTimeout(properties.getConnectTimeout())
                 .followRedirects(HttpClient.Redirect.NEVER)
                 .build();
+    }
+
+    @Bean
+    public AgentTool knowledgeSearchTool(KnowledgeRetriever retriever) {
+        return new KnowledgeSearchTool(retriever);
     }
 
     @Bean

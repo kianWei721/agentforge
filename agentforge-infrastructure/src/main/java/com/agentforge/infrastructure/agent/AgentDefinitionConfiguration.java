@@ -8,6 +8,7 @@ import com.agentforge.infrastructure.config.ModelProviderProperties;
 import com.agentforge.tool.device.DeviceEventsTool;
 import com.agentforge.tool.device.DevicePropertiesTool;
 import com.agentforge.tool.device.DeviceStatusTool;
+import com.agentforge.tool.knowledge.KnowledgeSearchTool;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.boot.ApplicationRunner;
@@ -120,6 +121,26 @@ public class AgentDefinitionConfiguration {
                                 current.createdAt(),
                                 now));
             }
+
+            if (!repository.existsById("iot-knowledge-diagnostic")) {
+                repository.save(
+                        new AgentDefinition(
+                                "iot-knowledge-diagnostic",
+                                "IoT Knowledge Diagnostic Agent",
+                                "V0.6.1 IoT diagnostic Agent with knowledge grounding",
+                                knowledgeGroundingPrompt(),
+                                "dashscope",
+                                modelProperties.getDashscope().getModel(),
+                                List.of(
+                                        DeviceStatusTool.NAME,
+                                        DevicePropertiesTool.NAME,
+                                        DeviceEventsTool.NAME,
+                                        KnowledgeSearchTool.NAME),
+                                true,
+                                1L,
+                                now,
+                                now));
+            }
         };
     }
 
@@ -128,6 +149,22 @@ public class AgentDefinitionConfiguration {
                 && IOT_DIAGNOSTIC_V05_DESCRIPTION.equals(current.description())
                 && IOT_DIAGNOSTIC_V05_PROMPT.equals(current.systemPrompt())
                 && diagnosticTools().equals(current.toolNames());
+    }
+
+    private static String knowledgeGroundingPrompt() {
+        return "你是 AgentForge 的 IoT 知识增强诊断 Agent。"
+                + "query_device_status、query_device_properties、query_device_events 返回的是实时业务系统或其历史观测事实；"
+                + "search_knowledge 返回的是静态知识库片段，例如设备说明书、故障手册、SOP、平台文档。"
+                + "必须严格区分这两类证据：知识库内容不能被描述为设备当前事实，实时 Tool 结果也不能冒充手册规则。"
+                + "判断设备当前状态、最后通信、属性值时，以 IoT Tool 为事实来源；"
+                + "解释字段含义、排查步骤、推荐动作时，可以检索知识库作为指导。"
+                + "如果知识库没有相关命中，明确说知识依据不足，不得用常识伪造成内部手册内容。"
+                + "知识建议与实时状态冲突时，实时事实决定设备现在是什么状态，知识只用于解释和排查方法。"
+                + "所有基于知识库的具体规则或步骤必须带上 search_knowledge 返回的 citationId，格式保持原样，例如 [KB:documentId#3]。"
+                + "知识命中只支持它实际写明的内容，不要扩写成来源没有提供的结论。"
+                + "离线根因在没有直接证据时保持 UNKNOWN；知识库只能给排查建议，不能把候选原因升级为已确认原因。"
+                + "最终回答优先分为：实时观测事实、知识库依据、综合判断、建议排查步骤、仍然未知的信息。"
+                + "只使用当前 Agent 注册的只读工具，不执行设备控制。";
     }
 
     private static List<String> diagnosticTools() {

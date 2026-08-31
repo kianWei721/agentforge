@@ -15,5 +15,10 @@
             <artifactId>agentforge-core</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>com.agentforge</groupId>
+            <artifactId>agentforge-rag</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
 </project>
