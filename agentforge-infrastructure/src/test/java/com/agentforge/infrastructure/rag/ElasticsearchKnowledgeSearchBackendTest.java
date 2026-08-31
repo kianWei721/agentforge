@@ -19,7 +19,35 @@ import org.junit.jupiter.api.Test;
 class ElasticsearchKnowledgeSearchBackendTest {
 
     @Test
-    void shouldCreateVectorMappingBulkIndexAndSearchBothChannels() throws Exception {
+    void shouldUseIndexedKnnOnElasticsearch8() throws Exception {
+        List<RequestCapture> requests = runScenario("8.19.0");
+
+        String allBodies =
+                requests.stream().map(RequestCapture::body).reduce("", (a, b) -> a + "\n" + b);
+        assertTrue(allBodies.contains("\"type\":\"dense_vector\""));
+        assertTrue(allBodies.contains("\"dims\":3"));
+        assertTrue(allBodies.contains("\"index\":true"));
+        assertTrue(allBodies.contains("\"similarity\":\"cosine\""));
+        assertTrue(allBodies.contains("\"knn\""));
+        assertFalse(allBodies.contains("cosineSimilarity(params.query_vector"));
+    }
+
+    @Test
+    void shouldUseScriptScoreCosineOnElasticsearch7() throws Exception {
+        List<RequestCapture> requests = runScenario("7.17.24");
+
+        String allBodies =
+                requests.stream().map(RequestCapture::body).reduce("", (a, b) -> a + "\n" + b);
+        assertTrue(allBodies.contains("\"type\":\"dense_vector\""));
+        assertTrue(allBodies.contains("\"dims\":3"));
+        assertFalse(allBodies.contains("\"index\":true"));
+        assertFalse(allBodies.contains("\"similarity\":\"cosine\""));
+        assertFalse(allBodies.contains("\"knn\""));
+        assertTrue(allBodies.contains("cosineSimilarity(params.query_vector, 'embedding') + 1.0"));
+        assertTrue(allBodies.contains("\"script_score\""));
+    }
+
+    private static List<RequestCapture> runScenario(String version) throws Exception {
         List<RequestCapture> requests = new CopyOnWriteArrayList<>();
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext(
@@ -37,7 +65,10 @@ class ElasticsearchKnowledgeSearchBackendTest {
 
                     int status = 200;
                     String response;
-                    if ("DELETE".equals(exchange.getRequestMethod())) {
+                    if ("GET".equals(exchange.getRequestMethod())
+                            && "/".equals(exchange.getRequestURI().getPath())) {
+                        response = "{\"version\":{\"number\":\"" + version + "\"}}";
+                    } else if ("DELETE".equals(exchange.getRequestMethod())) {
                         status = 404;
                         response = "{\"error\":\"not_found\"}";
                     } else if (exchange.getRequestURI().getPath().endsWith("/_search")) {
@@ -103,20 +134,19 @@ class ElasticsearchKnowledgeSearchBackendTest {
             assertEquals(1, lexical.size());
             assertEquals("doc-1", lexical.get(0).documentId());
             assertEquals(1, vector.size());
+            assertEquals(
+                    version.startsWith("7.")
+                            ? "EXACT_SCRIPT_SCORE_COSINE"
+                            : "APPROXIMATE_KNN",
+                    backend.vectorSearchMode());
 
-            String allBodies =
-                    requests.stream().map(RequestCapture::body).reduce("", (a, b) -> a + "\n" + b);
-            assertTrue(allBodies.contains("\"type\":\"dense_vector\""));
-            assertTrue(allBodies.contains("\"dims\":3"));
-            assertTrue(allBodies.contains("\"embedding\":[0.1,0.2,0.3]"));
-            assertTrue(allBodies.contains("\"multi_match\""));
-            assertTrue(allBodies.contains("\"knn\""));
             assertTrue(
                     requests.stream()
                             .anyMatch(
                                     request ->
                                             "POST".equals(request.method())
                                                     && "/_bulk".equals(request.path())));
+            return List.copyOf(requests);
         } finally {
             server.stop(0);
         }

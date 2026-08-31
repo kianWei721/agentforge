@@ -25,6 +25,7 @@ public class ElasticsearchKnowledgeSearchBackend implements KnowledgeSearchBacke
     private final KnowledgeHybridProperties.Elasticsearch properties;
     private final String baseUrl;
     private final String indexName;
+    private volatile Integer elasticsearchMajorVersion;
 
     public ElasticsearchKnowledgeSearchBackend(
             HttpClient httpClient,
@@ -39,6 +40,8 @@ public class ElasticsearchKnowledgeSearchBackend implements KnowledgeSearchBacke
 
     @Override
     public void recreateIndex(int dimensions) {
+        int majorVersion = elasticsearchMajorVersion();
+
         HttpResponse<String> delete = send("DELETE", "/" + indexName, null, "application/json");
         if (delete.statusCode() != 200
                 && delete.statusCode() != 202
@@ -59,8 +62,10 @@ public class ElasticsearchKnowledgeSearchBackend implements KnowledgeSearchBacke
         ObjectNode vector = propertiesNode.putObject("embedding");
         vector.put("type", "dense_vector");
         vector.put("dims", dimensions);
-        vector.put("index", true);
-        vector.put("similarity", "cosine");
+        if (majorVersion >= 8) {
+            vector.put("index", true);
+            vector.put("similarity", "cosine");
+        }
 
         HttpResponse<String> create =
                 send("PUT", "/" + indexName, json(root), "application/json");
@@ -133,6 +138,24 @@ public class ElasticsearchKnowledgeSearchBackend implements KnowledgeSearchBacke
 
     @Override
     public List<KnowledgeBackendHit> searchVector(float[] queryVector, int limit) {
+        return elasticsearchMajorVersion() >= 8
+                ? searchApproximateKnn(queryVector, limit)
+                : searchExactCosineScriptScore(queryVector, limit);
+    }
+
+    @Override
+    public String indexName() {
+        return indexName;
+    }
+
+    @Override
+    public String vectorSearchMode() {
+        return elasticsearchMajorVersion() >= 8
+                ? "APPROXIMATE_KNN"
+                : "EXACT_SCRIPT_SCORE_COSINE";
+    }
+
+    private List<KnowledgeBackendHit> searchApproximateKnn(float[] queryVector, int limit) {
         ObjectNode root = searchSource(limit);
         ObjectNode knn = root.putObject("knn");
         knn.put("field", "embedding");
@@ -145,9 +168,54 @@ public class ElasticsearchKnowledgeSearchBackend implements KnowledgeSearchBacke
         return search(root);
     }
 
-    @Override
-    public String indexName() {
-        return indexName;
+    private List<KnowledgeBackendHit> searchExactCosineScriptScore(
+            float[] queryVector, int limit) {
+        ObjectNode root = searchSource(limit);
+        ObjectNode scriptScore = root.putObject("query").putObject("script_score");
+        scriptScore.putObject("query").putObject("match_all");
+        ObjectNode script = scriptScore.putObject("script");
+        script.put("source", "cosineSimilarity(params.query_vector, 'embedding') + 1.0");
+        ArrayNode vector =
+                script.putObject("params").putArray("query_vector");
+        for (float value : queryVector) {
+            vector.add(value);
+        }
+        return search(root);
+    }
+
+    private int elasticsearchMajorVersion() {
+        Integer current = elasticsearchMajorVersion;
+        if (current != null) {
+            return current;
+        }
+        synchronized (this) {
+            if (elasticsearchMajorVersion == null) {
+                HttpResponse<String> response =
+                        send("GET", "/", null, "application/json");
+                require2xx("read version", response);
+                try {
+                    String version =
+                            objectMapper
+                                    .readTree(response.body())
+                                    .path("version")
+                                    .path("number")
+                                    .asText("");
+                    if (!version.matches("\\d+\\..*")) {
+                        throw new IllegalStateException(
+                                "Elasticsearch version number is missing");
+                    }
+                    elasticsearchMajorVersion =
+                            Integer.parseInt(version.substring(0, version.indexOf('.')));
+                } catch (Exception exception) {
+                    if (exception instanceof IllegalStateException stateException) {
+                        throw stateException;
+                    }
+                    throw new IllegalStateException(
+                            "Failed to parse Elasticsearch version", exception);
+                }
+            }
+            return elasticsearchMajorVersion;
+        }
     }
 
     private ObjectNode searchSource(int limit) {
