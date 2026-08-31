@@ -15,4 +15,8 @@ public interface KnowledgeSearchBackend {
     List<KnowledgeBackendHit> searchVector(float[] queryVector, int limit);
 
     String indexName();
+
+    default String vectorSearchMode() {
+        return "UNKNOWN";
+    }
 }
