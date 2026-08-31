@@ -36,6 +36,27 @@ agentforge:
       api-key: ${DASHSCOPE_API_KEY:}
       base-url: ${DASHSCOPE_BASE_URL:}
       model: ${DASHSCOPE_MODEL:qwen3.8-flash}
+  knowledge:
+    hybrid:
+      enabled: ${AGENTFORGE_KNOWLEDGE_HYBRID_ENABLED:false}
+      candidate-multiplier: ${AGENTFORGE_KNOWLEDGE_CANDIDATE_MULTIPLIER:4}
+      rrf-k: ${AGENTFORGE_KNOWLEDGE_RRF_K:60}
+      max-candidates: ${AGENTFORGE_KNOWLEDGE_MAX_CANDIDATES:100000}
+      embedding:
+        base-url: ${AGENTFORGE_KNOWLEDGE_EMBEDDING_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
+        api-key: ${AGENTFORGE_KNOWLEDGE_EMBEDDING_API_KEY:${DASHSCOPE_API_KEY:}}
+        model: ${AGENTFORGE_KNOWLEDGE_EMBEDDING_MODEL:text-embedding-v4}
+        dimensions: ${AGENTFORGE_KNOWLEDGE_EMBEDDING_DIMENSIONS:1024}
+        batch-size: ${AGENTFORGE_KNOWLEDGE_EMBEDDING_BATCH_SIZE:10}
+        request-timeout: ${AGENTFORGE_KNOWLEDGE_EMBEDDING_REQUEST_TIMEOUT:15s}
+      elasticsearch:
+        base-url: ${AGENTFORGE_KNOWLEDGE_ES_BASE_URL:}
+        index-name: ${AGENTFORGE_KNOWLEDGE_ES_INDEX:agentforge-knowledge-v1}
+        username: ${AGENTFORGE_KNOWLEDGE_ES_USERNAME:}
+        password: ${AGENTFORGE_KNOWLEDGE_ES_PASSWORD:}
+        api-key: ${AGENTFORGE_KNOWLEDGE_ES_API_KEY:}
+        connect-timeout: ${AGENTFORGE_KNOWLEDGE_ES_CONNECT_TIMEOUT:2s}
+        request-timeout: ${AGENTFORGE_KNOWLEDGE_ES_REQUEST_TIMEOUT:5s}
   iot:
     lure-lamp-control:
       enabled: ${AGENTFORGE_IOT_LURE_LAMP_CONTROL_ENABLED:false}

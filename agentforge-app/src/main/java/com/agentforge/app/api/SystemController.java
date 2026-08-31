@@ -6,6 +6,7 @@ import com.agentforge.infrastructure.config.AgentRuntimeProperties;
 import com.agentforge.infrastructure.config.AgentSessionCacheProperties;
 import com.agentforge.infrastructure.config.IoTDeviceStatusProperties;
 import com.agentforge.infrastructure.config.IoTLureLampControlProperties;
+import com.agentforge.infrastructure.config.KnowledgeHybridProperties;
 import com.agentforge.infrastructure.config.ToolConfirmationProperties;
 import com.agentforge.infrastructure.config.ToolGovernanceProperties;
 import com.agentforge.infrastructure.config.ToolPolicyProperties;
@@ -40,6 +41,7 @@ public class SystemController {
     private final ToolConfirmationProperties toolConfirmationProperties;
     private final KnowledgeRetriever knowledgeRetriever;
     private final KnowledgeIngestionService knowledgeIngestionService;
+    private final KnowledgeHybridProperties knowledgeHybridProperties;
 
     public SystemController(
             ModelGatewayCatalog modelGatewayCatalog,
@@ -55,7 +57,8 @@ public class SystemController {
             ToolPolicyProperties toolPolicyProperties,
             ToolConfirmationProperties toolConfirmationProperties,
             KnowledgeRetriever knowledgeRetriever,
-            KnowledgeIngestionService knowledgeIngestionService) {
+            KnowledgeIngestionService knowledgeIngestionService,
+            KnowledgeHybridProperties knowledgeHybridProperties) {
         this.modelGatewayCatalog = modelGatewayCatalog;
         this.agentProperties = agentProperties;
         this.agentService = agentService;
@@ -70,6 +73,7 @@ public class SystemController {
         this.toolConfirmationProperties = toolConfirmationProperties;
         this.knowledgeRetriever = knowledgeRetriever;
         this.knowledgeIngestionService = knowledgeIngestionService;
+        this.knowledgeHybridProperties = knowledgeHybridProperties;
     }
 
     @GetMapping("/health")
@@ -84,7 +88,7 @@ public class SystemController {
         result.put("name", "AgentForge");
         result.put("version", "0.3.0-SNAPSHOT");
         result.put("status", infrastructure.ready() ? "UP" : "DEGRADED");
-        result.put("milestone", "V0.6.1-knowledge-grounding-foundation");
+        result.put("milestone", "V0.6.2-hybrid-retrieval");
         result.put("mysql", infrastructure.mysqlUp() ? "UP" : "DOWN");
         result.put("redis", infrastructure.redisUp() ? "UP" : "DOWN");
         result.put("activeModelProvider", modelGatewayCatalog.activeProvider());
@@ -131,6 +135,17 @@ public class SystemController {
         result.put("knowledgeGroundingEnabled", true);
         result.put("knowledgeRetrieverMode", knowledgeRetriever.mode());
         result.put("knowledgeDocuments", knowledgeIngestionService.list().size());
+        result.put("knowledgeHybridEnabled", knowledgeHybridProperties.isEnabled());
+        result.put("knowledgeHybridConfigured", knowledgeHybridProperties.isConfigured());
+        result.put(
+                "knowledgeEmbeddingModel",
+                knowledgeHybridProperties.getEmbedding().getModel());
+        result.put(
+                "knowledgeEmbeddingDimensions",
+                knowledgeHybridProperties.getEmbedding().getDimensions());
+        result.put(
+                "knowledgeElasticsearchIndex",
+                knowledgeHybridProperties.getElasticsearch().getIndexName());
         return result;
     }
 }

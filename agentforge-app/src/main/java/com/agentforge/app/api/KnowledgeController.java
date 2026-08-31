@@ -2,10 +2,13 @@ package com.agentforge.app.api;
 
 import com.agentforge.core.AgentForgeConstants;
 import com.agentforge.rag.KnowledgeDocument;
+import com.agentforge.rag.KnowledgeIndexReport;
+import com.agentforge.rag.KnowledgeIndexService;
 import com.agentforge.rag.KnowledgeIngestionService;
 import com.agentforge.rag.KnowledgeRetriever;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -18,12 +21,15 @@ public class KnowledgeController {
 
     private final KnowledgeIngestionService ingestionService;
     private final KnowledgeRetriever retriever;
+    private final Optional<KnowledgeIndexService> indexService;
 
     public KnowledgeController(
             KnowledgeIngestionService ingestionService,
-            KnowledgeRetriever retriever) {
+            KnowledgeRetriever retriever,
+            Optional<KnowledgeIndexService> indexService) {
         this.ingestionService = ingestionService;
         this.retriever = retriever;
+        this.indexService = indexService;
     }
 
     @PostMapping("/documents")
@@ -64,6 +70,18 @@ public class KnowledgeController {
         return Mono.fromRunnable(() -> ingestionService.delete(documentId))
                 .subscribeOn(Schedulers.boundedElastic())
                 .then();
+    }
+
+    @PostMapping("/index/rebuild")
+    public Mono<KnowledgeIndexReport> rebuildIndex() {
+        KnowledgeIndexService service =
+                indexService.orElseThrow(
+                        () ->
+                                new ResponseStatusException(
+                                        HttpStatus.CONFLICT,
+                                        "Hybrid knowledge retrieval is disabled."));
+        return Mono.fromCallable(service::rebuild)
+                .subscribeOn(Schedulers.boundedElastic());
     }
 
     @PostMapping("/search")

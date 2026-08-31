@@ -2,7 +2,7 @@
 
 AgentForge 是一个基于 Java 的企业级 AI Agent 编排与运行平台练习项目。
 
-当前里程碑：**V0.6.1 — Knowledge Grounding Foundation**。V0.5/V0.5.1 已完成真实 IoT Multi-Tool 诊断与证据语义加固。
+当前里程碑：**V0.6.2 — Embedding + Elasticsearch Hybrid Retrieval**。V0.6.1 已完成 Knowledge Grounding 语义链验收。
 
 ## 已完成链路
 
@@ -20,6 +20,30 @@ HTTP / SSE
   -> mark execution terminal
   -> emit durable done
 ```
+
+## V0.6.2 当前目标
+
+V0.6.2 将 `KnowledgeRetriever` 的实现从 `LEXICAL_V1` 升级为：
+
+```text
+DashScope text-embedding-v4
+        +
+Elasticsearch BM25
+        +
+Elasticsearch dense_vector kNN
+        +
+Java RRF fusion
+        ↓
+HYBRID_ES_RRF_V1
+```
+
+MySQL 继续是知识事实源，Elasticsearch 只是可重建的检索索引。启用 Hybrid 后需要先执行：
+
+```http
+POST /api/v1/knowledge/index/rebuild
+```
+
+详细设计见 `docs/V0.6.2-hybrid-retrieval.md`。
 
 ## V0.6.1 当前目标
 
