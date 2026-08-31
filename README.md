@@ -2,7 +2,7 @@
 
 AgentForge 是一个基于 Java 的企业级 AI Agent 编排与运行平台练习项目。
 
-当前里程碑：**V0.5 — Multi-Tool IoT Diagnostic Agent**。V0.4 Tool Governance & Resilience 已完成真实设备写 Tool、HITL Confirmation 与治理链路验收。
+当前里程碑：**V0.6.1 — Knowledge Grounding Foundation**。V0.5/V0.5.1 已完成真实 IoT Multi-Tool 诊断与证据语义加固。
 
 ## 已完成链路
 
@@ -20,6 +20,43 @@ HTTP / SSE
   -> mark execution terminal
   -> emit durable done
 ```
+
+## V0.6.1 当前目标
+
+V0.6 开始把“实时业务事实”和“静态知识依据”组合起来，但不把知识偷偷拼进 System Prompt。
+
+第一阶段新增：
+
+```text
+MySQL: af_knowledge_document / af_knowledge_chunk
+KnowledgeChunker
+KnowledgeRetriever SPI
+LexicalKnowledgeRetriever (LEXICAL_V1)
+search_knowledge Tool
+Knowledge REST API
+iot-knowledge-diagnostic Agent
+```
+
+证据边界：
+
+```text
+IoT Tool
+= 设备当前/历史业务事实
+
+search_knowledge
+= 设备说明书、故障手册、SOP、平台文档等静态知识
+
+Knowledge hit
+!= 当前设备事实
+Knowledge suggestion
+!= 已确认故障根因
+```
+
+V0.6.1 先验收 Knowledge Ingestion / Chunk / Retrieval / Citation / Grounding 语义。
+下一切片再把 `KnowledgeRetriever` 从 `LEXICAL_V1` 演进为 Embedding + Elasticsearch / Hybrid Retrieval，
+上层 Tool 和 Agent 语义保持不变。
+
+详细设计见 `docs/V0.6.1-knowledge-grounding-foundation.md`。
 
 ## V0.5 当前目标
 

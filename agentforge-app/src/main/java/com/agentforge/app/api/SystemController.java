@@ -12,6 +12,8 @@ import com.agentforge.infrastructure.config.ToolPolicyProperties;
 import com.agentforge.infrastructure.health.InfrastructureStatus;
 import com.agentforge.infrastructure.health.InfrastructureStatusService;
 import com.agentforge.model.ModelGatewayCatalog;
+import com.agentforge.rag.KnowledgeIngestionService;
+import com.agentforge.rag.KnowledgeRetriever;
 import com.agentforge.runtime.AgentRuntimeManager;
 import com.agentforge.tool.ToolRegistry;
 import java.util.LinkedHashMap;
@@ -36,6 +38,8 @@ public class SystemController {
     private final ToolGovernanceProperties toolGovernanceProperties;
     private final ToolPolicyProperties toolPolicyProperties;
     private final ToolConfirmationProperties toolConfirmationProperties;
+    private final KnowledgeRetriever knowledgeRetriever;
+    private final KnowledgeIngestionService knowledgeIngestionService;
 
     public SystemController(
             ModelGatewayCatalog modelGatewayCatalog,
@@ -49,7 +53,9 @@ public class SystemController {
             IoTLureLampControlProperties iotLureLampControlProperties,
             ToolGovernanceProperties toolGovernanceProperties,
             ToolPolicyProperties toolPolicyProperties,
-            ToolConfirmationProperties toolConfirmationProperties) {
+            ToolConfirmationProperties toolConfirmationProperties,
+            KnowledgeRetriever knowledgeRetriever,
+            KnowledgeIngestionService knowledgeIngestionService) {
         this.modelGatewayCatalog = modelGatewayCatalog;
         this.agentProperties = agentProperties;
         this.agentService = agentService;
@@ -62,6 +68,8 @@ public class SystemController {
         this.toolGovernanceProperties = toolGovernanceProperties;
         this.toolPolicyProperties = toolPolicyProperties;
         this.toolConfirmationProperties = toolConfirmationProperties;
+        this.knowledgeRetriever = knowledgeRetriever;
+        this.knowledgeIngestionService = knowledgeIngestionService;
     }
 
     @GetMapping("/health")
@@ -76,7 +84,7 @@ public class SystemController {
         result.put("name", "AgentForge");
         result.put("version", "0.3.0-SNAPSHOT");
         result.put("status", infrastructure.ready() ? "UP" : "DEGRADED");
-        result.put("milestone", "V0.5.1-diagnostic-semantic-hardening");
+        result.put("milestone", "V0.6.1-knowledge-grounding-foundation");
         result.put("mysql", infrastructure.mysqlUp() ? "UP" : "DOWN");
         result.put("redis", infrastructure.redisUp() ? "UP" : "DOWN");
         result.put("activeModelProvider", modelGatewayCatalog.activeProvider());
@@ -120,6 +128,9 @@ public class SystemController {
                 "toolPolicyConfirmHighRiskReadOnly",
                 toolPolicyProperties.isRequireConfirmationForHighRiskReadOnly());
         result.put("toolConfirmationTtl", toolConfirmationProperties.getTtl().toString());
+        result.put("knowledgeGroundingEnabled", true);
+        result.put("knowledgeRetrieverMode", knowledgeRetriever.mode());
+        result.put("knowledgeDocuments", knowledgeIngestionService.list().size());
         return result;
     }
 }
