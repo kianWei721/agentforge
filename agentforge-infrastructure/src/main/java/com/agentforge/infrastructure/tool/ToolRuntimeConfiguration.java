@@ -5,6 +5,10 @@ import com.agentforge.infrastructure.config.IoTLureLampControlProperties;
 import com.agentforge.tool.AgentTool;
 import com.agentforge.tool.DefaultToolRegistry;
 import com.agentforge.tool.ToolRegistry;
+import com.agentforge.tool.device.DeviceEventsQueryPort;
+import com.agentforge.tool.device.DeviceEventsTool;
+import com.agentforge.tool.device.DevicePropertiesQueryPort;
+import com.agentforge.tool.device.DevicePropertiesTool;
 import com.agentforge.tool.device.DeviceStatusQueryPort;
 import com.agentforge.tool.device.DeviceStatusTool;
 import com.agentforge.tool.device.LureLampControlPort;
@@ -44,6 +48,38 @@ public class ToolRuntimeConfiguration {
     }
 
     @Bean
+    public DevicePropertiesQueryPort devicePropertiesQueryPort(
+            IoTDeviceStatusProperties properties) {
+        if (!properties.isHttpMode()) {
+            return new DemoDevicePropertiesQueryAdapter();
+        }
+        properties.validateForHttp();
+        return new HttpDevicePropertiesQueryAdapter(
+                readHttpClient(properties), new ObjectMapper(), properties);
+    }
+
+    @Bean
+    public AgentTool devicePropertiesTool(DevicePropertiesQueryPort queryPort) {
+        return new DevicePropertiesTool(queryPort);
+    }
+
+    @Bean
+    public DeviceEventsQueryPort deviceEventsQueryPort(
+            IoTDeviceStatusProperties properties) {
+        if (!properties.isHttpMode()) {
+            return new DemoDeviceEventsQueryAdapter();
+        }
+        properties.validateForHttp();
+        return new HttpDeviceEventsQueryAdapter(
+                readHttpClient(properties), new ObjectMapper(), properties);
+    }
+
+    @Bean
+    public AgentTool deviceEventsTool(DeviceEventsQueryPort queryPort) {
+        return new DeviceEventsTool(queryPort);
+    }
+
+    @Bean
     @ConditionalOnProperty(
             prefix = "agentforge.iot.lure-lamp-control",
             name = "enabled",
@@ -78,6 +114,13 @@ public class ToolRuntimeConfiguration {
                 controlPort,
                 properties.getVerifyAttempts(),
                 properties.getVerifyInterval());
+    }
+
+    private static HttpClient readHttpClient(IoTDeviceStatusProperties properties) {
+        return HttpClient.newBuilder()
+                .connectTimeout(properties.getConnectTimeout())
+                .followRedirects(HttpClient.Redirect.NEVER)
+                .build();
     }
 
     @Bean

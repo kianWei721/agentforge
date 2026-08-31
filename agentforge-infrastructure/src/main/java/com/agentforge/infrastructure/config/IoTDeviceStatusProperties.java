@@ -15,6 +15,8 @@ public class IoTDeviceStatusProperties {
     private Mode mode = Mode.DEMO;
     private String baseUrl = "";
     private String detailPath = "/admin-api/device/web/devices/{deviceId}";
+    private String detailsPath = "/admin-api/device/web/devices/{deviceId}/details";
+    private String eventsHistoryPath = "/admin-api/device/web/devices/{deviceId}/events/history";
     private String accessToken = "";
     private String tenantId = "";
     private Duration connectTimeout = Duration.ofSeconds(2);
@@ -46,6 +48,22 @@ public class IoTDeviceStatusProperties {
 
     public void setDetailPath(String detailPath) {
         this.detailPath = detailPath == null ? "" : detailPath.trim();
+    }
+
+    public String getDetailsPath() {
+        return detailsPath;
+    }
+
+    public void setDetailsPath(String detailsPath) {
+        this.detailsPath = detailsPath == null ? "" : detailsPath.trim();
+    }
+
+    public String getEventsHistoryPath() {
+        return eventsHistoryPath;
+    }
+
+    public void setEventsHistoryPath(String eventsHistoryPath) {
+        this.eventsHistoryPath = eventsHistoryPath == null ? "" : eventsHistoryPath.trim();
     }
 
     public String getAccessToken() {
@@ -161,6 +179,8 @@ public class IoTDeviceStatusProperties {
             throw new IllegalArgumentException(
                     "agentforge.iot.device-status.detail-path must start with / and contain {deviceId}");
         }
+        validateDevicePath(detailsPath, "details-path");
+        validateDevicePath(eventsHistoryPath, "events-history-path");
         if (accessToken.isBlank()) {
             throw new IllegalArgumentException(
                     "agentforge.iot.device-status.access-token must not be blank in HTTP mode");
@@ -194,6 +214,17 @@ public class IoTDeviceStatusProperties {
                 || circuitBreakerOpenDuration.isNegative()) {
             throw new IllegalArgumentException(
                     "agentforge.iot.device-status.circuit-breaker-open-duration must be positive");
+        }
+    }
+
+    private static void validateDevicePath(String path, String name) {
+        if (path == null
+                || path.isBlank()
+                || !path.startsWith("/")
+                || !path.contains("{deviceId}")) {
+            throw new IllegalArgumentException(
+                    "agentforge.iot.device-status." + name
+                            + " must start with / and contain {deviceId}");
         }
     }
 
