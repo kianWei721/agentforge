@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 class DeviceStatusToolTest {
 
     @Test
-    void shouldQueryDemoDevice() {
+    void shouldQueryDemoDeviceWithFreshnessMetadata() {
         DeviceStatusTool tool = new DeviceStatusTool(new DemoDeviceStatusQueryAdapter());
 
         ToolResult result =
@@ -22,6 +22,9 @@ class DeviceStatusToolTest {
         assertTrue(result.success());
         assertEquals("ONLINE", result.data().get("status"));
         assertEquals("demo-adapter", result.data().get("source"));
+        assertNotNull(result.data().get("queriedAt"));
+        assertInstanceOf(Long.class, result.data().get("lastSeenAgeSeconds"));
+        assertTrue((Long) result.data().get("lastSeenAgeSeconds") >= 0L);
     }
 
     @Test
