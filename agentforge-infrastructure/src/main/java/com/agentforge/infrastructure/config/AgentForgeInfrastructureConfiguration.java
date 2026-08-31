@@ -12,6 +12,7 @@ import org.springframework.context.annotation.Configuration;
     IoTLureLampControlProperties.class,
     ToolGovernanceProperties.class,
     ToolPolicyProperties.class,
-    ToolConfirmationProperties.class
+    ToolConfirmationProperties.class,
+    KnowledgeHybridProperties.class
 })
 public class AgentForgeInfrastructureConfiguration {}
