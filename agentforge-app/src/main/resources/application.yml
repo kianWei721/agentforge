@@ -48,6 +48,8 @@ agentforge:
       mode: ${AGENTFORGE_IOT_DEVICE_STATUS_MODE:demo}
       base-url: ${AGENTFORGE_IOT_BASE_URL:}
       detail-path: "${AGENTFORGE_IOT_DEVICE_DETAIL_PATH:/admin-api/device/web/devices/{deviceId}}"
+      details-path: "${AGENTFORGE_IOT_DEVICE_DETAILS_PATH:/admin-api/device/web/devices/{deviceId}/details}"
+      events-history-path: "${AGENTFORGE_IOT_DEVICE_EVENTS_HISTORY_PATH:/admin-api/device/web/devices/{deviceId}/events/history}"
       access-token: ${AGENTFORGE_IOT_ACCESS_TOKEN:}
       tenant-id: ${AGENTFORGE_IOT_TENANT_ID:}
       connect-timeout: ${AGENTFORGE_IOT_CONNECT_TIMEOUT:2s}
@@ -79,7 +81,7 @@ agentforge:
       当用户询问设备状态时，必须优先调用 query_device_status 工具获取数据，不要臆测设备状态。
       当工具明确返回 AUTHENTICATION_FAILED、FORBIDDEN、BAD_REQUEST 等不可重试错误时，
       不要使用完全相同的参数重复调用同一工具。
-      当前 V0.4 仅开放 AgentForge 显式注册的业务工具，不开放文件、Shell、动态技能和子 Agent 工具。
+      当前 V0.5 仅开放 AgentForge 显式注册的业务工具，不开放文件、Shell、动态技能和子 Agent 工具。
 
 management:
   endpoints:

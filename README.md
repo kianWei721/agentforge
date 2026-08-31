@@ -2,7 +2,7 @@
 
 AgentForge 是一个基于 Java 的企业级 AI Agent 编排与运行平台练习项目。
 
-当前里程碑：V0.4 — Tool Governance & Resilience（Slice 1/2/3A/3B-1 已验收，Slice 3B-2 PENDING Safety Gate 已验收，真实设备写执行尚未进行）。
+当前里程碑：**V0.5 — Multi-Tool IoT Diagnostic Agent**。V0.4 Tool Governance & Resilience 已完成真实设备写 Tool、HITL Confirmation 与治理链路验收。
 
 ## 已完成链路
 
@@ -20,6 +20,28 @@ HTTP / SSE
   -> mark execution terminal
   -> emit durable done
 ```
+
+## V0.5 当前目标
+
+V0.5 在不修改现有 yudao 平台代码的前提下，新增两个 LOW-risk / read-only Tool：
+
+```text
+query_device_properties
+query_device_events
+```
+
+并新增专用 `iot-diagnostic` Agent，默认绑定：
+
+```text
+query_device_status
+query_device_properties
+query_device_events
+```
+
+目标是让模型面对“设备最近运行是否正常”这类自然语言问题时，自主选择并连续调用多个只读 Tool，
+再区分“观测事实”和“模型推断”给出诊断。写 Tool `set_lure_lamp_state` 不绑定到诊断 Agent。
+
+详细设计见 `docs/V0.5-multi-tool-iot-diagnostic.md`。
 
 ## V0.3 当前能力
 
