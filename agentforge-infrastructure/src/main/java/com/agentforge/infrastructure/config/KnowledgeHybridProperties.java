@@ -55,7 +55,7 @@ public class KnowledgeHybridProperties {
     }
 
     public boolean isConfigured() {
-        return !enabled || (embedding.isConfigured() && elasticsearch.isConfigured());
+        return enabled && embedding.isConfigured() && elasticsearch.isConfigured();
     }
 
     public void validate() {
