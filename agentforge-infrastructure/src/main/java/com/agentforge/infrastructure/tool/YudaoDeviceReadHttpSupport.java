@@ -92,12 +92,31 @@ final class YudaoDeviceReadHttpSupport {
             if ((trimmed.startsWith("{") && trimmed.endsWith("}"))
                     || (trimmed.startsWith("[") && trimmed.endsWith("]"))) {
                 try {
-                    return objectMapper.convertValue(
-                            objectMapper.readTree(trimmed), new TypeReference<Object>() {});
+                    return normalizeJsonValue(objectMapper.readTree(trimmed));
                 } catch (Exception ignored) {
                 }
             }
             return text;
+        }
+        return normalizeJsonValue(value);
+    }
+
+    private Object normalizeJsonValue(JsonNode value) {
+        if (value == null || value.isNull()) return null;
+        if (value.isIntegralNumber()) return value.longValue();
+        if (value.isFloatingPointNumber()) return value.doubleValue();
+        if (value.isBoolean()) return value.booleanValue();
+        if (value.isTextual()) return value.asText();
+        if (value.isArray()) {
+            java.util.List<Object> result = new java.util.ArrayList<>();
+            value.forEach(item -> result.add(normalizeJsonValue(item)));
+            return result;
+        }
+        if (value.isObject()) {
+            java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
+            value.fields().forEachRemaining(
+                    entry -> result.put(entry.getKey(), normalizeJsonValue(entry.getValue())));
+            return result;
         }
         return objectMapper.convertValue(value, new TypeReference<Object>() {});
     }

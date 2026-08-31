@@ -15,6 +15,8 @@ import java.util.Optional;
 
 public class HttpDevicePropertiesQueryAdapter implements DevicePropertiesQueryPort {
     private static final String SOURCE = "yudao-device-web-http";
+    private static final java.util.Set<String> SENSITIVE_IDENTIFIERS =
+            java.util.Set.of("GeoLocation", "ManualGeoLocation", "ProduceInfo");
     private final IoTDeviceStatusProperties properties;
     private final YudaoDeviceReadHttpSupport http;
 
@@ -52,7 +54,11 @@ public class HttpDevicePropertiesQueryAdapter implements DevicePropertiesQueryPo
             for (JsonNode item : propertiesNode) {
                 JsonNode model = item.get("model");
                 String identifier = YudaoDeviceReadHttpSupport.text(model, "identifier");
-                if (identifier == null || identifier.isBlank()) continue;
+                if (identifier == null
+                        || identifier.isBlank()
+                        || SENSITIVE_IDENTIFIERS.contains(identifier)) {
+                    continue;
+                }
                 values.put(identifier, new DevicePropertyValue(
                         YudaoDeviceReadHttpSupport.text(model, "propertyName"),
                         http.toJavaValue(item.get("latestValue")),

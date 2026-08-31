@@ -33,7 +33,10 @@ class HttpDeviceDiagnosticQueryAdapterTest {
                                 + "\"model\":{\"identifier\":\"PeripheralStatus\",\"propertyName\":\"外设状态\"},"
                                 + "\"latestValue\":{\"TrapLight\":1,\"RainCompartment\":0},"
                                 + "\"latestTime\":1788060000000,\"source\":\"DEVICE_REPORT\","
-                                + "\"shadowStatus\":\"SYNCED\"}]},\"msg\":\"\"}"));
+                                + "\"shadowStatus\":\"SYNCED\"},{"
+                                + "\"model\":{\"identifier\":\"GeoLocation\",\"propertyName\":\"地理位置\"},"
+                                + "\"latestValue\":{\"Latitude\":30.3,\"Longitude\":120.4},"
+                                + "\"latestTime\":1788060000000,\"source\":\"DEVICE_REPORT\"}]},\"msg\":\"\"}"));
         server.start();
         try {
             HttpDevicePropertiesQueryAdapter adapter = new HttpDevicePropertiesQueryAdapter(
@@ -44,6 +47,7 @@ class HttpDeviceDiagnosticQueryAdapterTest {
             var status = (java.util.Map<String, Object>)
                     snapshot.properties().get("PeripheralStatus").value();
             assertEquals(1L, status.get("TrapLight"));
+            assertFalse(snapshot.properties().containsKey("GeoLocation"));
 
             ToolResult result = new DevicePropertiesTool(id -> java.util.Optional.of(snapshot))
                     .execute(new ToolInvocationContext("a", "u", "s"), java.util.Map.of("deviceId", "373"));
