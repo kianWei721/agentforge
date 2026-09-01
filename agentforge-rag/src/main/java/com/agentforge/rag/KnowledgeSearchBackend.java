@@ -19,4 +19,15 @@ public interface KnowledgeSearchBackend {
     default String vectorSearchMode() {
         return "UNKNOWN";
     }
+
+    /**
+     * Convert a backend-specific vector search score into cosine similarity in [-1, 1].
+     *
+     * <p>The relevance gate must not compare raw Elasticsearch scores across different
+     * vector-search implementations. Implementations should normalize their own score
+     * semantics here.
+     */
+    default double normalizeVectorScore(double backendScore) {
+        return backendScore;
+    }
 }
