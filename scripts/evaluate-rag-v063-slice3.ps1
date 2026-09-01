@@ -8,6 +8,34 @@ $ErrorActionPreference = "Stop"
 $root = $BaseUrl.TrimEnd("/")
 $datasetPath = Join-Path $PSScriptRoot "rag-eval-v063-slice3.json"
 
+function Invoke-Utf8JsonPost {
+    param(
+        [Parameter(Mandatory = $true)][string]$Uri,
+        [Parameter(Mandatory = $true)][string]$JsonBody
+    )
+
+    $client = New-Object System.Net.Http.HttpClient
+    try {
+        $content = New-Object System.Net.Http.StringContent(
+            $JsonBody,
+            [System.Text.Encoding]::UTF8,
+            "application/json"
+        )
+        $response = $client.PostAsync($Uri, $content).GetAwaiter().GetResult()
+        $bytes = $response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult()
+        $text = [System.Text.Encoding]::UTF8.GetString($bytes)
+
+        if (-not $response.IsSuccessStatusCode) {
+            throw ("HTTP {0} from {1}" -f [int]$response.StatusCode, $Uri)
+        }
+
+        return $text | ConvertFrom-Json
+    }
+    finally {
+        $client.Dispose()
+    }
+}
+
 if (-not (Test-Path $datasetPath)) {
     throw "Evaluation dataset not found: $datasetPath"
 }
@@ -38,7 +66,7 @@ $failed = $false
 
 foreach ($case in $cases) {
     $body = @{ query = $case.query; topK = 5 } | ConvertTo-Json
-    $result = Invoke-RestMethod -Method POST -Uri ($root + "/api/v1/knowledge/search") -ContentType "application/json; charset=utf-8" -Body $body
+    $result = Invoke-Utf8JsonPost -Uri ($root + "/api/v1/knowledge/search") -JsonBody $body
 
     $top = $null
     if ($result.count -gt 0) { $top = $result.hits[0] }
