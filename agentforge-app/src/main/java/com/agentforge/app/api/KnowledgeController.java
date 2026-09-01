@@ -101,6 +101,7 @@ public class KnowledgeController {
                                     noAnswer,
                                     noAnswer ? "NO_RELEVANT_KNOWLEDGE_RETURNED" : null,
                                     hits,
+                                    retrieval.queryRewriteDiagnostics(),
                                     retrieval.rerankDiagnostics(),
                                     retrieval.answerabilityDiagnostics());
                         })

@@ -9,8 +9,12 @@ $root = $BaseUrl.TrimEnd("/")
 
 $health = Invoke-RestMethod -Method GET -Uri ($root + "/api/v1/system/health")
 
-if ($health.knowledgeRetrieverMode -ne "HYBRID_ES_RRF_RERANK_JUDGE_V1") {
-    throw "V0.6.3 answerability evaluation requires knowledgeRetrieverMode=HYBRID_ES_RRF_RERANK_JUDGE_V1. Actual: $($health.knowledgeRetrieverMode)"
+$supportedModes = @(
+    "HYBRID_ES_RRF_RERANK_JUDGE_V1",
+    "HYBRID_ES_RRF_REWRITE_RERANK_JUDGE_V1"
+)
+if ($supportedModes -notcontains $health.knowledgeRetrieverMode) {
+    throw "V0.6.3 answerability evaluation requires a RERANK_JUDGE retrieval mode. Actual: $($health.knowledgeRetrieverMode)"
 }
 if ($health.knowledgeAnswerabilityEnabled -ne $true -or $health.knowledgeAnswerabilityConfigured -ne $true) {
     throw "V0.6.3 answerability judge is not enabled/configured. Run .\scripts\configure-answerability.ps1 and restart AgentForge."

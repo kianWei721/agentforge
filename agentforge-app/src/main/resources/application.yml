@@ -59,6 +59,13 @@ agentforge:
         api-key: ${AGENTFORGE_KNOWLEDGE_ES_API_KEY:}
         connect-timeout: ${AGENTFORGE_KNOWLEDGE_ES_CONNECT_TIMEOUT:2s}
         request-timeout: ${AGENTFORGE_KNOWLEDGE_ES_REQUEST_TIMEOUT:5s}
+    query-rewrite:
+      enabled: ${AGENTFORGE_KNOWLEDGE_QUERY_REWRITE_ENABLED:false}
+      base-url: ${AGENTFORGE_KNOWLEDGE_QUERY_REWRITE_BASE_URL:${DASHSCOPE_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}}
+      api-key: ${AGENTFORGE_KNOWLEDGE_QUERY_REWRITE_API_KEY:${DASHSCOPE_API_KEY:}}
+      model: ${AGENTFORGE_KNOWLEDGE_QUERY_REWRITE_MODEL:${DASHSCOPE_MODEL:qwen3.8-flash}}
+      request-timeout: ${AGENTFORGE_KNOWLEDGE_QUERY_REWRITE_REQUEST_TIMEOUT:15s}
+      max-query-chars: ${AGENTFORGE_KNOWLEDGE_QUERY_REWRITE_MAX_QUERY_CHARS:512}
     rerank:
       enabled: ${AGENTFORGE_KNOWLEDGE_RERANK_ENABLED:false}
       base-url: ${AGENTFORGE_KNOWLEDGE_RERANK_BASE_URL:}

@@ -2,7 +2,7 @@
 
 AgentForge 是一个基于 Java 的企业级 AI Agent 编排与运行平台练习项目。
 
-当前里程碑：**V0.6.3 — Retrieval Quality / Retrieval Budget**。Slice 1 的 Hybrid Retrieval + Reranker + Answerability Judge 已完成真实验收。
+当前里程碑：**V0.6.3 — Query Rewrite + Expanded Evaluation**。Slice 1 的 Retrieval Quality 与 Slice 2 的 Retrieval Budget 已完成真实验收。
 
 ## 已完成链路
 
@@ -85,6 +85,38 @@ Trace 额外持久化 `retrievalBudgetDecision / Reason / Limit / Used / Remaini
 ```text
 AGENTFORGE_RETRIEVAL_BUDGET_ENABLED=true
 AGENTFORGE_RETRIEVAL_BUDGET_MAX_CALLS_PER_EXECUTION=3
+```
+
+## V0.6.3 Slice 3 — Query Rewrite + Expanded Evaluation
+
+Query Rewrite 只改变 Candidate Retrieval 使用的检索 Query，不改变用户原始问题的判定语义：
+
+```text
+Original User Query
+      ↓
+qwen3.8-flash Query Rewrite
+      ↓
+Retrieval Query -> Embedding + BM25/Vector
+
+Original User Query -> qwen3-rerank
+Original User Query -> Answerability Judge
+```
+
+这样允许对口语、跨语言表达做保守规范化，同时避免 Rewrite 改写后的语义替代用户真实问题。技术字段、错误码、数值与操作符要求原样保留。
+
+Rewrite 是检索优化层，因此 Provider 失败时 fail-open 回退原 Query；Answerability Judge 仍保持最终知识准入边界。
+
+扩展评测集从 4 Case 增加到 12 Case，覆盖中文口语、Mixed-language、英文、短 Query、根因边界、精确字段名和值、无知识字段语义等。评测数据与 runner 分离：
+
+```text
+scripts/rag-eval-v063-slice3.json
+scripts/evaluate-rag-v063-slice3.ps1
+```
+
+启用：
+
+```powershell
+.\scripts\configure-query-rewrite.ps1
 ```
 
 ## V0.6.2 已完成
