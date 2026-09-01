@@ -111,6 +111,14 @@ class DashScopeKnowledgeRerankerTest {
             assertTrue(result.noAnswer());
             assertTrue(result.hits().isEmpty());
             assertEquals(0.82d, result.noAnswerScore(), 0.0001d);
+            assertNotNull(result.diagnostics());
+            assertEquals(0.41d, result.diagnostics().topRealScore(), 0.0001d);
+            assertEquals(2, result.diagnostics().topRealRank());
+            assertEquals(1, result.diagnostics().noAnswerRank());
+            assertEquals("NO_ANSWER_SENTINEL", result.diagnostics().decision());
+            assertEquals(0, result.diagnostics().acceptedCount());
+            assertNotNull(result.diagnostics().topRealTextSha256());
+            assertEquals(64, result.diagnostics().topRealTextSha256().length());
         } finally {
             server.stop(0);
         }

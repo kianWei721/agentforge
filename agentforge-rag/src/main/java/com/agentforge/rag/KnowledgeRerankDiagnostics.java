@@ -6,6 +6,9 @@ public record KnowledgeRerankDiagnostics(
         int acceptedCount,
         String decision,
         Double topRealScore,
+        Integer topRealRank,
         String topRealCitationId,
+        Integer topRealTextChars,
+        String topRealTextSha256,
         Double noAnswerScore,
         Integer noAnswerRank) {}

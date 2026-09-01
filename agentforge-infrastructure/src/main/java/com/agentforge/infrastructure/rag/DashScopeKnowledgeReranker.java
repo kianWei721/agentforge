@@ -14,6 +14,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -62,6 +63,9 @@ public class DashScopeKnowledgeReranker implements KnowledgeReranker {
                             0,
                             0,
                             "NO_CANDIDATES",
+                            null,
+                            null,
+                            null,
                             null,
                             null,
                             null,
@@ -130,31 +134,47 @@ public class DashScopeKnowledgeReranker implements KnowledgeReranker {
                             .reversed()
                             .thenComparingInt(RankedItem::index));
 
-            List<KnowledgeSearchHit> accepted = new ArrayList<>();
             Double noAnswerScore = null;
             Integer noAnswerRank = null;
             Double topRealScore = null;
+            Integer topRealRank = null;
             String topRealCitationId = null;
+            Integer topRealTextChars = null;
+            String topRealTextSha256 = null;
 
             for (int rank = 0; rank < ranked.size(); rank++) {
                 RankedItem item = ranked.get(rank);
+                int oneBasedRank = rank + 1;
                 if (item.index() == sentinelIndex) {
                     noAnswerScore = item.score();
-                    noAnswerRank = rank + 1;
-                    break;
+                    noAnswerRank = oneBasedRank;
+                    continue;
                 }
-                KnowledgeSearchHit candidate = candidates.get(item.index());
                 if (topRealScore == null) {
+                    KnowledgeSearchHit candidate = candidates.get(item.index());
+                    String rerankText = rerankDocument(candidate);
                     topRealScore = item.score();
+                    topRealRank = oneBasedRank;
                     topRealCitationId = candidate.citationId();
-                }
-                if (accepted.size() < topK) {
-                    accepted.add(candidate.withRerankScore(item.score()));
+                    topRealTextChars = rerankText.length();
+                    topRealTextSha256 = sha256Hex(rerankText);
                 }
             }
 
             if (noAnswerRank == null) {
                 throw new IllegalStateException("rerank provider omitted no-answer sentinel");
+            }
+
+            List<KnowledgeSearchHit> accepted = new ArrayList<>();
+            for (int rank = 0; rank < ranked.size() && rank < noAnswerRank - 1; rank++) {
+                RankedItem item = ranked.get(rank);
+                if (item.index() == sentinelIndex) {
+                    break;
+                }
+                if (accepted.size() < topK) {
+                    accepted.add(
+                            candidates.get(item.index()).withRerankScore(item.score()));
+                }
             }
 
             String decision =
@@ -168,7 +188,10 @@ public class DashScopeKnowledgeReranker implements KnowledgeReranker {
                             accepted.size(),
                             decision,
                             topRealScore,
+                            topRealRank,
                             topRealCitationId,
+                            topRealTextChars,
+                            topRealTextSha256,
                             noAnswerScore,
                             noAnswerRank);
 
@@ -248,6 +271,21 @@ public class DashScopeKnowledgeReranker implements KnowledgeReranker {
         return singleLine.length() <= maxLength
                 ? singleLine
                 : singleLine.substring(0, maxLength) + "...";
+    }
+
+    private static String sha256Hex(String value) {
+        try {
+            byte[] digest =
+                    MessageDigest.getInstance("SHA-256")
+                            .digest(value.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(digest.length * 2);
+            for (byte item : digest) {
+                hex.append(String.format("%02x", item & 0xff));
+            }
+            return hex.toString();
+        } catch (Exception exception) {
+            throw new IllegalStateException("failed to hash rerank candidate", exception);
+        }
     }
 
     private static String bearer(String apiKey) {
