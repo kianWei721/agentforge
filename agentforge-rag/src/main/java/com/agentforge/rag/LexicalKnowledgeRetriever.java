@@ -3,7 +3,6 @@ package com.agentforge.rag;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -69,7 +68,9 @@ public class LexicalKnowledgeRetriever implements KnowledgeRetriever {
                                     c.sourceType(),
                                     c.sourceRef(),
                                     c.content(),
-                                    scoredCandidate.score());
+                                    scoredCandidate.score(),
+                                    "LEXICAL",
+                                    null);
                         })
                 .toList();
     }

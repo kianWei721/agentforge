@@ -11,6 +11,8 @@ public class KnowledgeHybridProperties {
     private int candidateMultiplier = 4;
     private int rrfK = 60;
     private int maxCandidates = 100000;
+    private boolean relevanceGateEnabled = true;
+    private double minVectorSimilarity = 0.60d;
     private final Embedding embedding = new Embedding();
     private final Elasticsearch elasticsearch = new Elasticsearch();
 
@@ -44,6 +46,22 @@ public class KnowledgeHybridProperties {
 
     public void setMaxCandidates(int maxCandidates) {
         this.maxCandidates = maxCandidates;
+    }
+
+    public boolean isRelevanceGateEnabled() {
+        return relevanceGateEnabled;
+    }
+
+    public void setRelevanceGateEnabled(boolean relevanceGateEnabled) {
+        this.relevanceGateEnabled = relevanceGateEnabled;
+    }
+
+    public double getMinVectorSimilarity() {
+        return minVectorSimilarity;
+    }
+
+    public void setMinVectorSimilarity(double minVectorSimilarity) {
+        this.minVectorSimilarity = minVectorSimilarity;
     }
 
     public Embedding getEmbedding() {
@@ -84,6 +102,10 @@ public class KnowledgeHybridProperties {
         }
         if (maxCandidates < 1) {
             throw new IllegalStateException("maxCandidates must be positive.");
+        }
+        if (minVectorSimilarity < -1d || minVectorSimilarity > 1d) {
+            throw new IllegalStateException(
+                    "minVectorSimilarity must be between -1 and 1.");
         }
     }
 

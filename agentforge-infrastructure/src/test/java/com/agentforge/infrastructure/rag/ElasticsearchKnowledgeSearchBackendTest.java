@@ -152,6 +152,11 @@ class ElasticsearchKnowledgeSearchBackendTest {
                             : "APPROXIMATE_KNN",
                     backend.vectorSearchMode());
 
+            double normalized =
+                    backend.normalizeVectorScore(
+                            version.startsWith("7.") ? 1.75d : 0.875d);
+            assertEquals(0.75d, normalized, 0.0001d);
+
             assertTrue(
                     requests.stream()
                             .anyMatch(

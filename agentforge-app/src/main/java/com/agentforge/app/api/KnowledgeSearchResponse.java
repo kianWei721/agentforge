@@ -6,4 +6,6 @@ import java.util.List;
 public record KnowledgeSearchResponse(
         String retrievalMode,
         int count,
+        boolean noAnswer,
+        String noAnswerReason,
         List<KnowledgeSearchHit> hits) {}

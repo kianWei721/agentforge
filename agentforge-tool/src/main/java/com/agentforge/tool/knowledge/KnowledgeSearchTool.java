@@ -95,6 +95,10 @@ public class KnowledgeSearchTool implements AgentTool {
                 }
                 item.put("content", hit.content());
                 item.put("score", hit.score());
+                item.put("matchType", hit.matchType());
+                if (hit.vectorSimilarity() != null) {
+                    item.put("vectorSimilarity", hit.vectorSimilarity());
+                }
                 resultHits.add(item);
             }
 
@@ -103,7 +107,15 @@ public class KnowledgeSearchTool implements AgentTool {
             data.put("retrievalMode", retriever.mode());
             data.put("count", resultHits.size());
             data.put("hits", resultHits);
+            boolean noAnswer = resultHits.isEmpty();
+            data.put("noAnswer", noAnswer);
+            if (noAnswer) {
+                data.put("noAnswerReason", "NO_RELEVANT_KNOWLEDGE_RETURNED");
+            }
             data.put("groundingSemantics", "STATIC_KNOWLEDGE_NOT_RUNTIME_FACT");
+            data.put(
+                    "relevanceSemantics",
+                    "RETURNED_HITS_PASSED_RETRIEVER_RELEVANCE_POLICY");
             return ToolResult.success("knowledge searched", data);
         } catch (RuntimeException exception) {
             return ToolResult.failure(

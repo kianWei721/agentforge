@@ -9,4 +9,6 @@ public record KnowledgeSearchHit(
         KnowledgeSourceType sourceType,
         String sourceRef,
         String content,
-        double score) {}
+        double score,
+        String matchType,
+        Double vectorSimilarity) {}
