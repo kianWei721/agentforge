@@ -5,6 +5,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# Windows PowerShell 5.1 does not always preload System.Net.Http.
+# Load it explicitly before creating HttpClient/StringContent for UTF-8-safe response handling.
+Add-Type -AssemblyName System.Net.Http -ErrorAction Stop
+
 $root = $BaseUrl.TrimEnd("/")
 $datasetPath = Join-Path $PSScriptRoot "rag-eval-v063-slice3.json"
 
