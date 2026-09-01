@@ -2,7 +2,7 @@
 
 AgentForge 是一个基于 Java 的企业级 AI Agent 编排与运行平台练习项目。
 
-当前里程碑：**V0.6.2 — Embedding + Elasticsearch Hybrid Retrieval**。V0.6.1 已完成 Knowledge Grounding 语义链验收。
+当前里程碑：**V0.6.3 — Retrieval Quality / Relevance Gate**。V0.6.2 已完成 Embedding + Elasticsearch Hybrid Retrieval 真实环境验收。
 
 ## 已完成链路
 
@@ -21,7 +21,33 @@ HTTP / SSE
   -> emit durable done
 ```
 
-## V0.6.2 当前目标
+## V0.6.3 当前目标
+
+V0.6.2 已证明“中文 Query → 英文 Knowledge”的跨语言召回链路可用，但真实 Agent 验收暴露了新的问题：当知识库很小时，向量检索总会返回一个最近邻，即使它并不能回答当前问题。
+
+V0.6.3 Slice 1 增加 Relevance Gate（相关性门槛）与 No-answer（无答案）语义：
+
+```text
+BM25 candidate
+      +
+Vector candidate
+      ↓
+RRF fusion
+      ↓
+Relevance Gate
+  - lexical hit: 保留
+  - vector-only: cosine similarity >= threshold 才保留
+      ↓
+HYBRID_ES_RRF_GATE_V1
+      ↓
+无相关知识时明确 count=0 / noAnswer=true
+```
+
+默认 `minVectorSimilarity=0.60`，可通过 `AGENTFORGE_KNOWLEDGE_MIN_VECTOR_SIMILARITY` 调整。返回结果额外暴露 `matchType` 与 `vectorSimilarity`，用于真实语料校准；RRF `score` 仍然只是排名融合分数，不是概率或相似度。
+
+详细设计与验收见 `docs/V0.6.3-retrieval-quality.md`。
+
+## V0.6.2 已完成
 
 V0.6.2 将 `KnowledgeRetriever` 的实现从 `LEXICAL_V1` 升级为：
 
