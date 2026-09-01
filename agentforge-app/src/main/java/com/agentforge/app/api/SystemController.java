@@ -7,6 +7,7 @@ import com.agentforge.infrastructure.config.AgentSessionCacheProperties;
 import com.agentforge.infrastructure.config.IoTDeviceStatusProperties;
 import com.agentforge.infrastructure.config.IoTLureLampControlProperties;
 import com.agentforge.infrastructure.config.KnowledgeAnswerabilityProperties;
+import com.agentforge.infrastructure.config.KnowledgeEvaluationProperties;
 import com.agentforge.infrastructure.config.KnowledgeHybridProperties;
 import com.agentforge.infrastructure.config.KnowledgeQueryRewriteProperties;
 import com.agentforge.infrastructure.config.KnowledgeRerankProperties;
@@ -49,6 +50,7 @@ public class SystemController {
     private final KnowledgeQueryRewriteProperties knowledgeQueryRewriteProperties;
     private final KnowledgeRerankProperties knowledgeRerankProperties;
     private final KnowledgeAnswerabilityProperties knowledgeAnswerabilityProperties;
+    private final KnowledgeEvaluationProperties knowledgeEvaluationProperties;
     private final RetrievalBudgetProperties retrievalBudgetProperties;
 
     public SystemController(
@@ -70,6 +72,7 @@ public class SystemController {
             KnowledgeQueryRewriteProperties knowledgeQueryRewriteProperties,
             KnowledgeRerankProperties knowledgeRerankProperties,
             KnowledgeAnswerabilityProperties knowledgeAnswerabilityProperties,
+            KnowledgeEvaluationProperties knowledgeEvaluationProperties,
             RetrievalBudgetProperties retrievalBudgetProperties) {
         this.modelGatewayCatalog = modelGatewayCatalog;
         this.agentProperties = agentProperties;
@@ -89,6 +92,7 @@ public class SystemController {
         this.knowledgeQueryRewriteProperties = knowledgeQueryRewriteProperties;
         this.knowledgeRerankProperties = knowledgeRerankProperties;
         this.knowledgeAnswerabilityProperties = knowledgeAnswerabilityProperties;
+        this.knowledgeEvaluationProperties = knowledgeEvaluationProperties;
         this.retrievalBudgetProperties = retrievalBudgetProperties;
     }
 
@@ -104,7 +108,7 @@ public class SystemController {
         result.put("name", "AgentForge");
         result.put("version", "0.3.0-SNAPSHOT");
         result.put("status", infrastructure.ready() ? "UP" : "DEGRADED");
-        result.put("milestone", "V0.6.3-query-rewrite-eval");
+        result.put("milestone", "V0.7-production-knowledge-platform");
         result.put("mysql", infrastructure.mysqlUp() ? "UP" : "DOWN");
         result.put("redis", infrastructure.redisUp() ? "UP" : "DOWN");
         result.put("activeModelProvider", modelGatewayCatalog.activeProvider());
@@ -198,6 +202,23 @@ public class SystemController {
         result.put(
                 "knowledgeAnswerabilityCandidateLimit",
                 knowledgeAnswerabilityProperties.getCandidateLimit());
+        result.put("knowledgeEvaluationEnabled", knowledgeEvaluationProperties.isEnabled());
+        result.put(
+                "knowledgeEvaluationConfigured",
+                knowledgeEvaluationProperties.isConfigured()
+                        && knowledgeHybridProperties.isConfigured()
+                        && knowledgeQueryRewriteProperties.isConfigured()
+                        && knowledgeRerankProperties.isConfigured()
+                        && knowledgeAnswerabilityProperties.isConfigured());
+        result.put(
+                "knowledgeEvaluationIndex",
+                knowledgeEvaluationProperties.getIndexName());
+        result.put(
+                "knowledgeEvaluationDataset",
+                knowledgeEvaluationProperties.getDatasetResource());
+        result.put(
+                "knowledgeEvaluationTopK",
+                knowledgeEvaluationProperties.getTopK());
         result.put("retrievalBudgetEnabled", retrievalBudgetProperties.isEnabled());
         result.put(
                 "retrievalBudgetMaxCallsPerExecution",

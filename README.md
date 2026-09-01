@@ -2,7 +2,7 @@
 
 AgentForge 是一个基于 Java 的企业级 AI Agent 编排与运行平台练习项目。
 
-当前里程碑：**V0.6.3 — Query Rewrite + Expanded Evaluation**。Slice 1 的 Retrieval Quality 与 Slice 2 的 Retrieval Budget 已完成真实验收。
+当前里程碑：**V0.7 — Production Knowledge Platform**。V0.6.3 的 Retrieval Quality、Retrieval Budget、Query Rewrite 已完成真实验收，V0.7 开始建设可量化、可隔离、可回归的企业级知识评测能力。
 
 ## 已完成链路
 
@@ -86,6 +86,32 @@ Trace 额外持久化 `retrievalBudgetDecision / Reason / Limit / Used / Remaini
 AGENTFORGE_RETRIEVAL_BUDGET_ENABLED=true
 AGENTFORGE_RETRIEVAL_BUDGET_MAX_CALLS_PER_EXECUTION=3
 ```
+
+## V0.7 — Production Knowledge Platform
+
+V0.7 第一阶段先解决“如何证明 RAG 质量”的问题，而不是继续堆模型组件。
+
+### Slice 1 — Multi-document Gold Dataset + Evaluation Harness
+
+新增独立 Gold Dataset：10 个 synthetic evaluation documents、24 个 gold queries（20 answerable + 4 explicit no-answer）。
+
+Evaluation 使用独立 Elasticsearch index `agentforge-knowledge-eval-v070`，不写 MySQL Knowledge 表，也不碰生产索引。
+
+一次运行同时比较 Query Rewrite OFF / ON，输出 Recall@1/3/5、MRR、No-answer Accuracy、Overall Accuracy 以及 Rewrite Delta。
+
+配置：
+
+```powershell
+.\scripts\configure-knowledge-evaluation.ps1
+```
+
+运行：
+
+```powershell
+.\scripts\evaluate-rag-v070.ps1
+```
+
+第一轮只做 calibration，不提前拍脑袋设 Quality Gate。
 
 ## V0.6.3 Slice 3 — Query Rewrite + Expanded Evaluation
 

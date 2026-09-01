@@ -17,6 +17,7 @@ import org.springframework.context.annotation.Configuration;
     KnowledgeQueryRewriteProperties.class,
     KnowledgeRerankProperties.class,
     KnowledgeAnswerabilityProperties.class,
+    KnowledgeEvaluationProperties.class,
     RetrievalBudgetProperties.class
 })
 public class AgentForgeInfrastructureConfiguration {}

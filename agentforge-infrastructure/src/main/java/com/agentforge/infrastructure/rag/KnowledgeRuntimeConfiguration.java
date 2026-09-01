@@ -1,6 +1,7 @@
 package com.agentforge.infrastructure.rag;
 
 import com.agentforge.infrastructure.config.KnowledgeAnswerabilityProperties;
+import com.agentforge.infrastructure.config.KnowledgeEvaluationProperties;
 import com.agentforge.infrastructure.config.KnowledgeHybridProperties;
 import com.agentforge.infrastructure.config.KnowledgeQueryRewriteProperties;
 import com.agentforge.infrastructure.config.KnowledgeRerankProperties;
@@ -8,6 +9,7 @@ import com.agentforge.rag.EmbeddingProvider;
 import com.agentforge.rag.HybridKnowledgeRetriever;
 import com.agentforge.rag.KnowledgeAnswerabilityJudge;
 import com.agentforge.rag.KnowledgeChunker;
+import com.agentforge.rag.KnowledgeEvaluator;
 import com.agentforge.rag.KnowledgeIndexService;
 import com.agentforge.rag.KnowledgeIngestionService;
 import com.agentforge.rag.KnowledgeQueryRewriter;
@@ -22,6 +24,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.ResourceLoader;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 @Configuration
@@ -162,6 +165,52 @@ public class KnowledgeRuntimeConfiguration {
                 rerankProperties.getCandidateLimit(),
                 answerabilityJudgeProvider.getIfAvailable(),
                 answerabilityProperties.getCandidateLimit());
+    }
+
+    @Bean
+    @ConditionalOnProperty(
+            prefix = "agentforge.knowledge.evaluation",
+            name = "enabled",
+            havingValue = "true")
+    public KnowledgeEvaluator knowledgeEvaluator(
+            EmbeddingProvider embeddingProvider,
+            KnowledgeHybridProperties hybridProperties,
+            KnowledgeRerankProperties rerankProperties,
+            KnowledgeAnswerabilityProperties answerabilityProperties,
+            KnowledgeEvaluationProperties evaluationProperties,
+            ObjectProvider<KnowledgeQueryRewriter> queryRewriterProvider,
+            ObjectProvider<KnowledgeReranker> rerankerProvider,
+            ObjectProvider<KnowledgeAnswerabilityJudge> answerabilityJudgeProvider,
+            ResourceLoader resourceLoader) {
+        KnowledgeQueryRewriter rewriter =
+                queryRewriterProvider.getIfAvailable(
+                        () -> {
+                            throw new IllegalStateException(
+                                    "Knowledge evaluation requires Query Rewrite.");
+                        });
+        KnowledgeReranker reranker =
+                rerankerProvider.getIfAvailable(
+                        () -> {
+                            throw new IllegalStateException(
+                                    "Knowledge evaluation requires Reranker.");
+                        });
+        KnowledgeAnswerabilityJudge judge =
+                answerabilityJudgeProvider.getIfAvailable(
+                        () -> {
+                            throw new IllegalStateException(
+                                    "Knowledge evaluation requires Answerability Judge.");
+                        });
+        return new ElasticsearchGoldDatasetKnowledgeEvaluator(
+                embeddingProvider,
+                hybridProperties,
+                rerankProperties,
+                answerabilityProperties,
+                evaluationProperties,
+                rewriter,
+                reranker,
+                judge,
+                resourceLoader,
+                new ObjectMapper());
     }
 
     @Bean
