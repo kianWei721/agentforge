@@ -88,7 +88,7 @@ public class SystemController {
         result.put("name", "AgentForge");
         result.put("version", "0.3.0-SNAPSHOT");
         result.put("status", infrastructure.ready() ? "UP" : "DEGRADED");
-        result.put("milestone", "V0.6.2-hybrid-retrieval");
+        result.put("milestone", "V0.6.3-retrieval-quality-gate");
         result.put("mysql", infrastructure.mysqlUp() ? "UP" : "DOWN");
         result.put("redis", infrastructure.redisUp() ? "UP" : "DOWN");
         result.put("activeModelProvider", modelGatewayCatalog.activeProvider());
@@ -146,6 +146,12 @@ public class SystemController {
         result.put(
                 "knowledgeElasticsearchIndex",
                 knowledgeHybridProperties.getElasticsearch().getIndexName());
+        result.put(
+                "knowledgeRelevanceGateEnabled",
+                knowledgeHybridProperties.isRelevanceGateEnabled());
+        result.put(
+                "knowledgeMinVectorSimilarity",
+                knowledgeHybridProperties.getMinVectorSimilarity());
         return result;
     }
 }

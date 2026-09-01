@@ -42,6 +42,8 @@ agentforge:
       candidate-multiplier: ${AGENTFORGE_KNOWLEDGE_CANDIDATE_MULTIPLIER:4}
       rrf-k: ${AGENTFORGE_KNOWLEDGE_RRF_K:60}
       max-candidates: ${AGENTFORGE_KNOWLEDGE_MAX_CANDIDATES:100000}
+      relevance-gate-enabled: ${AGENTFORGE_KNOWLEDGE_RELEVANCE_GATE_ENABLED:true}
+      min-vector-similarity: ${AGENTFORGE_KNOWLEDGE_MIN_VECTOR_SIMILARITY:0.60}
       embedding:
         base-url: ${AGENTFORGE_KNOWLEDGE_EMBEDDING_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
         api-key: ${AGENTFORGE_KNOWLEDGE_EMBEDDING_API_KEY:${DASHSCOPE_API_KEY:}}

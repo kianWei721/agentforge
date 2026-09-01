@@ -155,6 +155,15 @@ public class ElasticsearchKnowledgeSearchBackend implements KnowledgeSearchBacke
                 : "EXACT_SCRIPT_SCORE_COSINE";
     }
 
+    @Override
+    public double normalizeVectorScore(double backendScore) {
+        double cosine =
+                elasticsearchMajorVersion() >= 8
+                        ? (2.0d * backendScore) - 1.0d
+                        : backendScore - 1.0d;
+        return Math.max(-1.0d, Math.min(1.0d, cosine));
+    }
+
     private List<KnowledgeBackendHit> searchApproximateKnn(float[] queryVector, int limit) {
         ObjectNode root = searchSource(limit);
         ObjectNode knn = root.putObject("knn");

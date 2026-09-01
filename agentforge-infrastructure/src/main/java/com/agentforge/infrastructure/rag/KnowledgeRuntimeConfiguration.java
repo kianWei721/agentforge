@@ -91,7 +91,9 @@ public class KnowledgeRuntimeConfiguration {
                 embeddingProvider,
                 backend,
                 properties.getCandidateMultiplier(),
-                properties.getRrfK());
+                properties.getRrfK(),
+                properties.isRelevanceGateEnabled(),
+                properties.getMinVectorSimilarity());
     }
 
     @Bean
