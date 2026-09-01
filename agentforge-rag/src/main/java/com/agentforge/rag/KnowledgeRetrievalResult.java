@@ -4,13 +4,20 @@ import java.util.List;
 
 public record KnowledgeRetrievalResult(
         List<KnowledgeSearchHit> hits,
-        KnowledgeRerankDiagnostics rerankDiagnostics) {
+        KnowledgeRerankDiagnostics rerankDiagnostics,
+        KnowledgeAnswerabilityDiagnostics answerabilityDiagnostics) {
 
     public KnowledgeRetrievalResult {
         hits = hits == null ? List.of() : List.copyOf(hits);
     }
 
+    public KnowledgeRetrievalResult(
+            List<KnowledgeSearchHit> hits,
+            KnowledgeRerankDiagnostics rerankDiagnostics) {
+        this(hits, rerankDiagnostics, null);
+    }
+
     public static KnowledgeRetrievalResult of(List<KnowledgeSearchHit> hits) {
-        return new KnowledgeRetrievalResult(hits, null);
+        return new KnowledgeRetrievalResult(hits, null, null);
     }
 }

@@ -1,5 +1,8 @@
 package com.agentforge.tool.knowledge;
 
+import com.agentforge.rag.KnowledgeAnswerabilityDecision;
+import com.agentforge.rag.KnowledgeAnswerabilityDiagnostics;
+import com.agentforge.rag.KnowledgeRetrievalResult;
 import com.agentforge.rag.KnowledgeRetriever;
 import com.agentforge.rag.KnowledgeSearchHit;
 import com.agentforge.tool.AgentTool;
@@ -53,8 +56,10 @@ public class KnowledgeSearchTool implements AgentTool {
                                         "description", "面向知识库的明确检索问题或关键词"),
                                 "topK",
                                 topK),
-                "required", List.of("query"),
-                "additionalProperties", false);
+                "required",
+                List.of("query"),
+                "additionalProperties",
+                false);
     }
 
     @Override
@@ -64,10 +69,14 @@ public class KnowledgeSearchTool implements AgentTool {
 
     @Override
     public ToolResult execute(
-            ToolInvocationContext context, Map<String, Object> arguments) {
+            ToolInvocationContext context,
+            Map<String, Object> arguments) {
         String query = text(arguments.get("query"));
         if (query == null) {
-            return ToolResult.failure("query is required", "INVALID_ARGUMENT", false);
+            return ToolResult.failure(
+                    "query is required",
+                    "INVALID_ARGUMENT",
+                    false);
         }
         Integer topK = parseTopK(arguments.get("topK"));
         if (topK == null) {
@@ -78,11 +87,16 @@ public class KnowledgeSearchTool implements AgentTool {
         }
 
         try {
-            List<KnowledgeSearchHit> hits = retriever.search(query, topK);
-            List<Map<String, Object>> resultHits = new ArrayList<>();
+            KnowledgeRetrievalResult retrieval =
+                    retriever.searchDetailed(query, topK);
+            List<KnowledgeSearchHit> hits = retrieval.hits();
+
+            List<Map<String, Object>> resultHits =
+                    new ArrayList<>();
             int rank = 1;
             for (KnowledgeSearchHit hit : hits) {
-                Map<String, Object> item = new LinkedHashMap<>();
+                Map<String, Object> item =
+                        new LinkedHashMap<>();
                 item.put("rank", rank++);
                 item.put("citationId", hit.citationId());
                 item.put("documentId", hit.documentId());
@@ -90,36 +104,97 @@ public class KnowledgeSearchTool implements AgentTool {
                 item.put("chunkIndex", hit.chunkIndex());
                 item.put("title", hit.title());
                 item.put("sourceType", hit.sourceType().name());
-                if (hit.sourceRef() != null && !hit.sourceRef().isBlank()) {
+                if (hit.sourceRef() != null
+                        && !hit.sourceRef().isBlank()) {
                     item.put("sourceRef", hit.sourceRef());
                 }
                 item.put("content", hit.content());
                 item.put("score", hit.score());
                 item.put("matchType", hit.matchType());
                 if (hit.vectorSimilarity() != null) {
-                    item.put("vectorSimilarity", hit.vectorSimilarity());
+                    item.put(
+                            "vectorSimilarity",
+                            hit.vectorSimilarity());
                 }
                 if (hit.rerankScore() != null) {
-                    item.put("rerankScore", hit.rerankScore());
+                    item.put(
+                            "rerankScore",
+                            hit.rerankScore());
                 }
                 resultHits.add(item);
             }
 
-            Map<String, Object> data = new LinkedHashMap<>();
+            Map<String, Object> data =
+                    new LinkedHashMap<>();
             data.put("query", query);
-            data.put("retrievalMode", retriever.mode());
+            data.put(
+                    "retrievalMode",
+                    retriever.mode());
             data.put("count", resultHits.size());
             data.put("hits", resultHits);
+
             boolean noAnswer = resultHits.isEmpty();
             data.put("noAnswer", noAnswer);
             if (noAnswer) {
-                data.put("noAnswerReason", "NO_RELEVANT_KNOWLEDGE_RETURNED");
+                data.put(
+                        "noAnswerReason",
+                        "NO_RELEVANT_KNOWLEDGE_RETURNED");
             }
-            data.put("groundingSemantics", "STATIC_KNOWLEDGE_NOT_RUNTIME_FACT");
+
+            KnowledgeAnswerabilityDiagnostics diagnostics =
+                    retrieval.answerabilityDiagnostics();
+            if (diagnostics != null) {
+                data.put(
+                        "answerabilityMode",
+                        diagnostics.judgeMode());
+                data.put(
+                        "answerabilityDecision",
+                        diagnostics.decision());
+                data.put(
+                        "answerabilityCandidateCount",
+                        diagnostics.candidateCount());
+                data.put(
+                        "answerabilitySupportedCount",
+                        diagnostics.supportedCount());
+
+                List<Map<String, Object>> decisions =
+                        new ArrayList<>();
+                for (KnowledgeAnswerabilityDecision decision :
+                        diagnostics.decisions()) {
+                    Map<String, Object> item =
+                            new LinkedHashMap<>();
+                    item.put("index", decision.index());
+                    item.put(
+                            "citationId",
+                            decision.citationId());
+                    item.put(
+                            "supported",
+                            decision.supported());
+                    item.put(
+                            "reasonCode",
+                            decision.reasonCode());
+                    item.put(
+                            "reason",
+                            decision.reason());
+                    decisions.add(item);
+                }
+                data.put(
+                        "answerabilityDecisions",
+                        decisions);
+            }
+
+            data.put(
+                    "groundingSemantics",
+                    "STATIC_KNOWLEDGE_NOT_RUNTIME_FACT");
             data.put(
                     "relevanceSemantics",
-                    "RETURNED_HITS_PASSED_RETRIEVER_RELEVANCE_POLICY");
-            return ToolResult.success("knowledge searched", data);
+                    diagnostics == null
+                            ? "RETURNED_HITS_PASSED_RETRIEVER_RELEVANCE_POLICY"
+                            : "RETURNED_HITS_PASSED_RETRIEVAL_RERANK_AND_ANSWERABILITY_POLICY");
+
+            return ToolResult.success(
+                    "knowledge searched",
+                    data);
         } catch (RuntimeException exception) {
             return ToolResult.failure(
                     "knowledge search unavailable",
@@ -155,7 +230,9 @@ public class KnowledgeSearchTool implements AgentTool {
                 }
                 value = Integer.parseInt(text);
             }
-            return value >= 1 && value <= MAX_TOP_K ? value : null;
+            return value >= 1 && value <= MAX_TOP_K
+                    ? value
+                    : null;
         } catch (RuntimeException exception) {
             return null;
         }

@@ -1,9 +1,11 @@
 package com.agentforge.infrastructure.rag;
 
+import com.agentforge.infrastructure.config.KnowledgeAnswerabilityProperties;
 import com.agentforge.infrastructure.config.KnowledgeHybridProperties;
 import com.agentforge.infrastructure.config.KnowledgeRerankProperties;
 import com.agentforge.rag.EmbeddingProvider;
 import com.agentforge.rag.HybridKnowledgeRetriever;
+import com.agentforge.rag.KnowledgeAnswerabilityJudge;
 import com.agentforge.rag.KnowledgeChunker;
 import com.agentforge.rag.KnowledgeIndexService;
 import com.agentforge.rag.KnowledgeIngestionService;
@@ -99,6 +101,23 @@ public class KnowledgeRuntimeConfiguration {
 
     @Bean
     @ConditionalOnProperty(
+            prefix = "agentforge.knowledge.answerability",
+            name = "enabled",
+            havingValue = "true")
+    public KnowledgeAnswerabilityJudge knowledgeAnswerabilityJudge(
+            KnowledgeAnswerabilityProperties properties) {
+        properties.validate();
+        HttpClient client =
+                HttpClient.newBuilder()
+                        .connectTimeout(properties.getRequestTimeout())
+                        .followRedirects(HttpClient.Redirect.NEVER)
+                        .build();
+        return new DashScopeKnowledgeAnswerabilityJudge(
+                client, new ObjectMapper(), properties);
+    }
+
+    @Bean
+    @ConditionalOnProperty(
             prefix = "agentforge.knowledge.hybrid",
             name = "enabled",
             havingValue = "true")
@@ -107,7 +126,9 @@ public class KnowledgeRuntimeConfiguration {
             KnowledgeSearchBackend backend,
             KnowledgeHybridProperties properties,
             KnowledgeRerankProperties rerankProperties,
-            ObjectProvider<KnowledgeReranker> rerankerProvider) {
+            KnowledgeAnswerabilityProperties answerabilityProperties,
+            ObjectProvider<KnowledgeReranker> rerankerProvider,
+            ObjectProvider<KnowledgeAnswerabilityJudge> answerabilityJudgeProvider) {
         return new HybridKnowledgeRetriever(
                 embeddingProvider,
                 backend,
@@ -116,7 +137,9 @@ public class KnowledgeRuntimeConfiguration {
                 properties.isRelevanceGateEnabled(),
                 properties.getMinVectorSimilarity(),
                 rerankerProvider.getIfAvailable(),
-                rerankProperties.getCandidateLimit());
+                rerankProperties.getCandidateLimit(),
+                answerabilityJudgeProvider.getIfAvailable(),
+                answerabilityProperties.getCandidateLimit());
     }
 
     @Bean
