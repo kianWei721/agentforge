@@ -34,42 +34,67 @@ public class KnowledgeIndexService {
         long startedAt = System.nanoTime();
         List<KnowledgeCandidate> candidates = repository.findEnabledCandidates(maxCandidates);
 
+        if (candidates.isEmpty()) {
+            backend.recreateIndex(embeddingProvider.dimensions());
+            backend.refresh();
+            return report(startedAt, 0);
+        }
+
+        int firstEnd = Math.min(candidates.size(), embeddingBatchSize);
+        List<KnowledgeIndexedChunk> firstBatch =
+                embedBatch(candidates.subList(0, firstEnd));
+
+        // Do not destroy the current derived index until the embedding provider has
+        // successfully completed at least one real request. This protects rebuilds
+        // from common credential/quota/model/configuration failures.
         backend.recreateIndex(embeddingProvider.dimensions());
 
         int indexed = 0;
-        for (int start = 0; start < candidates.size(); start += embeddingBatchSize) {
-            int end = Math.min(candidates.size(), start + embeddingBatchSize);
-            List<KnowledgeCandidate> batch = candidates.subList(start, end);
-            List<String> texts =
-                    batch.stream()
-                            .map(KnowledgeIndexService::embeddingText)
-                            .toList();
-            List<float[]> vectors = embeddingProvider.embed(texts);
-            if (vectors.size() != batch.size()) {
-                throw new IllegalStateException(
-                        "embedding count mismatch: expected="
-                                + batch.size()
-                                + ", actual="
-                                + vectors.size());
-            }
+        backend.indexBatch(firstBatch);
+        indexed += firstBatch.size();
 
-            List<KnowledgeIndexedChunk> indexedBatch = new ArrayList<>(batch.size());
-            for (int i = 0; i < batch.size(); i++) {
-                float[] vector = vectors.get(i);
-                if (vector.length != embeddingProvider.dimensions()) {
-                    throw new IllegalStateException(
-                            "embedding dimension mismatch: expected="
-                                    + embeddingProvider.dimensions()
-                                    + ", actual="
-                                    + vector.length);
-                }
-                indexedBatch.add(new KnowledgeIndexedChunk(batch.get(i), vector));
-            }
+        for (int start = firstEnd; start < candidates.size(); start += embeddingBatchSize) {
+            int end = Math.min(candidates.size(), start + embeddingBatchSize);
+            List<KnowledgeIndexedChunk> indexedBatch =
+                    embedBatch(candidates.subList(start, end));
             backend.indexBatch(indexedBatch);
             indexed += indexedBatch.size();
         }
 
         backend.refresh();
+        return report(startedAt, indexed);
+    }
+
+    private List<KnowledgeIndexedChunk> embedBatch(List<KnowledgeCandidate> batch) {
+        List<String> texts =
+                batch.stream()
+                        .map(KnowledgeIndexService::embeddingText)
+                        .toList();
+        List<float[]> vectors = embeddingProvider.embed(texts);
+        if (vectors.size() != batch.size()) {
+            throw new IllegalStateException(
+                    "embedding count mismatch: expected="
+                            + batch.size()
+                            + ", actual="
+                            + vectors.size());
+        }
+
+        List<KnowledgeIndexedChunk> indexedBatch = new ArrayList<>(batch.size());
+        for (int i = 0; i < batch.size(); i++) {
+            float[] vector = vectors.get(i);
+            if (vector.length != embeddingProvider.dimensions()) {
+                throw new IllegalStateException(
+                        "embedding dimension mismatch: expected="
+                                + embeddingProvider.dimensions()
+                                + ", actual="
+                                + vector.length);
+            }
+            indexedBatch.add(new KnowledgeIndexedChunk(batch.get(i), vector));
+        }
+        return List.copyOf(indexedBatch);
+    }
+
+    private KnowledgeIndexReport report(long startedAt, int indexed) {
         long durationMs = (System.nanoTime() - startedAt) / 1_000_000L;
         return new KnowledgeIndexReport(
                 backend.indexName(),
