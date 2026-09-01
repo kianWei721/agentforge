@@ -1,5 +1,7 @@
 param(
-    [string]$BaseUrl = "http://localhost:8080"
+    [string]$BaseUrl = "http://localhost:8080",
+    [ValidateRange(60, 3600)]
+    [int]$RequestTimeoutSeconds = 900
 )
 
 $ErrorActionPreference = "Stop"
@@ -10,9 +12,15 @@ $root = $BaseUrl.TrimEnd("/")
 function Invoke-Utf8JsonPost {
     param([Parameter(Mandatory = $true)][string]$Uri)
     $client = New-Object System.Net.Http.HttpClient
+    $client.Timeout = [TimeSpan]::FromSeconds($RequestTimeoutSeconds)
     try {
         $content = New-Object System.Net.Http.StringContent("{}", [System.Text.Encoding]::UTF8, "application/json")
-        $response = $client.PostAsync($Uri, $content).GetAwaiter().GetResult()
+        try {
+            $response = $client.PostAsync($Uri, $content).GetAwaiter().GetResult()
+        }
+        catch [System.Threading.Tasks.TaskCanceledException] {
+            throw ("Evaluation request exceeded client timeout of {0}s. The V0.7 gold run is synchronous and may issue dozens of embedding/rerank/judge requests. Increase -RequestTimeoutSeconds if needed." -f $RequestTimeoutSeconds)
+        }
         $bytes = $response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult()
         $text = [System.Text.Encoding]::UTF8.GetString($bytes)
         if (-not $response.IsSuccessStatusCode) {
@@ -37,7 +45,7 @@ if ($health.knowledgeEvaluationIndex -eq $health.knowledgeElasticsearchIndex) {
     throw "Evaluation index must not equal the production knowledge index."
 }
 
-Write-Host "Running isolated V0.7 gold evaluation. This can make multiple embedding/rerank/judge requests..."
+Write-Host ("Running isolated V0.7 gold evaluation with client timeout {0}s. This can make multiple embedding/rerank/judge requests..." -f $RequestTimeoutSeconds)
 $report = Invoke-Utf8JsonPost -Uri ($root + "/api/v1/knowledge/evaluation/run")
 
 if ($report.documentCount -lt 5 -or $report.caseCount -lt 10) {
