@@ -40,6 +40,9 @@ foreach ($case in $cases) {
         Candidates = if ($null -eq $diag) { $null } else { $diag.candidateCount }
         Accepted = if ($null -eq $diag) { $null } else { $diag.acceptedCount }
         TopRealScore = if ($null -eq $diag) { $null } else { $diag.topRealScore }
+        TopRealRank = if ($null -eq $diag) { $null } else { $diag.topRealRank }
+        TopRealChars = if ($null -eq $diag) { $null } else { $diag.topRealTextChars }
+        TopRealSha256 = if ($null -eq $diag) { "" } else { $diag.topRealTextSha256 }
         SentinelScore = if ($null -eq $diag) { $null } else { $diag.noAnswerScore }
         SentinelRank = if ($null -eq $diag) { $null } else { $diag.noAnswerRank }
         TopTitle = if ($null -eq $top) { "" } else { $top.title }
@@ -53,7 +56,7 @@ foreach ($case in $cases) {
 $rows | Format-Table -AutoSize
 
 if ($failed) {
-    throw "V0.6.3 retrieval evaluation failed. Inspect rerankDiagnostics: candidateCount distinguishes recall miss from reranker rejection; topRealScore/noAnswerScore show the live Java rerank decision."
+    throw "V0.6.3 retrieval evaluation failed. Inspect rerankDiagnostics: compare topRealScore/topRealRank with SentinelScore/SentinelRank. TopRealChars/Sha256 identify the exact Java candidate payload without exposing its content."
 }
 
 Write-Host ""
