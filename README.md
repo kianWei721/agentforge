@@ -2,7 +2,7 @@
 
 AgentForge 是一个基于 Java 的企业级 AI Agent 编排与运行平台练习项目。
 
-当前里程碑：**V0.6.3 — Retrieval Quality / Relevance Gate**。V0.6.2 已完成 Embedding + Elasticsearch Hybrid Retrieval 真实环境验收。
+当前里程碑：**V0.6.3 — Retrieval Quality / Reranker + No-answer Sentinel**。V0.6.2 已完成 Embedding + Elasticsearch Hybrid Retrieval 真实环境验收。
 
 ## 已完成链路
 
@@ -46,6 +46,8 @@ HYBRID_ES_RRF_GATE_V1
 默认 `minVectorSimilarity=0.60`，可通过 `AGENTFORGE_KNOWLEDGE_MIN_VECTOR_SIMILARITY` 调整。返回结果额外暴露 `matchType` 与 `vectorSimilarity`，用于真实语料校准；RRF `score` 仍然只是排名融合分数，不是概率或相似度。
 
 详细设计与验收见 `docs/V0.6.3-retrieval-quality.md`。
+
+V0.6.3 的真实校准进一步证明：单一 cosine similarity threshold 无法同时保留跨语言正样本并拒绝字段语义负样本。因此启用 Reranker 后，Hybrid Retriever 会在 RRF Candidate 后调用独立的 `KnowledgeReranker`，使用 `qwen3-rerank + NO_ANSWER_SENTINEL` 判断 Answerability；该路径模式为 `HYBRID_ES_RRF_RERANK_V1`。Reranker 未启用时仍保留原 `HYBRID_ES_RRF_GATE_V1` fallback。
 
 ## V0.6.2 已完成
 
