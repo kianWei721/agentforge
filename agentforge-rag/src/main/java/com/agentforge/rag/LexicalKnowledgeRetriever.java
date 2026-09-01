@@ -70,6 +70,7 @@ public class LexicalKnowledgeRetriever implements KnowledgeRetriever {
                                     c.content(),
                                     scoredCandidate.score(),
                                     "LEXICAL",
+                                    null,
                                     null);
                         })
                 .toList();

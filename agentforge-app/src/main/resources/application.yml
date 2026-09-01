@@ -59,6 +59,13 @@ agentforge:
         api-key: ${AGENTFORGE_KNOWLEDGE_ES_API_KEY:}
         connect-timeout: ${AGENTFORGE_KNOWLEDGE_ES_CONNECT_TIMEOUT:2s}
         request-timeout: ${AGENTFORGE_KNOWLEDGE_ES_REQUEST_TIMEOUT:5s}
+    rerank:
+      enabled: ${AGENTFORGE_KNOWLEDGE_RERANK_ENABLED:false}
+      base-url: ${AGENTFORGE_KNOWLEDGE_RERANK_BASE_URL:}
+      api-key: ${AGENTFORGE_KNOWLEDGE_RERANK_API_KEY:}
+      model: ${AGENTFORGE_KNOWLEDGE_RERANK_MODEL:qwen3-rerank}
+      candidate-limit: ${AGENTFORGE_KNOWLEDGE_RERANK_CANDIDATE_LIMIT:8}
+      request-timeout: ${AGENTFORGE_KNOWLEDGE_RERANK_REQUEST_TIMEOUT:15s}
   iot:
     lure-lamp-control:
       enabled: ${AGENTFORGE_IOT_LURE_LAMP_CONTROL_ENABLED:false}

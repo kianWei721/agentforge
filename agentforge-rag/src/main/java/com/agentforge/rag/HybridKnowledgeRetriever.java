@@ -13,6 +13,8 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
     private final int rrfK;
     private final boolean relevanceGateEnabled;
     private final double minVectorSimilarity;
+    private final KnowledgeReranker reranker;
+    private final int rerankCandidateLimit;
 
     public HybridKnowledgeRetriever(
             EmbeddingProvider embeddingProvider,
@@ -21,6 +23,26 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
             int rrfK,
             boolean relevanceGateEnabled,
             double minVectorSimilarity) {
+        this(
+                embeddingProvider,
+                backend,
+                candidateMultiplier,
+                rrfK,
+                relevanceGateEnabled,
+                minVectorSimilarity,
+                null,
+                8);
+    }
+
+    public HybridKnowledgeRetriever(
+            EmbeddingProvider embeddingProvider,
+            KnowledgeSearchBackend backend,
+            int candidateMultiplier,
+            int rrfK,
+            boolean relevanceGateEnabled,
+            double minVectorSimilarity,
+            KnowledgeReranker reranker,
+            int rerankCandidateLimit) {
         if (candidateMultiplier < 1) {
             throw new IllegalArgumentException("candidateMultiplier must be positive");
         }
@@ -30,12 +52,17 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
         if (minVectorSimilarity < -1d || minVectorSimilarity > 1d) {
             throw new IllegalArgumentException("minVectorSimilarity must be between -1 and 1");
         }
+        if (rerankCandidateLimit < 1 || rerankCandidateLimit > 100) {
+            throw new IllegalArgumentException("rerankCandidateLimit must be between 1 and 100");
+        }
         this.embeddingProvider = embeddingProvider;
         this.backend = backend;
         this.candidateMultiplier = candidateMultiplier;
         this.rrfK = rrfK;
         this.relevanceGateEnabled = relevanceGateEnabled;
         this.minVectorSimilarity = minVectorSimilarity;
+        this.reranker = reranker;
+        this.rerankCandidateLimit = rerankCandidateLimit;
     }
 
     @Override
@@ -64,13 +91,27 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
         addLexicalRanked(fused, lexical);
         addVectorRanked(fused, vector);
 
-        return fused.values().stream()
+        List<FusedHit> ranked =
+                fused.values().stream()
+                        .sorted(
+                                Comparator.comparingDouble(FusedHit::rrfScore)
+                                        .reversed()
+                                        .thenComparing(hit -> hit.hit().documentId())
+                                        .thenComparingInt(hit -> hit.hit().chunkIndex()))
+                        .toList();
+
+        if (reranker != null) {
+            int poolSize = Math.min(ranked.size(), Math.max(topK, rerankCandidateLimit));
+            List<KnowledgeSearchHit> candidates =
+                    ranked.stream()
+                            .limit(poolSize)
+                            .map(HybridKnowledgeRetriever::toSearchHit)
+                            .toList();
+            return reranker.rerank(normalizedQuery, candidates, topK).hits();
+        }
+
+        return ranked.stream()
                 .filter(this::passesRelevanceGate)
-                .sorted(
-                        Comparator.comparingDouble(FusedHit::rrfScore)
-                                .reversed()
-                                .thenComparing(hit -> hit.hit().documentId())
-                                .thenComparingInt(hit -> hit.hit().chunkIndex()))
                 .limit(topK)
                 .map(HybridKnowledgeRetriever::toSearchHit)
                 .toList();
@@ -78,6 +119,9 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
 
     @Override
     public String mode() {
+        if (reranker != null) {
+            return "HYBRID_ES_RRF_RERANK_V1";
+        }
         return relevanceGateEnabled
                 ? "HYBRID_ES_RRF_GATE_V1"
                 : "HYBRID_ES_RRF_V1";
@@ -174,7 +218,8 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
                 hit.content(),
                 fused.rrfScore(),
                 matchType,
-                fused.vectorSimilarity());
+                fused.vectorSimilarity(),
+                null);
     }
 
     private record FusedHit(

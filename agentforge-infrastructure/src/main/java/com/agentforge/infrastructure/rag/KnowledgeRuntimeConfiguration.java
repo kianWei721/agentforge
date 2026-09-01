@@ -1,12 +1,14 @@
 package com.agentforge.infrastructure.rag;
 
 import com.agentforge.infrastructure.config.KnowledgeHybridProperties;
+import com.agentforge.infrastructure.config.KnowledgeRerankProperties;
 import com.agentforge.rag.EmbeddingProvider;
 import com.agentforge.rag.HybridKnowledgeRetriever;
 import com.agentforge.rag.KnowledgeChunker;
 import com.agentforge.rag.KnowledgeIndexService;
 import com.agentforge.rag.KnowledgeIngestionService;
 import com.agentforge.rag.KnowledgeRepository;
+import com.agentforge.rag.KnowledgeReranker;
 import com.agentforge.rag.KnowledgeRetriever;
 import com.agentforge.rag.KnowledgeSearchBackend;
 import com.agentforge.rag.LexicalKnowledgeRetriever;
@@ -14,6 +16,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.http.HttpClient;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -80,20 +83,40 @@ public class KnowledgeRuntimeConfiguration {
 
     @Bean
     @ConditionalOnProperty(
+            prefix = "agentforge.knowledge.rerank",
+            name = "enabled",
+            havingValue = "true")
+    public KnowledgeReranker knowledgeReranker(KnowledgeRerankProperties properties) {
+        properties.validate();
+        HttpClient client =
+                HttpClient.newBuilder()
+                        .connectTimeout(properties.getRequestTimeout())
+                        .followRedirects(HttpClient.Redirect.NEVER)
+                        .build();
+        return new DashScopeKnowledgeReranker(
+                client, new ObjectMapper(), properties);
+    }
+
+    @Bean
+    @ConditionalOnProperty(
             prefix = "agentforge.knowledge.hybrid",
             name = "enabled",
             havingValue = "true")
     public KnowledgeRetriever hybridKnowledgeRetriever(
             EmbeddingProvider embeddingProvider,
             KnowledgeSearchBackend backend,
-            KnowledgeHybridProperties properties) {
+            KnowledgeHybridProperties properties,
+            KnowledgeRerankProperties rerankProperties,
+            ObjectProvider<KnowledgeReranker> rerankerProvider) {
         return new HybridKnowledgeRetriever(
                 embeddingProvider,
                 backend,
                 properties.getCandidateMultiplier(),
                 properties.getRrfK(),
                 properties.isRelevanceGateEnabled(),
-                properties.getMinVectorSimilarity());
+                properties.getMinVectorSimilarity(),
+                rerankerProvider.getIfAvailable(),
+                rerankProperties.getCandidateLimit());
     }
 
     @Bean

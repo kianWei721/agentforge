@@ -99,6 +99,9 @@ public class KnowledgeSearchTool implements AgentTool {
                 if (hit.vectorSimilarity() != null) {
                     item.put("vectorSimilarity", hit.vectorSimilarity());
                 }
+                if (hit.rerankScore() != null) {
+                    item.put("rerankScore", hit.rerankScore());
+                }
                 resultHits.add(item);
             }
 
