@@ -73,6 +73,11 @@ agentforge:
       model: ${AGENTFORGE_KNOWLEDGE_RERANK_MODEL:qwen3-rerank}
       candidate-limit: ${AGENTFORGE_KNOWLEDGE_RERANK_CANDIDATE_LIMIT:8}
       request-timeout: ${AGENTFORGE_KNOWLEDGE_RERANK_REQUEST_TIMEOUT:15s}
+    evaluation:
+      enabled: ${AGENTFORGE_KNOWLEDGE_EVALUATION_ENABLED:false}
+      index-name: ${AGENTFORGE_KNOWLEDGE_EVALUATION_INDEX:agentforge-knowledge-eval-v070}
+      dataset-resource: ${AGENTFORGE_KNOWLEDGE_EVALUATION_DATASET:classpath:knowledge/eval/v070-gold-dataset.json}
+      top-k: ${AGENTFORGE_KNOWLEDGE_EVALUATION_TOP_K:5}
     answerability:
       enabled: ${AGENTFORGE_KNOWLEDGE_ANSWERABILITY_ENABLED:false}
       base-url: ${AGENTFORGE_KNOWLEDGE_ANSWERABILITY_BASE_URL:${DASHSCOPE_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}}

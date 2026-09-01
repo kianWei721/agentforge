@@ -1,0 +1,102 @@
+{
+  "version": "V0.7-GOLD-1",
+  "description": "Evaluation-only synthetic multi-document corpus. It is isolated in a dedicated Elasticsearch index and must never be treated as production device truth.",
+  "documents": [
+    {
+      "id": "eval-offline-procedure",
+      "title": "Prolonged Device Offline Troubleshooting",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/offline-procedure",
+      "content": "Evaluation-only synthetic knowledge. For a device that has been offline for a prolonged period, troubleshoot in this order: verify the power supply, verify SIM and data-plan status, check cellular network coverage, and then inspect firmware or runtime health. This is a troubleshooting procedure only and is not proof of the actual root cause."
+    },
+    {
+      "id": "eval-shadow-conflict",
+      "title": "shadowStatus CONFLICT Semantics",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/shadow-conflict",
+      "content": "Evaluation-only synthetic knowledge. shadowStatus CONFLICT means the reported device state and the desired platform shadow state disagree. It is a state-consistency indicator. CONFLICT by itself does not prove that the device is offline or that the broker connection failed."
+    },
+    {
+      "id": "eval-signal-strength",
+      "title": "SignalStrength Field Semantics",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/signal-strength",
+      "content": "Evaluation-only synthetic knowledge. SignalStrength is a reported telemetry field. SignalStrength=0 means the stored field value is zero. Without protocol-specific freshness and encoding rules, zero alone must not be promoted to a confirmed no-signal or disconnected diagnosis."
+    },
+    {
+      "id": "eval-peripheral-status",
+      "title": "PeripheralStatus Bit Semantics",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/peripheral-status",
+      "content": "Evaluation-only synthetic knowledge. PeripheralStatus uses binary flags in this corpus: bit0 indicates the lure-lamp circuit and bit1 indicates the camera circuit. For each defined bit, 0 means inactive and 1 means active. No meaning is defined here for bits above bit1."
+    },
+    {
+      "id": "eval-sim-data-plan",
+      "title": "SIM and Data-plan Verification",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/sim-data-plan",
+      "content": "Evaluation-only synthetic knowledge. Verify SIM presence, activation state, remaining data-plan validity, and account suspension status when diagnosing cellular connectivity. This passage intentionally does not define a carrier HTTP API endpoint or database table."
+    },
+    {
+      "id": "eval-firmware-runtime",
+      "title": "Firmware and Runtime Health Inspection",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/firmware-runtime",
+      "content": "Evaluation-only synthetic knowledge. Firmware and runtime health inspection should review reboot counters, watchdog resets, crash or exception logs, process uptime, and the most recent successful telemetry cycle. These observations support diagnosis but do not independently prove a root cause."
+    },
+    {
+      "id": "eval-snapshot-semantics",
+      "title": "Last-saved Property Snapshot Semantics",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/property-snapshot",
+      "content": "Evaluation-only synthetic knowledge. A property snapshot is the last saved state known to the platform. Historical snapshot values are not live telemetry unless their timestamps are fresh. queriedAt describes query time, while snapshotUpdatedAt describes when the stored snapshot was last updated."
+    },
+    {
+      "id": "eval-event-history",
+      "title": "Thing-model Event History Semantics",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/event-history",
+      "content": "Evaluation-only synthetic knowledge. Thing-model event history records device events exposed by the event feed. It is not an alarm feed. An empty result means no event records were returned by that query and must not be interpreted as proof that no alarm condition ever occurred."
+    },
+    {
+      "id": "eval-reconnect-backoff",
+      "title": "Reconnect Backoff Procedure",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/reconnect-backoff",
+      "content": "Evaluation-only synthetic knowledge. After an unexpected connection loss, a client should retry with bounded backoff instead of a tight reconnect loop. Increase the delay between repeated failures up to a configured ceiling and reset the delay after a stable connection is restored."
+    },
+    {
+      "id": "eval-command-verification",
+      "title": "Device Command Verification",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/command-verification",
+      "content": "Evaluation-only synthetic knowledge. A successful command submission is not the same as verified device state. After a write command, query the authoritative device state with bounded verification attempts and report a verification timeout when the expected state cannot be observed."
+    }
+  ],
+  "cases": [
+    {"name":"offline-order-zh","category":"offline","query":"设备长期离线应该按什么顺序排查？","expectedDocumentIds":["eval-offline-procedure"]},
+    {"name":"offline-order-colloquial","category":"offline","query":"设备掉线很久了，一般先查什么后查什么？","expectedDocumentIds":["eval-offline-procedure"]},
+    {"name":"shadow-conflict-meaning","category":"shadow","query":"shadowStatus CONFLICT 是什么意思？","expectedDocumentIds":["eval-shadow-conflict"]},
+    {"name":"shadow-conflict-proof","category":"shadow","query":"CONFLICT 能不能直接证明设备离线？","expectedDocumentIds":["eval-shadow-conflict"]},
+    {"name":"signal-zero-meaning","category":"signal","query":"SignalStrength=0 具体代表什么？","expectedDocumentIds":["eval-signal-strength"]},
+    {"name":"signal-zero-root-cause","category":"signal","query":"SignalStrength=0 能否直接确认设备已经断网？","expectedDocumentIds":["eval-signal-strength"]},
+    {"name":"peripheral-bits","category":"peripheral","query":"PeripheralStatus 的 bit0 和 bit1 分别表示什么？","expectedDocumentIds":["eval-peripheral-status"]},
+    {"name":"peripheral-zero-one","category":"peripheral","query":"PeripheralStatus 已定义位里的 0/1 是什么语义？","expectedDocumentIds":["eval-peripheral-status"]},
+    {"name":"sim-diagnosis","category":"sim","query":"蜂窝网络异常时 SIM 和流量套餐应该检查哪些内容？","expectedDocumentIds":["eval-sim-data-plan"]},
+    {"name":"sim-english","category":"sim","query":"What SIM and data-plan checks should be performed for cellular connectivity diagnosis?","expectedDocumentIds":["eval-sim-data-plan"]},
+    {"name":"firmware-health","category":"firmware","query":"固件和运行时健康检查应该看哪些指标？","expectedDocumentIds":["eval-firmware-runtime"]},
+    {"name":"firmware-runtime-english","category":"firmware","query":"What should I inspect for firmware and runtime health?","expectedDocumentIds":["eval-firmware-runtime"]},
+    {"name":"snapshot-live-boundary","category":"snapshot","query":"属性快照是不是实时遥测？","expectedDocumentIds":["eval-snapshot-semantics"]},
+    {"name":"snapshot-timestamps","category":"snapshot","query":"queriedAt 和 snapshotUpdatedAt 分别表示什么？","expectedDocumentIds":["eval-snapshot-semantics"]},
+    {"name":"event-feed-boundary","category":"event","query":"thing-model event history 是告警流吗？","expectedDocumentIds":["eval-event-history"]},
+    {"name":"event-empty-meaning","category":"event","query":"事件查询为空能不能证明从来没有发生过告警？","expectedDocumentIds":["eval-event-history"]},
+    {"name":"reconnect-backoff","category":"network","query":"连接异常断开后重连退避应该怎么做？","expectedDocumentIds":["eval-reconnect-backoff"]},
+    {"name":"reconnect-loop","category":"network","query":"Why should a client avoid a tight reconnect loop after connection loss?","expectedDocumentIds":["eval-reconnect-backoff"]},
+    {"name":"command-submit-vs-verify","category":"command","query":"命令提交成功是不是就等于设备状态已经生效？","expectedDocumentIds":["eval-command-verification"]},
+    {"name":"command-verify-timeout","category":"command","query":"写命令之后应该如何验证设备最终状态？","expectedDocumentIds":["eval-command-verification"]},
+    {"name":"noanswer-offline-threshold","category":"no-answer","query":"设备离线多少分钟才定义为长期离线？","expectedDocumentIds":[]},
+    {"name":"noanswer-carrier-api","category":"no-answer","query":"查询 SIM 剩余流量的具体 HTTP API endpoint 是什么？","expectedDocumentIds":[]},
+    {"name":"noanswer-peripheral-bit7","category":"no-answer","query":"PeripheralStatus 的 bit7 表示什么？","expectedDocumentIds":[]},
+    {"name":"noanswer-conflict-table","category":"no-answer","query":"shadowStatus CONFLICT 存在哪张 MySQL 表里？","expectedDocumentIds":[]}
+  ]
+}
