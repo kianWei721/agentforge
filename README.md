@@ -2,7 +2,7 @@
 
 AgentForge 是一个基于 Java 的企业级 AI Agent 编排与运行平台练习项目。
 
-当前里程碑：**V0.6.3 — Retrieval Quality / Reranker + No-answer Sentinel**。V0.6.2 已完成 Embedding + Elasticsearch Hybrid Retrieval 真实环境验收。
+当前里程碑：**V0.6.3 — Retrieval Quality / Reranker + Answerability Judge**。V0.6.2 已完成 Embedding + Elasticsearch Hybrid Retrieval 真实环境验收。
 
 ## 已完成链路
 
@@ -47,7 +47,25 @@ HYBRID_ES_RRF_GATE_V1
 
 详细设计与验收见 `docs/V0.6.3-retrieval-quality.md`。
 
-V0.6.3 的真实校准进一步证明：单一 cosine similarity threshold 无法同时保留跨语言正样本并拒绝字段语义负样本。因此启用 Reranker 后，Hybrid Retriever 会在 RRF Candidate 后调用独立的 `KnowledgeReranker`，使用 `qwen3-rerank + NO_ANSWER_SENTINEL` 判断 Answerability；该路径模式为 `HYBRID_ES_RRF_RERANK_V1`。Reranker 未启用时仍保留原 `HYBRID_ES_RRF_GATE_V1` fallback。
+V0.6.3 的真实校准进一步证明：单一 cosine similarity threshold 无法同时保留跨语言正样本并拒绝字段语义负样本。随后真实集成测试又证明，`qwen3-rerank` 适合做候选排序，但 `qwen3-rerank + NO_ANSWER_SENTINEL` 不适合作为最终 No-answer Admission。
+
+当前完整链路：
+
+```text
+BM25 + Vector
+      ↓
+RRF
+      ↓
+qwen3-rerank
+  Candidate Ordering only
+      ↓
+qwen3.8-flash
+  Answerability Judge
+      ↓
+Knowledge / No-answer
+```
+
+启用完整链路后的 Retriever mode 为 `HYBRID_ES_RRF_RERANK_JUDGE_V1`。旧 `HYBRID_ES_RRF_GATE_V1` 仅保留为 Reranker/Judge 未启用时的 fallback。
 
 ## V0.6.2 已完成
 
