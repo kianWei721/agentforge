@@ -21,6 +21,7 @@ foreach ($case in $cases) {
 
     $top = $null
     if ($result.count -gt 0) { $top = $result.hits[0] }
+    $diag = $result.rerankDiagnostics
 
     if ($case.ExpectHit) {
         $pass = $result.count -ge 1 -and $top.title -eq $ExpectedTitle
@@ -35,9 +36,16 @@ foreach ($case in $cases) {
         Pass = $pass
         Count = $result.count
         NoAnswer = $result.noAnswer
+        Decision = if ($null -eq $diag) { "" } else { $diag.decision }
+        Candidates = if ($null -eq $diag) { $null } else { $diag.candidateCount }
+        Accepted = if ($null -eq $diag) { $null } else { $diag.acceptedCount }
+        TopRealScore = if ($null -eq $diag) { $null } else { $diag.topRealScore }
+        SentinelScore = if ($null -eq $diag) { $null } else { $diag.noAnswerScore }
+        SentinelRank = if ($null -eq $diag) { $null } else { $diag.noAnswerRank }
         TopTitle = if ($null -eq $top) { "" } else { $top.title }
         MatchType = if ($null -eq $top) { "" } else { $top.matchType }
         VectorSimilarity = if ($null -eq $top) { $null } else { $top.vectorSimilarity }
+        RerankScore = if ($null -eq $top) { $null } else { $top.rerankScore }
         RrfScore = if ($null -eq $top) { $null } else { $top.score }
     }
 }
@@ -45,8 +53,8 @@ foreach ($case in $cases) {
 $rows | Format-Table -AutoSize
 
 if ($failed) {
-    throw "V0.6.3 retrieval evaluation failed. Inspect vectorSimilarity and tune the relevance policy rather than treating nearest-neighbor results as relevant."
+    throw "V0.6.3 retrieval evaluation failed. Inspect rerankDiagnostics: candidateCount distinguishes recall miss from reranker rejection; topRealScore/noAnswerScore show the live Java rerank decision."
 }
 
 Write-Host ""
-Write-Host "V0.6.3 relevance-gate evaluation PASSED."
+Write-Host "V0.6.3 reranker-sentinel evaluation PASSED."

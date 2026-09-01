@@ -67,8 +67,13 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
 
     @Override
     public List<KnowledgeSearchHit> search(String query, int topK) {
+        return searchDetailed(query, topK).hits();
+    }
+
+    @Override
+    public KnowledgeRetrievalResult searchDetailed(String query, int topK) {
         if (query == null || query.isBlank()) {
-            return List.of();
+            return KnowledgeRetrievalResult.of(List.of());
         }
         if (topK < 1 || topK > 20) {
             throw new IllegalArgumentException("topK must be between 1 and 20");
@@ -107,14 +112,20 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
                             .limit(poolSize)
                             .map(HybridKnowledgeRetriever::toSearchHit)
                             .toList();
-            return reranker.rerank(normalizedQuery, candidates, topK).hits();
+            KnowledgeRerankResult rerankResult =
+                    reranker.rerank(normalizedQuery, candidates, topK);
+            return new KnowledgeRetrievalResult(
+                    rerankResult.hits(),
+                    rerankResult.diagnostics());
         }
 
-        return ranked.stream()
-                .filter(this::passesRelevanceGate)
-                .limit(topK)
-                .map(HybridKnowledgeRetriever::toSearchHit)
-                .toList();
+        List<KnowledgeSearchHit> hits =
+                ranked.stream()
+                        .filter(this::passesRelevanceGate)
+                        .limit(topK)
+                        .map(HybridKnowledgeRetriever::toSearchHit)
+                        .toList();
+        return KnowledgeRetrievalResult.of(hits);
     }
 
     @Override

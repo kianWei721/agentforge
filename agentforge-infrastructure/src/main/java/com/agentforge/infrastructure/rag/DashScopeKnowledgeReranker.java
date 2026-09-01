@@ -1,6 +1,7 @@
 package com.agentforge.infrastructure.rag;
 
 import com.agentforge.infrastructure.config.KnowledgeRerankProperties;
+import com.agentforge.rag.KnowledgeRerankDiagnostics;
 import com.agentforge.rag.KnowledgeRerankResult;
 import com.agentforge.rag.KnowledgeReranker;
 import com.agentforge.rag.KnowledgeSearchHit;
@@ -55,7 +56,21 @@ public class DashScopeKnowledgeReranker implements KnowledgeReranker {
             throw new IllegalArgumentException("topK must be between 1 and 20");
         }
         if (candidates == null || candidates.isEmpty()) {
-            return new KnowledgeRerankResult(List.of(), true, null);
+            KnowledgeRerankDiagnostics diagnostics =
+                    new KnowledgeRerankDiagnostics(
+                            mode(),
+                            0,
+                            0,
+                            "NO_CANDIDATES",
+                            null,
+                            null,
+                            null,
+                            null);
+            return new KnowledgeRerankResult(
+                    List.of(),
+                    true,
+                    null,
+                    diagnostics);
         }
 
         int realCount = candidates.size();
@@ -117,26 +132,51 @@ public class DashScopeKnowledgeReranker implements KnowledgeReranker {
 
             List<KnowledgeSearchHit> accepted = new ArrayList<>();
             Double noAnswerScore = null;
-            boolean sentinelSeen = false;
-            for (RankedItem item : ranked) {
+            Integer noAnswerRank = null;
+            Double topRealScore = null;
+            String topRealCitationId = null;
+
+            for (int rank = 0; rank < ranked.size(); rank++) {
+                RankedItem item = ranked.get(rank);
                 if (item.index() == sentinelIndex) {
                     noAnswerScore = item.score();
-                    sentinelSeen = true;
+                    noAnswerRank = rank + 1;
                     break;
                 }
+                KnowledgeSearchHit candidate = candidates.get(item.index());
+                if (topRealScore == null) {
+                    topRealScore = item.score();
+                    topRealCitationId = candidate.citationId();
+                }
                 if (accepted.size() < topK) {
-                    accepted.add(candidates.get(item.index()).withRerankScore(item.score()));
+                    accepted.add(candidate.withRerankScore(item.score()));
                 }
             }
 
-            if (!sentinelSeen) {
+            if (noAnswerRank == null) {
                 throw new IllegalStateException("rerank provider omitted no-answer sentinel");
             }
+
+            String decision =
+                    accepted.isEmpty()
+                            ? "NO_ANSWER_SENTINEL"
+                            : "KNOWLEDGE";
+            KnowledgeRerankDiagnostics diagnostics =
+                    new KnowledgeRerankDiagnostics(
+                            mode(),
+                            realCount,
+                            accepted.size(),
+                            decision,
+                            topRealScore,
+                            topRealCitationId,
+                            noAnswerScore,
+                            noAnswerRank);
 
             return new KnowledgeRerankResult(
                     accepted,
                     accepted.isEmpty(),
-                    noAnswerScore);
+                    noAnswerScore,
+                    diagnostics);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("rerank request interrupted", exception);

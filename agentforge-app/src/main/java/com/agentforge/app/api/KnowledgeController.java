@@ -89,14 +89,19 @@ public class KnowledgeController {
             @Valid @RequestBody KnowledgeSearchRequest request) {
         return Mono.fromCallable(
                         () -> {
-                            var hits = retriever.search(request.query(), request.resolvedTopK());
+                            var retrieval =
+                                    retriever.searchDetailed(
+                                            request.query(),
+                                            request.resolvedTopK());
+                            var hits = retrieval.hits();
                             boolean noAnswer = hits.isEmpty();
                             return new KnowledgeSearchResponse(
                                     retriever.mode(),
                                     hits.size(),
                                     noAnswer,
                                     noAnswer ? "NO_RELEVANT_KNOWLEDGE_RETURNED" : null,
-                                    hits);
+                                    hits,
+                                    retrieval.rerankDiagnostics());
                         })
                 .subscribeOn(Schedulers.boundedElastic());
     }
