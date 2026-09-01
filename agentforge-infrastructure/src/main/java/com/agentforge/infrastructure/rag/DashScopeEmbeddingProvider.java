@@ -76,8 +76,7 @@ public class DashScopeEmbeddingProvider implements EmbeddingProvider {
                             request,
                             HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new IllegalStateException(
-                        "embedding provider returned HTTP " + response.statusCode());
+                throw providerFailure(response);
             }
 
             JsonNode root = objectMapper.readTree(response.body());
@@ -131,6 +130,59 @@ public class DashScopeEmbeddingProvider implements EmbeddingProvider {
     @Override
     public int dimensions() {
         return properties.getDimensions();
+    }
+
+    private IllegalStateException providerFailure(HttpResponse<String> response) {
+        String code = null;
+        String message = null;
+        String requestId = null;
+        try {
+            JsonNode root = objectMapper.readTree(response.body());
+            JsonNode error = root.path("error");
+            code = firstText(error.path("code"), root.path("code"));
+            message = firstText(error.path("message"), root.path("message"));
+            requestId =
+                    firstText(
+                            root.path("request_id"),
+                            root.path("requestId"),
+                            root.path("id"));
+        } catch (Exception ignored) {
+            // Keep the error safe and concise. Never echo an arbitrary raw provider body.
+        }
+
+        StringBuilder detail =
+                new StringBuilder("embedding provider returned HTTP ")
+                        .append(response.statusCode());
+        if (hasText(code)) {
+            detail.append(", code=").append(sanitize(code, 120));
+        }
+        if (hasText(message)) {
+            detail.append(", message=").append(sanitize(message, 500));
+        }
+        if (hasText(requestId)) {
+            detail.append(", requestId=").append(sanitize(requestId, 160));
+        }
+        return new IllegalStateException(detail.toString());
+    }
+
+    private static String firstText(JsonNode... nodes) {
+        for (JsonNode node : nodes) {
+            if (node != null && node.isTextual() && !node.asText().isBlank()) {
+                return node.asText();
+            }
+        }
+        return null;
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private static String sanitize(String value, int maxLength) {
+        String singleLine = value.replaceAll("[\\r\\n\\t]+", " ").trim();
+        return singleLine.length() <= maxLength
+                ? singleLine
+                : singleLine.substring(0, maxLength) + "...";
     }
 
     private static String bearer(String apiKey) {
