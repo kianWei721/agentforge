@@ -121,7 +121,7 @@ public class ElasticsearchKnowledgeSearchBackend implements KnowledgeSearchBacke
     @Override
     public void refresh() {
         HttpResponse<String> response =
-                send("POST", "/" + indexName + "/_refresh", "{}", "application/json");
+                send("POST", "/" + indexName + "/_refresh", null, "application/json");
         require2xx("refresh index", response);
     }
 
