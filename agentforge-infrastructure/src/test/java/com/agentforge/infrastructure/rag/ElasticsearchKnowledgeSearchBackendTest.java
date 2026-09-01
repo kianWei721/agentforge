@@ -30,6 +30,7 @@ class ElasticsearchKnowledgeSearchBackendTest {
         assertTrue(allBodies.contains("\"similarity\":\"cosine\""));
         assertTrue(allBodies.contains("\"knn\""));
         assertFalse(allBodies.contains("cosineSimilarity(params.query_vector"));
+        assertRefreshHasNoBody(requests);
     }
 
     @Test
@@ -45,6 +46,17 @@ class ElasticsearchKnowledgeSearchBackendTest {
         assertFalse(allBodies.contains("\"knn\""));
         assertTrue(allBodies.contains("cosineSimilarity(params.query_vector, 'embedding') + 1.0"));
         assertTrue(allBodies.contains("\"script_score\""));
+        assertRefreshHasNoBody(requests);
+    }
+
+    private static void assertRefreshHasNoBody(List<RequestCapture> requests) {
+        RequestCapture refresh =
+                requests.stream()
+                        .filter(request -> request.path().endsWith("/_refresh"))
+                        .findFirst()
+                        .orElseThrow();
+        assertEquals("POST", refresh.method());
+        assertEquals("", refresh.body());
     }
 
     private static List<RequestCapture> runScenario(String version) throws Exception {
