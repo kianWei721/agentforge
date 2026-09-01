@@ -24,7 +24,10 @@ if ($health.knowledgeAnswerabilityEnabled -ne $true -or $health.knowledgeAnswera
     throw "Answerability Judge must remain enabled for Slice 3 evaluation."
 }
 
-$cases = @(Get-Content -LiteralPath $datasetPath -Raw -Encoding UTF8 | ConvertFrom-Json)
+$parsedCases = Get-Content -LiteralPath $datasetPath -Raw -Encoding UTF8 | ConvertFrom-Json
+# Windows PowerShell 5.1 may return a JSON array as one array object. Re-enumerate it explicitly
+# so Count reflects the number of evaluation cases instead of the outer pipeline object.
+$cases = @($parsedCases | ForEach-Object { $_ })
 if ($cases.Count -lt 10) {
     throw "Expanded evaluation dataset must contain at least 10 cases."
 }
