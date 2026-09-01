@@ -1,0 +1,86 @@
+[
+  {
+    "name": "positive-cross-language-offline",
+    "category": "positive",
+    "query": "设备长期离线应该按什么顺序排查？",
+    "expectHit": true,
+    "requiredTokens": []
+  },
+  {
+    "name": "positive-colloquial-offline",
+    "category": "positive",
+    "query": "设备掉线很久了，一般先查什么后查什么？",
+    "expectHit": true,
+    "requiredTokens": []
+  },
+  {
+    "name": "positive-mixed-language",
+    "category": "positive",
+    "query": "设备长期 offline 的 troubleshooting sequence 是什么？",
+    "expectHit": true,
+    "requiredTokens": []
+  },
+  {
+    "name": "positive-english-offline",
+    "category": "positive",
+    "query": "For a device that has been offline for a prolonged period, what troubleshooting order should I follow?",
+    "expectHit": true,
+    "requiredTokens": []
+  },
+  {
+    "name": "positive-short-procedure",
+    "category": "positive",
+    "query": "长时间离线排查流程",
+    "expectHit": true,
+    "requiredTokens": []
+  },
+  {
+    "name": "positive-explicit-check-order",
+    "category": "positive",
+    "query": "设备长期离线时，供电、SIM、网络覆盖和固件运行状态应该按什么顺序检查？",
+    "expectHit": true,
+    "requiredTokens": ["SIM"]
+  },
+  {
+    "name": "positive-root-cause-boundary",
+    "category": "positive",
+    "query": "仅凭设备长期离线和这套排查流程，能不能确认具体根因？",
+    "expectHit": true,
+    "requiredTokens": []
+  },
+  {
+    "name": "negative-shadow-conflict",
+    "category": "negative",
+    "query": "shadowStatus CONFLICT 的字段语义是什么？",
+    "expectHit": false,
+    "requiredTokens": ["shadowStatus", "CONFLICT"]
+  },
+  {
+    "name": "negative-signal-strength",
+    "category": "negative",
+    "query": "SignalStrength=0 在这个设备里具体代表什么？",
+    "expectHit": false,
+    "requiredTokens": ["SignalStrength=0"]
+  },
+  {
+    "name": "negative-peripheral-status",
+    "category": "negative",
+    "query": "PeripheralStatus 各字段的 0/1 具体表示什么？",
+    "expectHit": false,
+    "requiredTokens": ["PeripheralStatus", "0/1"]
+  },
+  {
+    "name": "negative-offline-duration-threshold",
+    "category": "negative",
+    "query": "设备离线多久才算长期离线？",
+    "expectHit": false,
+    "requiredTokens": []
+  },
+  {
+    "name": "negative-sim-balance-query",
+    "category": "negative",
+    "query": "SIM 卡剩余流量应该调用哪个接口查询？",
+    "expectHit": false,
+    "requiredTokens": ["SIM"]
+  }
+]
