@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Configuration;
     ToolGovernanceProperties.class,
     ToolPolicyProperties.class,
     ToolConfirmationProperties.class,
-    KnowledgeHybridProperties.class
+    KnowledgeHybridProperties.class,
+    KnowledgeRerankProperties.class
 })
 public class AgentForgeInfrastructureConfiguration {}

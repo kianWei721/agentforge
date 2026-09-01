@@ -76,6 +76,72 @@ class HybridKnowledgeRetrieverTest {
     }
 
     @Test
+    void rerankerShouldReceiveCandidatesBeforeLegacySimilarityGate() {
+        KnowledgeBackendHit crossLanguage =
+                hit("doc-offline", "chunk-offline", "Offline troubleshooting", 0.48d);
+        KnowledgeReranker reranker =
+                new KnowledgeReranker() {
+                    @Override
+                    public KnowledgeRerankResult rerank(
+                            String query, List<KnowledgeSearchHit> candidates, int topK) {
+                        assertEquals(1, candidates.size());
+                        assertEquals(0.48d, candidates.get(0).vectorSimilarity(), 0.0001d);
+                        return new KnowledgeRerankResult(
+                                List.of(candidates.get(0).withRerankScore(0.92d)),
+                                false,
+                                0.70d);
+                    }
+
+                    @Override
+                    public String mode() {
+                        return "TEST_RERANK";
+                    }
+                };
+
+        KnowledgeRetriever retriever =
+                new HybridKnowledgeRetriever(
+                        embeddingProvider(),
+                        backend(List.of(), List.of(crossLanguage)),
+                        4,
+                        60,
+                        true,
+                        0.60d,
+                        reranker,
+                        8);
+
+        List<KnowledgeSearchHit> hits =
+                retriever.search("设备长期离线应该按什么顺序排查？", 5);
+
+        assertEquals(1, hits.size());
+        assertEquals(0.92d, hits.get(0).rerankScore(), 0.0001d);
+        assertEquals("HYBRID_ES_RRF_RERANK_V1", retriever.mode());
+    }
+
+    @Test
+    void rerankerMayReturnNoAnswerEvenWhenNearestNeighborExists() {
+        KnowledgeBackendHit unrelated =
+                hit("doc-offline", "chunk-offline", "Offline troubleshooting", 0.56d);
+        KnowledgeReranker reranker =
+                (query, candidates, topK) ->
+                        new KnowledgeRerankResult(List.of(), true, 0.81d);
+
+        KnowledgeRetriever retriever =
+                new HybridKnowledgeRetriever(
+                        embeddingProvider(),
+                        backend(List.of(), List.of(unrelated)),
+                        4,
+                        60,
+                        true,
+                        0.60d,
+                        reranker,
+                        8);
+
+        assertTrue(
+                retriever.search("SignalStrength=0 在这个设备里具体代表什么？", 5)
+                        .isEmpty());
+    }
+
+    @Test
     void shouldKeepLexicalCandidateEvenWhenVectorSimilarityIsBelowGate() {
         KnowledgeBackendHit exact =
                 hit("doc-exact", "chunk-exact", "shadowStatus CONFLICT", 4.2d);

@@ -7,6 +7,7 @@ import com.agentforge.infrastructure.config.AgentSessionCacheProperties;
 import com.agentforge.infrastructure.config.IoTDeviceStatusProperties;
 import com.agentforge.infrastructure.config.IoTLureLampControlProperties;
 import com.agentforge.infrastructure.config.KnowledgeHybridProperties;
+import com.agentforge.infrastructure.config.KnowledgeRerankProperties;
 import com.agentforge.infrastructure.config.ToolConfirmationProperties;
 import com.agentforge.infrastructure.config.ToolGovernanceProperties;
 import com.agentforge.infrastructure.config.ToolPolicyProperties;
@@ -42,6 +43,7 @@ public class SystemController {
     private final KnowledgeRetriever knowledgeRetriever;
     private final KnowledgeIngestionService knowledgeIngestionService;
     private final KnowledgeHybridProperties knowledgeHybridProperties;
+    private final KnowledgeRerankProperties knowledgeRerankProperties;
 
     public SystemController(
             ModelGatewayCatalog modelGatewayCatalog,
@@ -58,7 +60,8 @@ public class SystemController {
             ToolConfirmationProperties toolConfirmationProperties,
             KnowledgeRetriever knowledgeRetriever,
             KnowledgeIngestionService knowledgeIngestionService,
-            KnowledgeHybridProperties knowledgeHybridProperties) {
+            KnowledgeHybridProperties knowledgeHybridProperties,
+            KnowledgeRerankProperties knowledgeRerankProperties) {
         this.modelGatewayCatalog = modelGatewayCatalog;
         this.agentProperties = agentProperties;
         this.agentService = agentService;
@@ -74,6 +77,7 @@ public class SystemController {
         this.knowledgeRetriever = knowledgeRetriever;
         this.knowledgeIngestionService = knowledgeIngestionService;
         this.knowledgeHybridProperties = knowledgeHybridProperties;
+        this.knowledgeRerankProperties = knowledgeRerankProperties;
     }
 
     @GetMapping("/health")
@@ -88,7 +92,7 @@ public class SystemController {
         result.put("name", "AgentForge");
         result.put("version", "0.3.0-SNAPSHOT");
         result.put("status", infrastructure.ready() ? "UP" : "DEGRADED");
-        result.put("milestone", "V0.6.3-retrieval-quality-gate");
+        result.put("milestone", "V0.6.3-reranker-sentinel");
         result.put("mysql", infrastructure.mysqlUp() ? "UP" : "DOWN");
         result.put("redis", infrastructure.redisUp() ? "UP" : "DOWN");
         result.put("activeModelProvider", modelGatewayCatalog.activeProvider());
@@ -152,6 +156,12 @@ public class SystemController {
         result.put(
                 "knowledgeMinVectorSimilarity",
                 knowledgeHybridProperties.getMinVectorSimilarity());
+        result.put("knowledgeRerankEnabled", knowledgeRerankProperties.isEnabled());
+        result.put("knowledgeRerankConfigured", knowledgeRerankProperties.isConfigured());
+        result.put("knowledgeRerankModel", knowledgeRerankProperties.getModel());
+        result.put(
+                "knowledgeRerankCandidateLimit",
+                knowledgeRerankProperties.getCandidateLimit());
         return result;
     }
 }
