@@ -14,6 +14,7 @@ import org.springframework.context.annotation.Configuration;
     ToolPolicyProperties.class,
     ToolConfirmationProperties.class,
     KnowledgeHybridProperties.class,
+    KnowledgeQueryRewriteProperties.class,
     KnowledgeRerankProperties.class,
     KnowledgeAnswerabilityProperties.class,
     RetrievalBudgetProperties.class

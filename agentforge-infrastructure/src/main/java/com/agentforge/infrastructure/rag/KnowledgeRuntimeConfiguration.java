@@ -2,6 +2,7 @@ package com.agentforge.infrastructure.rag;
 
 import com.agentforge.infrastructure.config.KnowledgeAnswerabilityProperties;
 import com.agentforge.infrastructure.config.KnowledgeHybridProperties;
+import com.agentforge.infrastructure.config.KnowledgeQueryRewriteProperties;
 import com.agentforge.infrastructure.config.KnowledgeRerankProperties;
 import com.agentforge.rag.EmbeddingProvider;
 import com.agentforge.rag.HybridKnowledgeRetriever;
@@ -9,6 +10,7 @@ import com.agentforge.rag.KnowledgeAnswerabilityJudge;
 import com.agentforge.rag.KnowledgeChunker;
 import com.agentforge.rag.KnowledgeIndexService;
 import com.agentforge.rag.KnowledgeIngestionService;
+import com.agentforge.rag.KnowledgeQueryRewriter;
 import com.agentforge.rag.KnowledgeRepository;
 import com.agentforge.rag.KnowledgeReranker;
 import com.agentforge.rag.KnowledgeRetriever;
@@ -85,6 +87,23 @@ public class KnowledgeRuntimeConfiguration {
 
     @Bean
     @ConditionalOnProperty(
+            prefix = "agentforge.knowledge.query-rewrite",
+            name = "enabled",
+            havingValue = "true")
+    public KnowledgeQueryRewriter knowledgeQueryRewriter(
+            KnowledgeQueryRewriteProperties properties) {
+        properties.validate();
+        HttpClient client =
+                HttpClient.newBuilder()
+                        .connectTimeout(properties.getRequestTimeout())
+                        .followRedirects(HttpClient.Redirect.NEVER)
+                        .build();
+        return new DashScopeKnowledgeQueryRewriter(
+                client, new ObjectMapper(), properties);
+    }
+
+    @Bean
+    @ConditionalOnProperty(
             prefix = "agentforge.knowledge.rerank",
             name = "enabled",
             havingValue = "true")
@@ -125,8 +144,10 @@ public class KnowledgeRuntimeConfiguration {
             EmbeddingProvider embeddingProvider,
             KnowledgeSearchBackend backend,
             KnowledgeHybridProperties properties,
+            KnowledgeQueryRewriteProperties queryRewriteProperties,
             KnowledgeRerankProperties rerankProperties,
             KnowledgeAnswerabilityProperties answerabilityProperties,
+            ObjectProvider<KnowledgeQueryRewriter> queryRewriterProvider,
             ObjectProvider<KnowledgeReranker> rerankerProvider,
             ObjectProvider<KnowledgeAnswerabilityJudge> answerabilityJudgeProvider) {
         return new HybridKnowledgeRetriever(
@@ -136,6 +157,7 @@ public class KnowledgeRuntimeConfiguration {
                 properties.getRrfK(),
                 properties.isRelevanceGateEnabled(),
                 properties.getMinVectorSimilarity(),
+                queryRewriterProvider.getIfAvailable(),
                 rerankerProvider.getIfAvailable(),
                 rerankProperties.getCandidateLimit(),
                 answerabilityJudgeProvider.getIfAvailable(),

@@ -2,6 +2,7 @@ package com.agentforge.tool.knowledge;
 
 import com.agentforge.rag.KnowledgeAnswerabilityDecision;
 import com.agentforge.rag.KnowledgeAnswerabilityDiagnostics;
+import com.agentforge.rag.KnowledgeQueryRewriteDiagnostics;
 import com.agentforge.rag.KnowledgeRetrievalResult;
 import com.agentforge.rag.KnowledgeRetriever;
 import com.agentforge.rag.KnowledgeSearchHit;
@@ -132,6 +133,16 @@ public class KnowledgeSearchTool implements AgentTool {
                     retriever.mode());
             data.put("count", resultHits.size());
             data.put("hits", resultHits);
+
+            KnowledgeQueryRewriteDiagnostics rewriteDiagnostics =
+                    retrieval.queryRewriteDiagnostics();
+            if (rewriteDiagnostics != null) {
+                data.put("queryRewriteMode", rewriteDiagnostics.rewriteMode());
+                data.put("retrievalQuery", rewriteDiagnostics.retrievalQuery());
+                data.put("queryRewriteChanged", rewriteDiagnostics.changed());
+                data.put("queryRewriteDecision", rewriteDiagnostics.decision());
+                data.put("queryRewriteReasonCode", rewriteDiagnostics.reasonCode());
+            }
 
             boolean noAnswer = resultHits.isEmpty();
             data.put("noAnswer", noAnswer);
