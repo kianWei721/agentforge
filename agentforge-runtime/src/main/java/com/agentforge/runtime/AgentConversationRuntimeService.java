@@ -267,7 +267,12 @@ public class AgentConversationRuntimeService {
                 stringMetadata(metadata, "policyDecision"),
                 stringMetadata(metadata, "policyReason"),
                 stringMetadata(metadata, "confirmationId"),
-                stringMetadata(metadata, "confirmationStatus"));
+                stringMetadata(metadata, "confirmationStatus"),
+                stringMetadata(metadata, "retrievalBudgetDecision"),
+                stringMetadata(metadata, "retrievalBudgetReason"),
+                integerMetadata(metadata, "retrievalBudgetLimit"),
+                integerMetadata(metadata, "retrievalBudgetUsed"),
+                integerMetadata(metadata, "retrievalBudgetRemaining"));
     }
 
     private static String stringMetadata(Map<String, Object> metadata, String key) {

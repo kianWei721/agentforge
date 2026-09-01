@@ -87,6 +87,11 @@ class JdbcExecutionRepositoryTest {
                     policy_reason VARCHAR(128),
                     confirmation_id VARCHAR(64),
                     confirmation_status VARCHAR(16),
+                    retrieval_budget_decision VARCHAR(32),
+                    retrieval_budget_reason VARCHAR(128),
+                    retrieval_budget_limit INT,
+                    retrieval_budget_used INT,
+                    retrieval_budget_remaining INT,
                     occurred_at TIMESTAMP(6) NOT NULL,
                     UNIQUE (execution_id, sequence_no)
                 )
@@ -194,7 +199,12 @@ class JdbcExecutionRepositoryTest {
                                 "REQUIRE_CONFIRMATION",
                                 "write_tool_requires_confirmation",
                                 "confirmation-1",
-                                "PENDING"));
+                                "PENDING",
+                                null,
+                                null,
+                                null,
+                                null,
+                                null));
 
         assertEquals(1L, first.sequenceNo());
         assertEquals(2L, second.sequenceNo());

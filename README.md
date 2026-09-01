@@ -2,7 +2,7 @@
 
 AgentForge 是一个基于 Java 的企业级 AI Agent 编排与运行平台练习项目。
 
-当前里程碑：**V0.6.3 — Retrieval Quality / Reranker + Answerability Judge**。V0.6.2 已完成 Embedding + Elasticsearch Hybrid Retrieval 真实环境验收。
+当前里程碑：**V0.6.3 — Retrieval Quality / Retrieval Budget**。Slice 1 的 Hybrid Retrieval + Reranker + Answerability Judge 已完成真实验收。
 
 ## 已完成链路
 
@@ -66,6 +66,26 @@ Knowledge / No-answer
 ```
 
 启用完整链路后的 Retriever mode 为 `HYBRID_ES_RRF_RERANK_JUDGE_V1`。旧 `HYBRID_ES_RRF_GATE_V1` 仅保留为 Reranker/Judge 未启用时的 fallback。
+
+## V0.6.3 Slice 2 — Retrieval Budget
+
+Runtime 对 `search_knowledge` 增加 Execution-scoped Retrieval Budget（执行级检索预算）。默认同一次 Execution 最多实际执行 3 次知识检索：
+
+```text
+search_knowledge #1 -> ALLOW used=1 remaining=2
+search_knowledge #2 -> ALLOW used=2 remaining=1
+search_knowledge #3 -> ALLOW used=3 remaining=0
+search_knowledge #4 -> BLOCK retrieval_budget_exhausted
+```
+
+Budget 在 `AgentScopeToolAdapter` 调用真实 Tool 之前执行，因此第 4 次及之后的调用不会进入 Knowledge Retriever，也不会产生 Embedding、Elasticsearch、Reranker 或 Answerability Judge 成本。Budget 不依赖 Query 参数，模型改写 Query 不能绕过总次数上限。
+
+Trace 额外持久化 `retrievalBudgetDecision / Reason / Limit / Used / Remaining`。默认配置：
+
+```text
+AGENTFORGE_RETRIEVAL_BUDGET_ENABLED=true
+AGENTFORGE_RETRIEVAL_BUDGET_MAX_CALLS_PER_EXECUTION=3
+```
 
 ## V0.6.2 已完成
 

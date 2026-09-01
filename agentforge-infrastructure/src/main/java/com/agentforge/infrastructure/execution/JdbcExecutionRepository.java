@@ -143,6 +143,11 @@ public class JdbcExecutionRepository implements ExecutionRepository {
                         input.policyReason(),
                         input.confirmationId(),
                         input.confirmationStatus(),
+                        input.retrievalBudgetDecision(),
+                        input.retrievalBudgetReason(),
+                        input.retrievalBudgetLimit(),
+                        input.retrievalBudgetUsed(),
+                        input.retrievalBudgetRemaining(),
                         Instant.now());
 
         jdbcTemplate.update(
@@ -156,8 +161,10 @@ public class JdbcExecutionRepository implements ExecutionRepository {
                     blocked_by_failure_code, outbound_protocol, downstream_system,
                     outbound_attempts, http_status, business_code, downstream_duration_ms,
                     outbound_outcome, tool_risk_level, tool_read_only, policy_decision,
-                    policy_reason, confirmation_id, confirmation_status, occurred_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    policy_reason, confirmation_id, confirmation_status,
+                    retrieval_budget_decision, retrieval_budget_reason, retrieval_budget_limit,
+                    retrieval_budget_used, retrieval_budget_remaining, occurred_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 event.id(),
                 event.executionId(),
@@ -195,6 +202,11 @@ public class JdbcExecutionRepository implements ExecutionRepository {
                 event.policyReason(),
                 event.confirmationId(),
                 event.confirmationStatus(),
+                event.retrievalBudgetDecision(),
+                event.retrievalBudgetReason(),
+                event.retrievalBudgetLimit(),
+                event.retrievalBudgetUsed(),
+                event.retrievalBudgetRemaining(),
                 Timestamp.from(event.occurredAt()));
 
         jdbcTemplate.update(
@@ -217,7 +229,9 @@ public class JdbcExecutionRepository implements ExecutionRepository {
                        blocked_by_failure_code, outbound_protocol, downstream_system,
                        outbound_attempts, http_status, business_code, downstream_duration_ms,
                        outbound_outcome, tool_risk_level, tool_read_only, policy_decision,
-                       policy_reason, confirmation_id, confirmation_status, occurred_at
+                       policy_reason, confirmation_id, confirmation_status,
+                       retrieval_budget_decision, retrieval_budget_reason, retrieval_budget_limit,
+                       retrieval_budget_used, retrieval_budget_remaining, occurred_at
                 FROM af_trace_event
                 WHERE execution_id = ?
                 ORDER BY sequence_no
@@ -368,6 +382,11 @@ public class JdbcExecutionRepository implements ExecutionRepository {
                 rs.getString("policy_reason"),
                 rs.getString("confirmation_id"),
                 rs.getString("confirmation_status"),
+                rs.getString("retrieval_budget_decision"),
+                rs.getString("retrieval_budget_reason"),
+                nullableInteger(rs, "retrieval_budget_limit"),
+                nullableInteger(rs, "retrieval_budget_used"),
+                nullableInteger(rs, "retrieval_budget_remaining"),
                 toInstant(rs.getTimestamp("occurred_at")));
     }
 

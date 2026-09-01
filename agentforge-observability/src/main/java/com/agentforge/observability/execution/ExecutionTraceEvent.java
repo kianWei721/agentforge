@@ -40,6 +40,11 @@ public record ExecutionTraceEvent(
         String policyReason,
         String confirmationId,
         String confirmationStatus,
+        String retrievalBudgetDecision,
+        String retrievalBudgetReason,
+        Integer retrievalBudgetLimit,
+        Integer retrievalBudgetUsed,
+        Integer retrievalBudgetRemaining,
         Instant occurredAt) {
 
     public ExecutionTraceEvent {

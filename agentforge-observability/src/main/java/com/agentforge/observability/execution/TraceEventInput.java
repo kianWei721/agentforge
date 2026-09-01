@@ -33,7 +33,12 @@ public record TraceEventInput(
         String policyDecision,
         String policyReason,
         String confirmationId,
-        String confirmationStatus) {
+        String confirmationStatus,
+        String retrievalBudgetDecision,
+        String retrievalBudgetReason,
+        Integer retrievalBudgetLimit,
+        Integer retrievalBudgetUsed,
+        Integer retrievalBudgetRemaining) {
 
     public TraceEventInput(
             String eventType,
@@ -61,6 +66,11 @@ public record TraceEventInput(
                 outputTokens,
                 cachedTokens,
                 modelTimeMs,
+                null,
+                null,
+                null,
+                null,
+                null,
                 null,
                 null,
                 null,
