@@ -101,7 +101,8 @@ public class KnowledgeController {
                                     noAnswer,
                                     noAnswer ? "NO_RELEVANT_KNOWLEDGE_RETURNED" : null,
                                     hits,
-                                    retrieval.rerankDiagnostics());
+                                    retrieval.rerankDiagnostics(),
+                                    retrieval.answerabilityDiagnostics());
                         })
                 .subscribeOn(Schedulers.boundedElastic());
     }

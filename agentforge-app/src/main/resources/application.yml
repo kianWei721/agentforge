@@ -66,6 +66,13 @@ agentforge:
       model: ${AGENTFORGE_KNOWLEDGE_RERANK_MODEL:qwen3-rerank}
       candidate-limit: ${AGENTFORGE_KNOWLEDGE_RERANK_CANDIDATE_LIMIT:8}
       request-timeout: ${AGENTFORGE_KNOWLEDGE_RERANK_REQUEST_TIMEOUT:15s}
+    answerability:
+      enabled: ${AGENTFORGE_KNOWLEDGE_ANSWERABILITY_ENABLED:false}
+      base-url: ${AGENTFORGE_KNOWLEDGE_ANSWERABILITY_BASE_URL:${DASHSCOPE_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}}
+      api-key: ${AGENTFORGE_KNOWLEDGE_ANSWERABILITY_API_KEY:${DASHSCOPE_API_KEY:}}
+      model: ${AGENTFORGE_KNOWLEDGE_ANSWERABILITY_MODEL:${DASHSCOPE_MODEL:qwen3.8-flash}}
+      candidate-limit: ${AGENTFORGE_KNOWLEDGE_ANSWERABILITY_CANDIDATE_LIMIT:8}
+      request-timeout: ${AGENTFORGE_KNOWLEDGE_ANSWERABILITY_REQUEST_TIMEOUT:20s}
   iot:
     lure-lamp-control:
       enabled: ${AGENTFORGE_IOT_LURE_LAMP_CONTROL_ENABLED:false}

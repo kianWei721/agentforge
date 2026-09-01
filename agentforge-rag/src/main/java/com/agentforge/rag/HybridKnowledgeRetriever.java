@@ -15,6 +15,8 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
     private final double minVectorSimilarity;
     private final KnowledgeReranker reranker;
     private final int rerankCandidateLimit;
+    private final KnowledgeAnswerabilityJudge answerabilityJudge;
+    private final int answerabilityCandidateLimit;
 
     public HybridKnowledgeRetriever(
             EmbeddingProvider embeddingProvider,
@@ -31,6 +33,8 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
                 relevanceGateEnabled,
                 minVectorSimilarity,
                 null,
+                8,
+                null,
                 8);
     }
 
@@ -43,6 +47,30 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
             double minVectorSimilarity,
             KnowledgeReranker reranker,
             int rerankCandidateLimit) {
+        this(
+                embeddingProvider,
+                backend,
+                candidateMultiplier,
+                rrfK,
+                relevanceGateEnabled,
+                minVectorSimilarity,
+                reranker,
+                rerankCandidateLimit,
+                null,
+                8);
+    }
+
+    public HybridKnowledgeRetriever(
+            EmbeddingProvider embeddingProvider,
+            KnowledgeSearchBackend backend,
+            int candidateMultiplier,
+            int rrfK,
+            boolean relevanceGateEnabled,
+            double minVectorSimilarity,
+            KnowledgeReranker reranker,
+            int rerankCandidateLimit,
+            KnowledgeAnswerabilityJudge answerabilityJudge,
+            int answerabilityCandidateLimit) {
         if (candidateMultiplier < 1) {
             throw new IllegalArgumentException("candidateMultiplier must be positive");
         }
@@ -55,6 +83,10 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
         if (rerankCandidateLimit < 1 || rerankCandidateLimit > 100) {
             throw new IllegalArgumentException("rerankCandidateLimit must be between 1 and 100");
         }
+        if (answerabilityCandidateLimit < 1 || answerabilityCandidateLimit > 20) {
+            throw new IllegalArgumentException(
+                    "answerabilityCandidateLimit must be between 1 and 20");
+        }
         this.embeddingProvider = embeddingProvider;
         this.backend = backend;
         this.candidateMultiplier = candidateMultiplier;
@@ -63,6 +95,8 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
         this.minVectorSimilarity = minVectorSimilarity;
         this.reranker = reranker;
         this.rerankCandidateLimit = rerankCandidateLimit;
+        this.answerabilityJudge = answerabilityJudge;
+        this.answerabilityCandidateLimit = answerabilityCandidateLimit;
     }
 
     @Override
@@ -105,18 +139,60 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
                                         .thenComparingInt(hit -> hit.hit().chunkIndex()))
                         .toList();
 
-        if (reranker != null) {
-            int poolSize = Math.min(ranked.size(), Math.max(topK, rerankCandidateLimit));
-            List<KnowledgeSearchHit> candidates =
+        if (reranker != null || answerabilityJudge != null) {
+            int downstreamLimit =
+                    answerabilityJudge == null
+                            ? topK
+                            : Math.max(topK, answerabilityCandidateLimit);
+            int poolLimit =
+                    reranker == null
+                            ? downstreamLimit
+                            : Math.max(downstreamLimit, rerankCandidateLimit);
+            int poolSize = Math.min(ranked.size(), poolLimit);
+
+            List<KnowledgeSearchHit> ordered =
                     ranked.stream()
                             .limit(poolSize)
                             .map(HybridKnowledgeRetriever::toSearchHit)
                             .toList();
-            KnowledgeRerankResult rerankResult =
-                    reranker.rerank(normalizedQuery, candidates, topK);
+
+            KnowledgeRerankDiagnostics rerankDiagnostics = null;
+            if (reranker != null && !ordered.isEmpty()) {
+                int rerankOutputLimit = Math.min(ordered.size(), downstreamLimit);
+                KnowledgeRerankResult rerankResult =
+                        reranker.rerank(
+                                normalizedQuery,
+                                ordered,
+                                rerankOutputLimit);
+                ordered = rerankResult.hits();
+                rerankDiagnostics = rerankResult.diagnostics();
+            }
+
+            if (answerabilityJudge != null && !ordered.isEmpty()) {
+                List<KnowledgeSearchHit> judgeCandidates =
+                        ordered.stream()
+                                .limit(answerabilityCandidateLimit)
+                                .toList();
+                KnowledgeAnswerabilityResult answerability =
+                        answerabilityJudge.judge(
+                                normalizedQuery,
+                                judgeCandidates);
+                List<KnowledgeSearchHit> hits =
+                        answerability.hits().stream()
+                                .limit(topK)
+                                .toList();
+                return new KnowledgeRetrievalResult(
+                        hits,
+                        rerankDiagnostics,
+                        answerability.diagnostics());
+            }
+
+            List<KnowledgeSearchHit> hits =
+                    ordered.stream().limit(topK).toList();
             return new KnowledgeRetrievalResult(
-                    rerankResult.hits(),
-                    rerankResult.diagnostics());
+                    hits,
+                    rerankDiagnostics,
+                    null);
         }
 
         List<KnowledgeSearchHit> hits =
@@ -130,6 +206,12 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
 
     @Override
     public String mode() {
+        if (reranker != null && answerabilityJudge != null) {
+            return "HYBRID_ES_RRF_RERANK_JUDGE_V1";
+        }
+        if (answerabilityJudge != null) {
+            return "HYBRID_ES_RRF_JUDGE_V1";
+        }
         if (reranker != null) {
             return "HYBRID_ES_RRF_RERANK_V1";
         }
@@ -180,7 +262,9 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
         for (int i = 0; i < ranked.size(); i++) {
             KnowledgeBackendHit hit = ranked.get(i);
             double contribution = rrfContribution(i);
-            double vectorSimilarity = clampCosine(backend.normalizeVectorScore(hit.score()));
+            double vectorSimilarity =
+                    clampCosine(
+                            backend.normalizeVectorScore(hit.score()));
             fused.compute(
                     hit.chunkId(),
                     (ignored, current) ->

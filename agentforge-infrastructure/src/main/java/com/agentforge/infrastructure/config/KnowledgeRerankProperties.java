@@ -14,10 +14,9 @@ public class KnowledgeRerankProperties {
     private int candidateLimit = 8;
     private Duration requestTimeout = Duration.ofSeconds(15);
     private String instruct =
-            "Rank passages by whether they directly answer the user's specific question. "
-                    + "If the real knowledge passages do not contain enough information to answer "
-                    + "the question, prefer the NO_ANSWER_SENTINEL passage over merely topically "
-                    + "related passages.";
+            "Given a web search query, retrieve relevant passages that answer the query. "
+                    + "Prefer passages that directly answer the specific question over passages "
+                    + "that are merely topically related.";
 
     public boolean isEnabled() {
         return enabled;
@@ -96,13 +95,18 @@ public class KnowledgeRerankProperties {
             throw new IllegalStateException("Knowledge rerank requires model.");
         }
         if (candidateLimit < 1 || candidateLimit > 100) {
-            throw new IllegalStateException("Rerank candidateLimit must be between 1 and 100.");
+            throw new IllegalStateException(
+                    "Rerank candidateLimit must be between 1 and 100.");
         }
-        if (requestTimeout == null || requestTimeout.isZero() || requestTimeout.isNegative()) {
-            throw new IllegalStateException("Rerank requestTimeout must be positive.");
+        if (requestTimeout == null
+                || requestTimeout.isZero()
+                || requestTimeout.isNegative()) {
+            throw new IllegalStateException(
+                    "Rerank requestTimeout must be positive.");
         }
         if (!StringUtils.hasText(instruct)) {
-            throw new IllegalStateException("Rerank instruct must not be blank.");
+            throw new IllegalStateException(
+                    "Rerank instruct must not be blank.");
         }
     }
 }
