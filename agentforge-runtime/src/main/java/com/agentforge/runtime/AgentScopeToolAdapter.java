@@ -1,5 +1,6 @@
 package com.agentforge.runtime;
 
+import com.agentforge.runtime.RetrievalBudgetState.RetrievalBudgetDecision;
 import com.agentforge.runtime.ToolGovernanceState.ToolGovernanceDecision;
 import com.agentforge.runtime.confirmation.ToolConfirmation;
 import com.agentforge.runtime.confirmation.ToolConfirmationBinding;
@@ -122,12 +123,34 @@ final class AgentScopeToolAdapter extends ToolBase {
                                                     : governance.beforeInvocation(
                                                             toolCallId, delegate.name(), input);
 
+                            RetrievalBudgetState retrievalBudget =
+                                    runtimeContext == null
+                                            ? null
+                                            : runtimeContext.get(RetrievalBudgetState.class);
+                            RetrievalBudgetDecision retrievalBudgetDecision =
+                                    retrievalBudget == null
+                                            ? null
+                                            : !effectivePolicy.decision().executable()
+                                                    ? retrievalBudget.skipped(
+                                                            toolCallId,
+                                                            delegate.name(),
+                                                            "policy_preempted")
+                                                    : !governanceDecision.allowed()
+                                                            ? retrievalBudget.skipped(
+                                                                    toolCallId,
+                                                                    delegate.name(),
+                                                                    "governance_preempted")
+                                                            : retrievalBudget.beforeInvocation(
+                                                                    toolCallId,
+                                                                    delegate.name());
+
                             long startedNanos = System.nanoTime();
                             try {
                                 ToolResult result =
                                         decideAndExecute(
                                                 effectivePolicy,
                                                 governanceDecision,
+                                                retrievalBudgetDecision,
                                                 confirmationDecision.confirmation(),
                                                 invocationContext,
                                                 input);
@@ -206,6 +229,7 @@ final class AgentScopeToolAdapter extends ToolBase {
     private ToolResult decideAndExecute(
             ToolPolicyEvaluation effectivePolicy,
             ToolGovernanceDecision governanceDecision,
+            RetrievalBudgetDecision retrievalBudgetDecision,
             ToolConfirmation confirmation,
             ToolInvocationContext context,
             Map<String, Object> input) {
@@ -242,6 +266,18 @@ final class AgentScopeToolAdapter extends ToolBase {
                             + previousCode
                             + "; do not retry unchanged arguments",
                     ToolGovernanceState.FAILURE_REPEATED_NON_RETRYABLE_CALL,
+                    false);
+        }
+        if (retrievalBudgetDecision != null && !retrievalBudgetDecision.allowed()) {
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("retrievalBudgetLimit", retrievalBudgetDecision.limit());
+            data.put("retrievalBudgetUsed", retrievalBudgetDecision.used());
+            data.put("retrievalBudgetRemaining", retrievalBudgetDecision.remaining());
+            return ToolResult.failure(
+                    "knowledge retrieval budget exhausted for this execution; "
+                            + "do not call search_knowledge again and answer from existing evidence",
+                    data,
+                    RetrievalBudgetState.FAILURE_RETRIEVAL_BUDGET_EXHAUSTED,
                     false);
         }
         return delegate.execute(context, input);

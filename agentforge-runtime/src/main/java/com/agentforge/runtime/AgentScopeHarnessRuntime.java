@@ -37,6 +37,7 @@ public final class AgentScopeHarnessRuntime implements AgentRuntime, AutoCloseab
     private final ToolGovernanceOptions toolGovernanceOptions;
     private final ToolExecutionPolicy toolExecutionPolicy;
     private final ToolConfirmationService toolConfirmationService;
+    private final RetrievalBudgetOptions retrievalBudgetOptions;
 
     public AgentScopeHarnessRuntime(
             String agentId,
@@ -107,6 +108,30 @@ public final class AgentScopeHarnessRuntime implements AgentRuntime, AutoCloseab
             ToolGovernanceOptions toolGovernanceOptions,
             ToolExecutionPolicy toolExecutionPolicy,
             ToolConfirmationService toolConfirmationService) {
+        this(
+                agentId,
+                name,
+                systemPrompt,
+                model,
+                businessTools,
+                stateStore,
+                toolGovernanceOptions,
+                toolExecutionPolicy,
+                toolConfirmationService,
+                RetrievalBudgetOptions.defaults());
+    }
+
+    public AgentScopeHarnessRuntime(
+            String agentId,
+            String name,
+            String systemPrompt,
+            Model model,
+            List<AgentTool> businessTools,
+            AgentStateStore stateStore,
+            ToolGovernanceOptions toolGovernanceOptions,
+            ToolExecutionPolicy toolExecutionPolicy,
+            ToolConfirmationService toolConfirmationService,
+            RetrievalBudgetOptions retrievalBudgetOptions) {
         Objects.requireNonNull(model, "model must not be null");
         Objects.requireNonNull(stateStore, "stateStore must not be null");
         this.toolGovernanceOptions =
@@ -118,6 +143,10 @@ public final class AgentScopeHarnessRuntime implements AgentRuntime, AutoCloseab
                         ? new BaselineToolExecutionPolicy(ToolPolicyOptions.defaults())
                         : toolExecutionPolicy;
         this.toolConfirmationService = toolConfirmationService;
+        this.retrievalBudgetOptions =
+                retrievalBudgetOptions == null
+                        ? RetrievalBudgetOptions.defaults()
+                        : retrievalBudgetOptions;
 
         Toolkit toolkit = new Toolkit();
         var permissionContextBuilder =
@@ -166,11 +195,14 @@ public final class AgentScopeHarnessRuntime implements AgentRuntime, AutoCloseab
     @Override
     public Flux<AgentStreamChunk> stream(AgentRuntimeRequest request) {
         ToolGovernanceState governanceState = new ToolGovernanceState(toolGovernanceOptions);
+        RetrievalBudgetState retrievalBudgetState =
+                new RetrievalBudgetState(retrievalBudgetOptions);
         RuntimeContext.Builder contextBuilder =
                 RuntimeContext.builder()
                         .userId(normalizeId(request.userId(), "anonymous"))
                         .sessionId(normalizeId(request.sessionId(), "default"))
-                        .put(ToolGovernanceState.class, governanceState);
+                        .put(ToolGovernanceState.class, governanceState)
+                        .put(RetrievalBudgetState.class, retrievalBudgetState);
         if (request.executionId() != null && !request.executionId().isBlank()) {
             contextBuilder.put(
                     ToolExecutionIdentity.class,
@@ -353,6 +385,20 @@ public final class AgentScopeHarnessRuntime implements AgentRuntime, AutoCloseab
         }
         if (telemetry.confirmationStatus() != null) {
             metadata.put("confirmationStatus", telemetry.confirmationStatus());
+        }
+
+        RetrievalBudgetState retrievalBudget =
+                context.get(RetrievalBudgetState.class);
+        if (retrievalBudget != null) {
+            RetrievalBudgetState.RetrievalBudgetDecision budgetDecision =
+                    retrievalBudget.decision(toolCallId);
+            if (budgetDecision != null) {
+                metadata.put("retrievalBudgetDecision", budgetDecision.decision());
+                metadata.put("retrievalBudgetReason", budgetDecision.reason());
+                metadata.put("retrievalBudgetLimit", budgetDecision.limit());
+                metadata.put("retrievalBudgetUsed", budgetDecision.used());
+                metadata.put("retrievalBudgetRemaining", budgetDecision.remaining());
+            }
         }
     }
 

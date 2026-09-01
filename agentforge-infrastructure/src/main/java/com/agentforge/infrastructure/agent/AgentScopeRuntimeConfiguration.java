@@ -3,6 +3,7 @@ package com.agentforge.infrastructure.agent;
 import com.agentforge.agent.AgentDefinition;
 import com.agentforge.agent.AgentDefinitionRepository;
 import com.agentforge.conversation.ConversationService;
+import com.agentforge.infrastructure.config.RetrievalBudgetProperties;
 import com.agentforge.infrastructure.config.ToolGovernanceProperties;
 import com.agentforge.infrastructure.config.ToolPolicyProperties;
 import com.agentforge.infrastructure.model.DashScopeModelFactory;
@@ -13,6 +14,7 @@ import com.agentforge.runtime.AgentRuntimeFactory;
 import com.agentforge.runtime.AgentRuntimeManager;
 import com.agentforge.runtime.AgentScopeHarnessRuntime;
 import com.agentforge.runtime.BaselineToolExecutionPolicy;
+import com.agentforge.runtime.RetrievalBudgetOptions;
 import com.agentforge.runtime.SessionContextRestoreService;
 import com.agentforge.runtime.ToolGovernanceOptions;
 import com.agentforge.runtime.ToolExecutionPolicy;
@@ -35,8 +37,10 @@ public class AgentScopeRuntimeConfiguration {
             AgentStateStore stateStore,
             ToolGovernanceProperties governanceProperties,
             ToolPolicyProperties policyProperties,
+            RetrievalBudgetProperties retrievalBudgetProperties,
             ToolConfirmationService confirmationService) {
         governanceProperties.validate();
+        retrievalBudgetProperties.validate();
         ToolGovernanceOptions governanceOptions =
                 new ToolGovernanceOptions(
                         governanceProperties.isEnabled(),
@@ -48,6 +52,10 @@ public class AgentScopeRuntimeConfiguration {
                                 policyProperties.isEnabled(),
                                 policyProperties.isRequireConfirmationForWriteTools(),
                                 policyProperties.isRequireConfirmationForHighRiskReadOnly()));
+        RetrievalBudgetOptions retrievalBudgetOptions =
+                new RetrievalBudgetOptions(
+                        retrievalBudgetProperties.isEnabled(),
+                        retrievalBudgetProperties.getMaxCallsPerExecution());
         return new AgentRuntimeFactory() {
             @Override
             public AgentRuntime create(AgentDefinition definition, List<AgentTool> tools) {
@@ -67,7 +75,8 @@ public class AgentScopeRuntimeConfiguration {
                         stateStore,
                         governanceOptions,
                         executionPolicy,
-                        confirmationService);
+                        confirmationService,
+                        retrievalBudgetOptions);
             }
         };
     }

@@ -168,7 +168,9 @@ final class ToolGovernanceState {
                 && options.blockRepeatedNonRetryableCalls()
                 && !result.success()
                 && !result.retryable()
-                && !FAILURE_REPEATED_NON_RETRYABLE_CALL.equals(result.failureCode())) {
+                && !FAILURE_REPEATED_NON_RETRYABLE_CALL.equals(result.failureCode())
+                && !RetrievalBudgetState.FAILURE_RETRIEVAL_BUDGET_EXHAUSTED.equals(
+                        result.failureCode())) {
             nonRetryableFailures.putIfAbsent(
                     decision.argumentFingerprint(),
                     new PriorFailure(toolCallId, result.failureCode()));

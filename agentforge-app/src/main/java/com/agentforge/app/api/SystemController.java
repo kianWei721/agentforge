@@ -9,6 +9,7 @@ import com.agentforge.infrastructure.config.IoTLureLampControlProperties;
 import com.agentforge.infrastructure.config.KnowledgeAnswerabilityProperties;
 import com.agentforge.infrastructure.config.KnowledgeHybridProperties;
 import com.agentforge.infrastructure.config.KnowledgeRerankProperties;
+import com.agentforge.infrastructure.config.RetrievalBudgetProperties;
 import com.agentforge.infrastructure.config.ToolConfirmationProperties;
 import com.agentforge.infrastructure.config.ToolGovernanceProperties;
 import com.agentforge.infrastructure.config.ToolPolicyProperties;
@@ -46,6 +47,7 @@ public class SystemController {
     private final KnowledgeHybridProperties knowledgeHybridProperties;
     private final KnowledgeRerankProperties knowledgeRerankProperties;
     private final KnowledgeAnswerabilityProperties knowledgeAnswerabilityProperties;
+    private final RetrievalBudgetProperties retrievalBudgetProperties;
 
     public SystemController(
             ModelGatewayCatalog modelGatewayCatalog,
@@ -64,7 +66,8 @@ public class SystemController {
             KnowledgeIngestionService knowledgeIngestionService,
             KnowledgeHybridProperties knowledgeHybridProperties,
             KnowledgeRerankProperties knowledgeRerankProperties,
-            KnowledgeAnswerabilityProperties knowledgeAnswerabilityProperties) {
+            KnowledgeAnswerabilityProperties knowledgeAnswerabilityProperties,
+            RetrievalBudgetProperties retrievalBudgetProperties) {
         this.modelGatewayCatalog = modelGatewayCatalog;
         this.agentProperties = agentProperties;
         this.agentService = agentService;
@@ -82,6 +85,7 @@ public class SystemController {
         this.knowledgeHybridProperties = knowledgeHybridProperties;
         this.knowledgeRerankProperties = knowledgeRerankProperties;
         this.knowledgeAnswerabilityProperties = knowledgeAnswerabilityProperties;
+        this.retrievalBudgetProperties = retrievalBudgetProperties;
     }
 
     @GetMapping("/health")
@@ -178,6 +182,10 @@ public class SystemController {
         result.put(
                 "knowledgeAnswerabilityCandidateLimit",
                 knowledgeAnswerabilityProperties.getCandidateLimit());
+        result.put("retrievalBudgetEnabled", retrievalBudgetProperties.isEnabled());
+        result.put(
+                "retrievalBudgetMaxCallsPerExecution",
+                retrievalBudgetProperties.getMaxCallsPerExecution());
         return result;
     }
 }

@@ -15,6 +15,7 @@ import org.springframework.context.annotation.Configuration;
     ToolConfirmationProperties.class,
     KnowledgeHybridProperties.class,
     KnowledgeRerankProperties.class,
-    KnowledgeAnswerabilityProperties.class
+    KnowledgeAnswerabilityProperties.class,
+    RetrievalBudgetProperties.class
 })
 public class AgentForgeInfrastructureConfiguration {}
