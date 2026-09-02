@@ -16,7 +16,9 @@ public final class KnowledgeEndToEndConfirmationAnalyzer {
             KnowledgeCandidateEvaluationVariantReport candidateLeader,
             KnowledgeEvaluationVariantReport control,
             KnowledgeEvaluationVariantReport challenger,
-            int productionRrfK) {
+            int productionRrfK,
+            List<String> initialNewFailureCases,
+            List<KnowledgeRegressionRecheckCaseReport> rechecks) {
         if (candidateConfirmation == null
                 || candidateLeader == null
                 || control == null
@@ -41,6 +43,19 @@ public final class KnowledgeEndToEndConfirmationAnalyzer {
                         .filter(name -> !challengerFailures.contains(name))
                         .toList();
 
+        List<KnowledgeRegressionRecheckCaseReport> safeRechecks =
+                rechecks == null ? List.of() : List.copyOf(rechecks);
+        List<String> confirmedRegressions =
+                safeRechecks.stream()
+                        .filter(recheck -> "CONFIRMED_REGRESSION".equals(recheck.status()))
+                        .map(KnowledgeRegressionRecheckCaseReport::caseName)
+                        .toList();
+        List<String> unstableRechecks =
+                safeRechecks.stream()
+                        .filter(recheck -> "UNSTABLE".equals(recheck.status()))
+                        .map(KnowledgeRegressionRecheckCaseReport::caseName)
+                        .toList();
+
         boolean metricsNonRegressing =
                 challenger.recallAt1() >= control.recallAt1()
                         && challenger.recallAt3() >= control.recallAt3()
@@ -51,10 +66,19 @@ public final class KnowledgeEndToEndConfirmationAnalyzer {
 
         boolean promotionEligible =
                 candidateLeaderConfirmed
+                        && confirmedRegressions.isEmpty()
+                        && unstableRechecks.isEmpty()
                         && newFailures.isEmpty()
                         && metricsNonRegressing;
 
-        String decision = promotionEligible ? "PROMOTION_ELIGIBLE" : "HOLD_PRODUCTION";
+        String decision;
+        if (promotionEligible) {
+            decision = "PROMOTION_ELIGIBLE";
+        } else if (!unstableRechecks.isEmpty()) {
+            decision = "HOLD_FOR_STABILITY";
+        } else {
+            decision = "HOLD_PRODUCTION";
+        }
 
         return new KnowledgeEndToEndConfirmationReport(
                 DECISION_BOUNDARY,
@@ -67,14 +91,27 @@ public final class KnowledgeEndToEndConfirmationAnalyzer {
                 productionRrfK,
                 control,
                 challenger,
+                initialNewFailureCases == null ? List.of() : initialNewFailureCases,
                 newFailures,
                 resolvedFailures,
+                safeRechecks,
+                confirmedRegressions,
+                unstableRechecks,
                 challenger.recallAt1() - control.recallAt1(),
                 challenger.recallAt3() - control.recallAt3(),
                 challenger.recallAt5() - control.recallAt5(),
                 challenger.meanReciprocalRank() - control.meanReciprocalRank(),
                 challenger.noAnswerAccuracy() - control.noAnswerAccuracy(),
                 challenger.overallAccuracy() - control.overallAccuracy());
+    }
+
+    public static List<String> newFailureCases(
+            KnowledgeEvaluationVariantReport control,
+            KnowledgeEvaluationVariantReport challenger) {
+        Set<String> controlFailures = failedCases(control);
+        return failedCases(challenger).stream()
+                .filter(name -> !controlFailures.contains(name))
+                .toList();
     }
 
     private static Set<String> failedCases(KnowledgeEvaluationVariantReport report) {

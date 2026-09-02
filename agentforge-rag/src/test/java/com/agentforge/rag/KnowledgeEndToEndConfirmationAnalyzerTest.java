@@ -8,32 +8,7 @@ import org.junit.jupiter.api.Test;
 class KnowledgeEndToEndConfirmationAnalyzerTest {
 
     @Test
-    void shouldPromoteOnlyWhenCandidateLeaderAndAllEndToEndMetricsDoNotRegress() {
-        KnowledgeCandidateEvaluationVariantReport leader =
-                candidate("HYBRID_RRF_K5_ORIGINAL", "ORIGINAL", 5);
-        KnowledgeChannelStrategyConfirmationReport candidateConfirmation =
-                confirmation(leader.variant());
-
-        KnowledgeEvaluationVariantReport control =
-                report("CONTROL", 0.95, 0.95, 0.95, 0.95, 1.0, 0.97, List.of(result("a", true)));
-        KnowledgeEvaluationVariantReport challenger =
-                report("CHALLENGER", 0.96, 0.96, 1.0, 0.97, 1.0, 1.0, List.of(result("a", true)));
-
-        KnowledgeEndToEndConfirmationReport confirmation =
-                KnowledgeEndToEndConfirmationAnalyzer.analyze(
-                        candidateConfirmation,
-                        leader,
-                        control,
-                        challenger,
-                        60);
-
-        assertTrue(confirmation.promotionEligible());
-        assertEquals("PROMOTION_ELIGIBLE", confirmation.decision());
-        assertTrue(confirmation.newFailureCases().isEmpty());
-    }
-
-    @Test
-    void shouldHoldWhenChallengerIntroducesNewCaseFailure() {
+    void shouldPromoteWhenNoRegressionRemainsAfterGate() {
         KnowledgeCandidateEvaluationVariantReport leader =
                 candidate("HYBRID_RRF_K5_ORIGINAL", "ORIGINAL", 5);
         KnowledgeChannelStrategyConfirmationReport candidateConfirmation =
@@ -42,7 +17,7 @@ class KnowledgeEndToEndConfirmationAnalyzerTest {
         KnowledgeEvaluationVariantReport control =
                 report("CONTROL", 1, 1, 1, 1, 1, 1, List.of(result("a", true)));
         KnowledgeEvaluationVariantReport challenger =
-                report("CHALLENGER", 1, 1, 1, 1, 1, 1, List.of(result("a", false)));
+                report("CHALLENGER", 1, 1, 1, 1, 1, 1, List.of(result("a", true)));
 
         KnowledgeEndToEndConfirmationReport confirmation =
                 KnowledgeEndToEndConfirmationAnalyzer.analyze(
@@ -50,11 +25,117 @@ class KnowledgeEndToEndConfirmationAnalyzerTest {
                         leader,
                         control,
                         challenger,
-                        60);
+                        60,
+                        List.of(),
+                        List.of());
+
+        assertTrue(confirmation.promotionEligible());
+        assertEquals("PROMOTION_ELIGIBLE", confirmation.decision());
+        assertTrue(confirmation.newFailureCases().isEmpty());
+    }
+
+    @Test
+    void shouldAcceptClearedTransientRecheck() {
+        KnowledgeCandidateEvaluationVariantReport leader =
+                candidate("HYBRID_RRF_K5_ORIGINAL", "ORIGINAL", 5);
+        KnowledgeChannelStrategyConfirmationReport candidateConfirmation =
+                confirmation(leader.variant());
+
+        KnowledgeEvaluationVariantReport control =
+                report("CONTROL", 1, 1, 1, 1, 1, 1, List.of(result("a", true)));
+        KnowledgeEvaluationVariantReport challenger =
+                report("CHALLENGER", 1, 1, 1, 1, 1, 1, List.of(result("a", true)));
+
+        KnowledgeRegressionRecheckCaseReport recheck =
+                recheck("a", 3, 3, "CLEARED_TRANSIENT");
+
+        KnowledgeEndToEndConfirmationReport confirmation =
+                KnowledgeEndToEndConfirmationAnalyzer.analyze(
+                        candidateConfirmation,
+                        leader,
+                        control,
+                        challenger,
+                        60,
+                        List.of("a"),
+                        List.of(recheck));
+
+        assertTrue(confirmation.promotionEligible());
+        assertEquals(List.of("a"), confirmation.initialNewFailureCases());
+        assertTrue(confirmation.confirmedRegressionCases().isEmpty());
+    }
+
+    @Test
+    void shouldHoldOnConfirmedRegression() {
+        KnowledgeCandidateEvaluationVariantReport leader =
+                candidate("HYBRID_RRF_K5_ORIGINAL", "ORIGINAL", 5);
+        KnowledgeChannelStrategyConfirmationReport candidateConfirmation =
+                confirmation(leader.variant());
+
+        KnowledgeEvaluationVariantReport control =
+                report("CONTROL", 1, 1, 1, 1, 1, 1, List.of(result("a", true)));
+        KnowledgeEvaluationVariantReport challenger =
+                report("CHALLENGER", 1, 1, 1, 1, 1, 1, List.of(result("a", true)));
+
+        KnowledgeRegressionRecheckCaseReport recheck =
+                recheck("a", 3, 0, "CONFIRMED_REGRESSION");
+
+        KnowledgeEndToEndConfirmationReport confirmation =
+                KnowledgeEndToEndConfirmationAnalyzer.analyze(
+                        candidateConfirmation,
+                        leader,
+                        control,
+                        challenger,
+                        60,
+                        List.of("a"),
+                        List.of(recheck));
 
         assertFalse(confirmation.promotionEligible());
-        assertEquals(List.of("a"), confirmation.newFailureCases());
         assertEquals("HOLD_PRODUCTION", confirmation.decision());
+        assertEquals(List.of("a"), confirmation.confirmedRegressionCases());
+    }
+
+    @Test
+    void shouldHoldForStabilityWhenRecheckIsMixed() {
+        KnowledgeCandidateEvaluationVariantReport leader =
+                candidate("HYBRID_RRF_K5_ORIGINAL", "ORIGINAL", 5);
+        KnowledgeChannelStrategyConfirmationReport candidateConfirmation =
+                confirmation(leader.variant());
+
+        KnowledgeEvaluationVariantReport control =
+                report("CONTROL", 1, 1, 1, 1, 1, 1, List.of(result("a", true)));
+        KnowledgeEvaluationVariantReport challenger =
+                report("CHALLENGER", 1, 1, 1, 1, 1, 1, List.of(result("a", true)));
+
+        KnowledgeRegressionRecheckCaseReport recheck =
+                recheck("a", 3, 2, "UNSTABLE");
+
+        KnowledgeEndToEndConfirmationReport confirmation =
+                KnowledgeEndToEndConfirmationAnalyzer.analyze(
+                        candidateConfirmation,
+                        leader,
+                        control,
+                        challenger,
+                        60,
+                        List.of("a"),
+                        List.of(recheck));
+
+        assertFalse(confirmation.promotionEligible());
+        assertEquals("HOLD_FOR_STABILITY", confirmation.decision());
+        assertEquals(List.of("a"), confirmation.unstableRecheckCases());
+    }
+
+    private static KnowledgeRegressionRecheckCaseReport recheck(
+            String name, int controlPasses, int challengerPasses, String status) {
+        return new KnowledgeRegressionRecheckCaseReport(
+                name,
+                3,
+                true,
+                false,
+                controlPasses,
+                challengerPasses,
+                status,
+                List.of(),
+                List.of());
     }
 
     private static KnowledgeCandidateEvaluationVariantReport candidate(

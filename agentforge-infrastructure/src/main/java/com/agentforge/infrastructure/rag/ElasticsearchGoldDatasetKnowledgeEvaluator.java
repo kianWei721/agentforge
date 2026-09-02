@@ -27,6 +27,7 @@ import com.agentforge.rag.KnowledgeEvaluator;
 import com.agentforge.rag.KnowledgeIndexedChunk;
 import com.agentforge.rag.KnowledgeQueryRewriteResult;
 import com.agentforge.rag.KnowledgeQueryRewriter;
+import com.agentforge.rag.KnowledgeRegressionRecheckCaseReport;
 import com.agentforge.rag.KnowledgeReranker;
 import com.agentforge.rag.KnowledgeRetriever;
 import com.agentforge.rag.KnowledgeSearchBackend;
@@ -51,6 +52,7 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
 
     private static final int EVALUATION_REWRITE_MAX_ATTEMPTS = 2;
     private static final long EVALUATION_REWRITE_RETRY_DELAY_MS = 500L;
+    private static final int REGRESSION_RECHECK_TRIALS = 3;
 
     private final EmbeddingProvider embeddingProvider;
     private final KnowledgeSearchBackend backend;
@@ -149,22 +151,52 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
                         candidateBenchmark,
                         channelStrategyConfirmation);
 
+        KnowledgeQueryRewriter challengerRewriter =
+                rewriterForQueryMode(
+                        candidateLeader.queryMode(),
+                        rewritePlan);
         KnowledgeEvaluationVariantReport challenger =
                 evaluateVariant(
                         "E2E_CHALLENGER_"
                                 + candidateLeader.variant(),
-                        rewriterForQueryMode(
-                                candidateLeader.queryMode(),
-                                rewritePlan),
+                        challengerRewriter,
                         candidateLeader.rrfK());
+
+        List<String> initialNewFailureCases =
+                KnowledgeEndToEndConfirmationAnalyzer.newFailureCases(
+                        rewrite,
+                        challenger);
+
+        List<KnowledgeRegressionRecheckCaseReport> regressionRechecks =
+                runTargetedRegressionRechecks(
+                        initialNewFailureCases,
+                        replayRewriter(rewritePlan),
+                        hybridProperties.getRrfK(),
+                        challengerRewriter,
+                        candidateLeader.rrfK(),
+                        rewrite,
+                        challenger);
+
+        KnowledgeEvaluationVariantReport stabilizedControl =
+                stabilizeVariant(
+                        rewrite,
+                        regressionRechecks,
+                        true);
+        KnowledgeEvaluationVariantReport stabilizedChallenger =
+                stabilizeVariant(
+                        challenger,
+                        regressionRechecks,
+                        false);
 
         KnowledgeEndToEndConfirmationReport endToEndConfirmation =
                 KnowledgeEndToEndConfirmationAnalyzer.analyze(
                         channelStrategyConfirmation,
                         candidateLeader,
-                        rewrite,
-                        challenger,
-                        hybridProperties.getRrfK());
+                        stabilizedControl,
+                        stabilizedChallenger,
+                        hybridProperties.getRrfK(),
+                        initialNewFailureCases,
+                        regressionRechecks);
 
         KnowledgeStageDiagnosticsReport stageDiagnostics =
                 evaluateStageDiagnostics(
@@ -604,6 +636,163 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
                         + queryMode);
     }
 
+    private List<KnowledgeRegressionRecheckCaseReport> runTargetedRegressionRechecks(
+            List<String> caseNames,
+            KnowledgeQueryRewriter controlRewriter,
+            int controlRrfK,
+            KnowledgeQueryRewriter challengerRewriter,
+            int challengerRrfK,
+            KnowledgeEvaluationVariantReport initialControl,
+            KnowledgeEvaluationVariantReport initialChallenger) {
+        if (caseNames == null || caseNames.isEmpty()) {
+            return List.of();
+        }
+
+        KnowledgeRetriever controlRetriever =
+                createRetriever(controlRewriter, controlRrfK);
+        KnowledgeRetriever challengerRetriever =
+                createRetriever(challengerRewriter, challengerRrfK);
+
+        Map<String, KnowledgeEvaluationCase> casesByName =
+                dataset.cases().stream()
+                        .collect(
+                                java.util.stream.Collectors.toMap(
+                                        KnowledgeEvaluationCase::name,
+                                        java.util.function.Function.identity(),
+                                        (left, right) -> left,
+                                        LinkedHashMap::new));
+        Map<String, KnowledgeEvaluationCaseResult> initialControlByName =
+                caseResultsByName(initialControl);
+        Map<String, KnowledgeEvaluationCaseResult> initialChallengerByName =
+                caseResultsByName(initialChallenger);
+
+        List<KnowledgeRegressionRecheckCaseReport> reports = new ArrayList<>();
+        for (String caseName : caseNames) {
+            KnowledgeEvaluationCase testCase = casesByName.get(caseName);
+            if (testCase == null) {
+                throw new IllegalStateException(
+                        "Targeted regression recheck case not found: " + caseName);
+            }
+
+            List<KnowledgeEvaluationCaseResult> controlTrials = new ArrayList<>();
+            List<KnowledgeEvaluationCaseResult> challengerTrials = new ArrayList<>();
+
+            // Alternate evaluation order across trials to avoid always giving one
+            // variant the earlier provider slot during a long calibration run.
+            for (int trial = 0; trial < REGRESSION_RECHECK_TRIALS; trial++) {
+                if (trial % 2 == 0) {
+                    controlTrials.add(evaluateCase(controlRetriever, testCase));
+                    challengerTrials.add(evaluateCase(challengerRetriever, testCase));
+                } else {
+                    challengerTrials.add(evaluateCase(challengerRetriever, testCase));
+                    controlTrials.add(evaluateCase(controlRetriever, testCase));
+                }
+            }
+
+            int controlPasses = countPassed(controlTrials);
+            int challengerPasses = countPassed(challengerTrials);
+            String status =
+                    classifyRegressionRecheck(
+                            controlPasses,
+                            challengerPasses);
+
+            reports.add(
+                    new KnowledgeRegressionRecheckCaseReport(
+                            caseName,
+                            REGRESSION_RECHECK_TRIALS,
+                            initialControlByName.get(caseName).passed(),
+                            initialChallengerByName.get(caseName).passed(),
+                            controlPasses,
+                            challengerPasses,
+                            status,
+                            controlTrials,
+                            challengerTrials));
+        }
+        return List.copyOf(reports);
+    }
+
+    private static String classifyRegressionRecheck(
+            int controlPasses,
+            int challengerPasses) {
+        if (controlPasses == REGRESSION_RECHECK_TRIALS
+                && challengerPasses == REGRESSION_RECHECK_TRIALS) {
+            return "CLEARED_TRANSIENT";
+        }
+        if (controlPasses == REGRESSION_RECHECK_TRIALS
+                && challengerPasses == 0) {
+            return "CONFIRMED_REGRESSION";
+        }
+        return "UNSTABLE";
+    }
+
+    private KnowledgeEvaluationVariantReport stabilizeVariant(
+            KnowledgeEvaluationVariantReport original,
+            List<KnowledgeRegressionRecheckCaseReport> rechecks,
+            boolean control) {
+        if (rechecks == null || rechecks.isEmpty()) {
+            return original;
+        }
+
+        Map<String, KnowledgeRegressionRecheckCaseReport> byCase =
+                rechecks.stream()
+                        .collect(
+                                java.util.stream.Collectors.toMap(
+                                        KnowledgeRegressionRecheckCaseReport::caseName,
+                                        java.util.function.Function.identity()));
+
+        List<KnowledgeEvaluationCaseResult> stabilized = new ArrayList<>();
+        for (KnowledgeEvaluationCaseResult originalCase : original.cases()) {
+            KnowledgeRegressionRecheckCaseReport recheck =
+                    byCase.get(originalCase.name());
+            if (recheck == null
+                    || !"CLEARED_TRANSIENT".equals(recheck.status())) {
+                stabilized.add(originalCase);
+                continue;
+            }
+
+            List<KnowledgeEvaluationCaseResult> trials =
+                    control ? recheck.controlTrials() : recheck.challengerTrials();
+            stabilized.add(conservativePassingResult(trials));
+        }
+
+        return summarizeVariant(
+                original.variant(),
+                original.retrievalMode(),
+                stabilized);
+    }
+
+    private static KnowledgeEvaluationCaseResult conservativePassingResult(
+            List<KnowledgeEvaluationCaseResult> trials) {
+        return trials.stream()
+                .filter(KnowledgeEvaluationCaseResult::passed)
+                .max(
+                        java.util.Comparator.comparingInt(
+                                result ->
+                                        result.firstRelevantRank() == null
+                                                ? 0
+                                                : result.firstRelevantRank()))
+                .orElseThrow(
+                        () ->
+                                new IllegalStateException(
+                                        "CLEARED_TRANSIENT recheck has no passing trial"));
+    }
+
+    private static int countPassed(
+            List<KnowledgeEvaluationCaseResult> trials) {
+        return (int) trials.stream()
+                .filter(KnowledgeEvaluationCaseResult::passed)
+                .count();
+    }
+
+    private static Map<String, KnowledgeEvaluationCaseResult> caseResultsByName(
+            KnowledgeEvaluationVariantReport report) {
+        return report.cases().stream()
+                .collect(
+                        java.util.stream.Collectors.toMap(
+                                KnowledgeEvaluationCaseResult::name,
+                                java.util.function.Function.identity()));
+    }
+
     private KnowledgeStageDiagnosticsReport evaluateStageDiagnostics(
             KnowledgeCandidateBenchmarkReport candidateBenchmark,
             KnowledgeEvaluationVariantReport baseline,
@@ -838,24 +1027,40 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
             KnowledgeQueryRewriter rewriter,
             int rrfK) {
         KnowledgeRetriever retriever =
-                new HybridKnowledgeRetriever(
-                        embeddingProvider,
-                        backend,
-                        hybridProperties.getCandidateMultiplier(),
-                        rrfK,
-                        hybridProperties.isRelevanceGateEnabled(),
-                        hybridProperties.getMinVectorSimilarity(),
-                        rewriter,
-                        reranker,
-                        rerankProperties.getCandidateLimit(),
-                        answerabilityJudge,
-                        answerabilityProperties.getCandidateLimit());
+                createRetriever(rewriter, rrfK);
 
         List<KnowledgeEvaluationCaseResult> results =
                 dataset.cases().stream()
                         .map(testCase -> evaluateCase(retriever, testCase))
                         .toList();
 
+        return summarizeVariant(
+                variant,
+                retrievalMode,
+                results);
+    }
+
+    private KnowledgeRetriever createRetriever(
+            KnowledgeQueryRewriter rewriter,
+            int rrfK) {
+        return new HybridKnowledgeRetriever(
+                embeddingProvider,
+                backend,
+                hybridProperties.getCandidateMultiplier(),
+                rrfK,
+                hybridProperties.isRelevanceGateEnabled(),
+                hybridProperties.getMinVectorSimilarity(),
+                rewriter,
+                reranker,
+                rerankProperties.getCandidateLimit(),
+                answerabilityJudge,
+                answerabilityProperties.getCandidateLimit());
+    }
+
+    private static KnowledgeEvaluationVariantReport summarizeVariant(
+            String variant,
+            String retrievalMode,
+            List<KnowledgeEvaluationCaseResult> results) {
         int answerableCases = 0;
         int noAnswerCases = 0;
         int hitAt1 = 0;
