@@ -17,6 +17,7 @@ import com.agentforge.rag.KnowledgeEvaluationCaseResult;
 import com.agentforge.rag.KnowledgeEvaluationDataset;
 import com.agentforge.rag.KnowledgeEvaluationDocument;
 import com.agentforge.rag.KnowledgeEvaluationReport;
+import com.agentforge.rag.KnowledgeEvaluationStageDiagnostic;
 import com.agentforge.rag.KnowledgeEvaluationVariantReport;
 import com.agentforge.rag.KnowledgeEvaluator;
 import com.agentforge.rag.KnowledgeIndexedChunk;
@@ -26,6 +27,7 @@ import com.agentforge.rag.KnowledgeReranker;
 import com.agentforge.rag.KnowledgeRetriever;
 import com.agentforge.rag.KnowledgeSearchBackend;
 import com.agentforge.rag.KnowledgeSearchHit;
+import com.agentforge.rag.KnowledgeStageDiagnosticsReport;
 import com.agentforge.rag.RrfFusion;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.InputStream;
@@ -110,12 +112,16 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
         KnowledgeEvaluationVariantReport rewrite =
                 evaluateVariant("HYBRID_REWRITE", queryRewriter);
 
+        KnowledgeStageDiagnosticsReport stageDiagnostics =
+                evaluateStageDiagnostics(candidateBenchmark, baseline, rewrite);
+
         return new KnowledgeEvaluationReport(
                 dataset.version(),
                 backend.indexName(),
                 dataset.documents().size(),
                 dataset.cases().size(),
                 candidateBenchmark,
+                stageDiagnostics,
                 baseline,
                 rewrite,
                 rewrite.recallAt1() - baseline.recallAt1(),
@@ -340,6 +346,234 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
                 .map(KnowledgeBackendHit::documentId)
                 .distinct()
                 .toList();
+    }
+
+    private KnowledgeStageDiagnosticsReport evaluateStageDiagnostics(
+            KnowledgeCandidateBenchmarkReport candidateBenchmark,
+            KnowledgeEvaluationVariantReport baseline,
+            KnowledgeEvaluationVariantReport rewrite) {
+        Set<String> selected = selectDiagnosticCases(candidateBenchmark, baseline, rewrite);
+        int candidateWindow = candidateBenchmark.candidateWindow();
+        List<KnowledgeEvaluationStageDiagnostic> diagnostics = new ArrayList<>();
+
+        for (KnowledgeEvaluationCase testCase : dataset.cases()) {
+            if (!selected.contains(testCase.name()) || testCase.noAnswerExpected()) {
+                continue;
+            }
+            diagnostics.add(
+                    stageDiagnostic(
+                            testCase,
+                            "ORIGINAL",
+                            testCase.query(),
+                            candidateWindow));
+            diagnostics.add(
+                    stageDiagnostic(
+                            testCase,
+                            "REWRITE",
+                            rewriteForEvaluation(testCase.query()),
+                            candidateWindow));
+        }
+
+        return new KnowledgeStageDiagnosticsReport(
+                hybridProperties.getRrfK(),
+                candidateWindow,
+                List.copyOf(selected),
+                diagnostics);
+    }
+
+    private Set<String> selectDiagnosticCases(
+            KnowledgeCandidateBenchmarkReport candidateBenchmark,
+            KnowledgeEvaluationVariantReport baseline,
+            KnowledgeEvaluationVariantReport rewrite) {
+        Set<String> selected = new LinkedHashSet<>();
+
+        for (KnowledgeEvaluationCaseResult result : baseline.cases()) {
+            if (!result.noAnswerExpected() && !result.passed()) {
+                selected.add(result.name());
+            }
+        }
+        for (KnowledgeEvaluationCaseResult result : rewrite.cases()) {
+            if (!result.noAnswerExpected() && !result.passed()) {
+                selected.add(result.name());
+            }
+        }
+
+        Map<String, KnowledgeCandidateEvaluationVariantReport> byVariant =
+                new LinkedHashMap<>();
+        for (KnowledgeCandidateEvaluationVariantReport variant
+                : candidateBenchmark.variants()) {
+            byVariant.put(variant.variant(), variant);
+        }
+
+        addChannelDisagreements(
+                selected,
+                byVariant.get("BM25_ORIGINAL"),
+                byVariant.get("VECTOR_ORIGINAL"));
+        addChannelDisagreements(
+                selected,
+                byVariant.get("BM25_REWRITE"),
+                byVariant.get("VECTOR_REWRITE"));
+
+        KnowledgeCandidateEvaluationVariantReport productionOriginal =
+                byVariant.get("HYBRID_RRF_K" + hybridProperties.getRrfK() + "_ORIGINAL");
+        KnowledgeCandidateEvaluationVariantReport productionRewrite =
+                byVariant.get("HYBRID_RRF_K" + hybridProperties.getRrfK() + "_REWRITE");
+        addNonRankOne(selected, productionOriginal);
+        addNonRankOne(selected, productionRewrite);
+
+        return selected;
+    }
+
+    private static void addChannelDisagreements(
+            Set<String> selected,
+            KnowledgeCandidateEvaluationVariantReport left,
+            KnowledgeCandidateEvaluationVariantReport right) {
+        if (left == null || right == null) {
+            return;
+        }
+        Map<String, Integer> rightRanks = new LinkedHashMap<>();
+        for (KnowledgeCandidateEvaluationCaseResult result : right.cases()) {
+            rightRanks.put(result.name(), result.firstRelevantRank());
+        }
+        for (KnowledgeCandidateEvaluationCaseResult result : left.cases()) {
+            Integer other = rightRanks.get(result.name());
+            if (!java.util.Objects.equals(result.firstRelevantRank(), other)) {
+                selected.add(result.name());
+            }
+        }
+    }
+
+    private static void addNonRankOne(
+            Set<String> selected,
+            KnowledgeCandidateEvaluationVariantReport variant) {
+        if (variant == null) {
+            return;
+        }
+        for (KnowledgeCandidateEvaluationCaseResult result : variant.cases()) {
+            if (result.firstRelevantRank() == null || result.firstRelevantRank() > 1) {
+                selected.add(result.name());
+            }
+        }
+    }
+
+    private KnowledgeEvaluationStageDiagnostic stageDiagnostic(
+            KnowledgeEvaluationCase testCase,
+            String queryMode,
+            String retrievalQuery,
+            int candidateWindow) {
+        CandidateChannels channels =
+                candidateChannels(retrievalQuery, candidateWindow);
+        List<KnowledgeSearchHit> fused =
+                RrfFusion.fuse(
+                        channels.lexical(),
+                        channels.vector(),
+                        hybridProperties.getRrfK(),
+                        backend::normalizeVectorScore);
+
+        int downstreamLimit =
+                Math.max(
+                        evaluationProperties.getTopK(),
+                        answerabilityProperties.getCandidateLimit());
+        int poolLimit =
+                Math.max(
+                        downstreamLimit,
+                        rerankProperties.getCandidateLimit());
+        List<KnowledgeSearchHit> rerankInput =
+                fused.stream()
+                        .limit(Math.min(fused.size(), poolLimit))
+                        .toList();
+
+        List<KnowledgeSearchHit> reranked = rerankInput;
+        if (!rerankInput.isEmpty()) {
+            int rerankOutputLimit =
+                    Math.min(rerankInput.size(), downstreamLimit);
+            reranked =
+                    reranker.rerank(
+                                    testCase.query(),
+                                    rerankInput,
+                                    rerankOutputLimit)
+                            .hits();
+        }
+
+        List<KnowledgeSearchHit> judgeInput =
+                reranked.stream()
+                        .limit(answerabilityProperties.getCandidateLimit())
+                        .toList();
+        List<KnowledgeSearchHit> finalHits = judgeInput;
+        String judgeDecision = "NOT_RUN";
+        List<String> expectedReasonCodes = List.of();
+        boolean judgeSupportedExpected = false;
+
+        if (!judgeInput.isEmpty()) {
+            var judged = answerabilityJudge.judge(testCase.query(), judgeInput);
+            finalHits =
+                    judged.hits().stream()
+                            .limit(evaluationProperties.getTopK())
+                            .toList();
+            if (judged.diagnostics() != null) {
+                judgeDecision = judged.diagnostics().decision();
+                Set<String> expectedCitations =
+                        testCase.expectedDocumentIds().stream()
+                                .map(id -> "KB:" + id + "#0")
+                                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+                List<String> reasons = new ArrayList<>();
+                boolean supported = false;
+                for (var decision : judged.diagnostics().decisions()) {
+                    if (expectedCitations.contains(decision.citationId())) {
+                        reasons.add(decision.reasonCode());
+                        supported = supported || decision.supported();
+                    }
+                }
+                expectedReasonCodes = List.copyOf(reasons);
+                judgeSupportedExpected = supported;
+            }
+        }
+
+        Set<String> expected =
+                new LinkedHashSet<>(testCase.expectedDocumentIds());
+        List<String> lexicalIds = documentIds(channels.lexical());
+        List<String> vectorIds = documentIds(channels.vector());
+        List<String> fusedIds =
+                fused.stream()
+                        .map(KnowledgeSearchHit::documentId)
+                        .distinct()
+                        .toList();
+        List<String> rerankIds =
+                reranked.stream()
+                        .map(KnowledgeSearchHit::documentId)
+                        .distinct()
+                        .toList();
+        List<String> finalIds =
+                finalHits.stream()
+                        .map(KnowledgeSearchHit::documentId)
+                        .distinct()
+                        .toList();
+
+        return new KnowledgeEvaluationStageDiagnostic(
+                testCase.name(),
+                testCase.category(),
+                queryMode,
+                testCase.query(),
+                retrievalQuery,
+                testCase.expectedDocumentIds(),
+                firstRelevantRank(lexicalIds, expected),
+                firstRelevantRank(vectorIds, expected),
+                firstRelevantRank(fusedIds, expected),
+                firstRelevantRank(rerankIds, expected),
+                firstRelevantRank(finalIds, expected),
+                top(lexicalIds, 3),
+                top(vectorIds, 3),
+                top(fusedIds, 5),
+                top(rerankIds, 5),
+                finalIds,
+                judgeDecision,
+                expectedReasonCodes,
+                judgeSupportedExpected,
+                finalIds.isEmpty());
+    }
+
+    private static List<String> top(List<String> values, int limit) {
+        return values.stream().limit(limit).toList();
     }
 
     private KnowledgeEvaluationVariantReport evaluateVariant(

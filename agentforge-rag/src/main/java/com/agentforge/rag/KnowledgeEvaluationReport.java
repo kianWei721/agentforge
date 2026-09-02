@@ -6,6 +6,7 @@ public record KnowledgeEvaluationReport(
         int documentCount,
         int caseCount,
         KnowledgeCandidateBenchmarkReport candidateBenchmark,
+        KnowledgeStageDiagnosticsReport stageDiagnostics,
         KnowledgeEvaluationVariantReport baseline,
         KnowledgeEvaluationVariantReport rewrite,
         double recallAt1Delta,
