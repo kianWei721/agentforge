@@ -18,11 +18,13 @@ import com.agentforge.infrastructure.config.ToolPolicyProperties;
 import com.agentforge.infrastructure.health.InfrastructureStatus;
 import com.agentforge.infrastructure.health.InfrastructureStatusService;
 import com.agentforge.model.ModelGatewayCatalog;
+import com.agentforge.rag.KnowledgeChannelStrategyAnalyzer;
 import com.agentforge.rag.KnowledgeIngestionService;
 import com.agentforge.rag.KnowledgeRetriever;
 import com.agentforge.runtime.AgentRuntimeManager;
 import com.agentforge.tool.ToolRegistry;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
@@ -108,7 +110,7 @@ public class SystemController {
         result.put("name", "AgentForge");
         result.put("version", "0.3.0-SNAPSHOT");
         result.put("status", infrastructure.ready() ? "UP" : "DEGRADED");
-        result.put("milestone", "V0.7-slice1b2-stage-diagnostics");
+        result.put("milestone", "V0.7-slice1b3-channel-strategy");
         result.put("mysql", infrastructure.mysqlUp() ? "UP" : "DOWN");
         result.put("redis", infrastructure.redisUp() ? "UP" : "DOWN");
         result.put("activeModelProvider", modelGatewayCatalog.activeProvider());
@@ -225,6 +227,19 @@ public class SystemController {
         result.put(
                 "knowledgeProductionRrfK",
                 knowledgeHybridProperties.getRrfK());
+        result.put(
+                "knowledgeEvaluationChannelStrategies",
+                List.of(
+                        "ORIGINAL",
+                        "REWRITE",
+                        "BM25_REWRITE_VECTOR_ORIGINAL",
+                        "BM25_ORIGINAL_VECTOR_REWRITE"));
+        result.put(
+                "knowledgeEvaluationSelectionPolicy",
+                KnowledgeChannelStrategyAnalyzer.SELECTION_POLICY);
+        result.put(
+                "knowledgeEvaluationDecisionBoundary",
+                KnowledgeChannelStrategyAnalyzer.DECISION_BOUNDARY);
         result.put(
                 "knowledgeEvaluationCandidateWindow",
                 Math.min(

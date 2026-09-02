@@ -120,6 +120,43 @@ k=120 -> near-flat stress point
 
 最终是否保留生产 `k=60` 只由 Gold Dataset 的 Recall@K、MRR 和具体 Hard Case 决定。
 
+### Slice 1B-3 — Channel-specific Query Strategy + RRF Parameter Confirmation
+
+Slice 1B-2 证明 Query Rewrite 对 BM25 有明显帮助，但会扰动 Vector。Slice 1B-3 不预设“Rewrite 只给 BM25”一定正确，而是做完整 2×2 factorial comparison（因子组合实验）：
+
+```text
+ORIGINAL
+  BM25   <- original
+  Vector <- original
+
+REWRITE
+  BM25   <- rewritten
+  Vector <- rewritten
+
+BM25_REWRITE_VECTOR_ORIGINAL
+  BM25   <- rewritten
+  Vector <- original
+
+BM25_ORIGINAL_VECTOR_REWRITE
+  BM25   <- original
+  Vector <- rewritten
+```
+
+四种 Query Strategy 都跑同一组 `k=5/20/60/120`，因此 Hybrid 部分形成 16 个可比 Variant。加上 BM25/Vector 单路基线，共 20 个 Candidate Variant。
+
+Parameter Confirmation 使用固定的候选阶段优先级：
+
+```text
+Recall@5
+-> Recall@3
+-> MRR
+-> Recall@1
+```
+
+这是因为 AgentForge 在 RRF 后还有 Reranker，首要目标是避免正确知识掉出候选池。完全同分时保留整个 Leading Frontier，不强行按 k 大小打破平局。
+
+当前 production 行为仍是 `REWRITE + k=60`。评测只输出 leading variant / deltas，不自动修改生产 Query Strategy 或 RRF k。
+
 ### Slice 1B-2 — Channel Disagreement + Stage Diagnostics
 
 GOLD-2 真实结果证明 Candidate Benchmark 已有区分度，但 20 documents 与 candidateWindow=20 使 Vector/RRF 仍接近全量排序，无法判断 RRF k。

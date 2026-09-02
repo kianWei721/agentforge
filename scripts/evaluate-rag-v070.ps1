@@ -35,8 +35,8 @@ function Invoke-Utf8JsonPost {
 
 $health = Invoke-RestMethod -Method GET -Uri ($root + "/api/v1/system/health")
 
-if ($health.milestone -ne "V0.7-slice1b2-stage-diagnostics") {
-    throw "Expected V0.7 Slice 1B-2 milestone. Actual: $($health.milestone)"
+if ($health.milestone -ne "V0.7-slice1b3-channel-strategy") {
+    throw "Expected V0.7 Slice 1B-3 milestone. Actual: $($health.milestone)"
 }
 if ($health.knowledgeEvaluationEnabled -ne $true -or $health.knowledgeEvaluationConfigured -ne $true) {
     throw "Knowledge evaluation is not enabled/configured. Run .\scripts\configure-knowledge-evaluation.ps1 and restart AgentForge."
@@ -51,8 +51,11 @@ $report = Invoke-Utf8JsonPost -Uri ($root + "/api/v1/knowledge/evaluation/run")
 if ($report.documentCount -lt 10 -or $report.caseCount -lt 20) {
     throw "Gold dataset is unexpectedly small."
 }
-if ($null -eq $report.candidateBenchmark -or $report.candidateBenchmark.variants.Count -lt 8) {
+if ($null -eq $report.candidateBenchmark -or $report.candidateBenchmark.variants.Count -lt 20) {
     throw "Candidate-stage benchmark report is missing or incomplete."
+}
+if ($null -eq $report.channelStrategyConfirmation) {
+    throw "Channel strategy confirmation report is missing."
 }
 if ($report.documentCount -le $report.candidateBenchmark.candidateWindow) {
     throw "GOLD corpus must be larger than the candidate window."
@@ -81,6 +84,41 @@ $candidateRows = @(
     }
 )
 $candidateRows | Format-Table -AutoSize
+
+Write-Host ""
+Write-Host "=== Channel-specific Query Strategy Matrix ==="
+$candidateRows |
+Where-Object { $_.Strategy -eq "HYBRID_RRF" } |
+Sort-Object QueryMode, RrfK |
+Format-Table -AutoSize
+
+Write-Host ""
+Write-Host "=== RRF Parameter Confirmation ==="
+$confirmation = $report.channelStrategyConfirmation
+[PSCustomObject]@{
+    SelectionPolicy = $confirmation.selectionPolicy
+    DecisionBoundary = $confirmation.decisionBoundary
+    ProductionVariant = $confirmation.productionVariant
+    ProductionRrfK = $confirmation.productionRrfK
+    ProductionOnLeadingFrontier = $confirmation.productionOnLeadingFrontier
+    UniqueLeader = $confirmation.uniqueLeader
+    LeadingVariant = $confirmation.leadingVariant
+    LeadingVariants = ($confirmation.leadingVariants -join ", ")
+    LeadingQueryModes = ($confirmation.leadingQueryModes -join ", ")
+    LeadingRrfKValues = ($confirmation.leadingRrfKValues -join ", ")
+    LeadingRecallAt1 = [math]::Round([double]$confirmation.leadingRecallAt1, 4)
+    LeadingRecallAt3 = [math]::Round([double]$confirmation.leadingRecallAt3, 4)
+    LeadingRecallAt5 = [math]::Round([double]$confirmation.leadingRecallAt5, 4)
+    LeadingMRR = [math]::Round([double]$confirmation.leadingMeanReciprocalRank, 4)
+    ProductionRecallAt1 = [math]::Round([double]$confirmation.productionRecallAt1, 4)
+    ProductionRecallAt3 = [math]::Round([double]$confirmation.productionRecallAt3, 4)
+    ProductionRecallAt5 = [math]::Round([double]$confirmation.productionRecallAt5, 4)
+    ProductionMRR = [math]::Round([double]$confirmation.productionMeanReciprocalRank, 4)
+    RecallAt1Delta = [math]::Round([double]$confirmation.recallAt1Delta, 4)
+    RecallAt3Delta = [math]::Round([double]$confirmation.recallAt3Delta, 4)
+    RecallAt5Delta = [math]::Round([double]$confirmation.recallAt5Delta, 4)
+    MRRDelta = [math]::Round([double]$confirmation.meanReciprocalRankDelta, 4)
+} | Format-List
 
 Write-Host ""
 Write-Host "=== Candidate-stage Non-Rank1 / Miss Audit ==="
@@ -186,6 +224,7 @@ Select-Object name, category, passed, noAnswerExpected, noAnswerActual, firstRel
 Format-Table -Wrap -AutoSize
 
 Write-Host ""
-Write-Host "V0.7 Slice 1B-2 calibration report generated."
+Write-Host "V0.7 Slice 1B-3 calibration report generated."
 Write-Host "Candidate-stage metrics are pre-reranker/pre-judge. End-to-end metrics remain separate."
-Write-Host "Do not choose a production RRF k from one metric alone; review Recall@K, MRR, hard cases, and rewrite stability together."
+Write-Host "The confirmation report is calibration-only and never changes production configuration automatically."
+Write-Host "A production change still requires a live end-to-end confirmation of the leading channel strategy."
