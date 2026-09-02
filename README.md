@@ -182,6 +182,42 @@ Promotion 必须同时满足：Candidate Leader 仍然唯一、Challenger 不新
 
 GOLD-3 同时升级为 `V0.7-GOLD-3.1`：仅修正 `offline-alarm-debounce` 的 answerability mismatch，在 Offline Alarm Policy 中明确 debounce/repeated-observation window 是为了降低瞬时掉线/短暂 telemetry gap 导致的误报。没有放宽 Answerability Judge。
 
+
+### Slice 1B-3 E2E Confirmation v2
+
+第一轮 Promotion Gate 正确触发 `HOLD_PRODUCTION`，唯一 Challenger-only failure 为 `reconnect-backoff-purpose`。Stage Diagnostics 同时证明同一 Control Strategy 的 Judge 重放存在一次 PASS / 一次 NO_ANSWER 差异，因此单次 LLM Judge 结果不能直接等同于稳定回归。
+
+v2 做两项修正：
+
+```text
+GOLD-3.2
+- 补齐 reconnect-backoff 的 why/rationale evidence
+- 不放宽 Answerability Judge
+
+Targeted Regression Recheck
+- 只针对 initial challenger-only failure
+- Control / Challenger 各重放 3 次
+- trial 顺序交替，减少固定先后顺序偏差
+```
+
+重检判定是保守的：
+
+```text
+Control 3/3 PASS + Challenger 3/3 PASS
+-> CLEARED_TRANSIENT
+
+Control 3/3 PASS + Challenger 0/3 PASS
+-> CONFIRMED_REGRESSION
+
+其他混合结果
+-> UNSTABLE
+-> HOLD_FOR_STABILITY
+```
+
+只有 `CLEARED_TRANSIENT` 的 Case 才会用重检中的保守 passing result 替换首次偶发失败并重新计算 E2E metrics。没有初始新失败时不额外调用模型。
+
+Production 配置仍不会自动修改。
+
 ### Slice 1B-2 — Channel Disagreement + Stage Diagnostics
 
 GOLD-2 真实结果证明 Candidate Benchmark 已有区分度，但 20 documents 与 candidateWindow=20 使 Vector/RRF 仍接近全量排序，无法判断 RRF k。

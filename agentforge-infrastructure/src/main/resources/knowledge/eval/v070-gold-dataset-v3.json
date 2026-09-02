@@ -1,6 +1,6 @@
 {
-  "version": "V0.7-GOLD-3.1",
-  "description": "Evaluation-only synthetic channel-disagreement corpus for V0.7 Slice 1B-3 end-to-end confirmation. GOLD-3.1 corrects the offline debounce answerability mismatch while preserving the 80-document hard-negative structure. It must never be treated as production device truth.",
+  "version": "V0.7-GOLD-3.2",
+  "description": "Evaluation-only synthetic channel-disagreement corpus for V0.7 Slice 1B-3 E2E Confirmation v2. GOLD-3.2 aligns reconnect-backoff rationale evidence with its why-question while preserving the 80-document hard-negative structure. It must never be treated as production device truth.",
   "documents": [
     {
       "id": "eval-offline-procedure",
@@ -140,7 +140,7 @@
       "title": "Connection Retry and Reconnect Backoff",
       "sourceType": "TEST",
       "sourceRef": "eval://v0.7/gold2/reconnect-backoff",
-      "content": "Evaluation-only synthetic knowledge. After unexpected connection loss, retry with bounded backoff instead of a tight reconnect loop. Increase delay across repeated failures up to a configured ceiling and reset delay after stable reconnection. This passage intentionally provides no exact ceiling in seconds."
+      "content": "Evaluation-only synthetic knowledge. After unexpected connection loss, use bounded reconnect backoff instead of a tight retry loop. Tight loops repeatedly retry while the dependency or network may still be unavailable, creating retry storms and unnecessary network, radio, CPU, and runtime load during sustained failures. Increase delay across repeated failures up to a configured ceiling and reset the delay after stable reconnection. This passage intentionally provides no exact ceiling in seconds."
     },
     {
       "id": "eval-offline-trap-01",
