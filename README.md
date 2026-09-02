@@ -218,6 +218,46 @@ Control 3/3 PASS + Challenger 0/3 PASS
 
 Production 配置仍不会自动修改。
 
+
+### Slice 1B-4 — Production Promotion
+
+GOLD-3.2 的最终 Promotion Gate 已得到 `PROMOTION_ELIGIBLE`。Candidate Leader 为 `ORIGINAL + RRF k=5`，完整 Reranker + Answerability E2E 与旧 `REWRITE + k=60` Control 都达到 100%，因此进入受控 Production Promotion。
+
+本阶段不通过 Git 合并直接改变正在运行的实例。仓库提供三段显式流程：
+
+```powershell
+# 1. 只读 preflight，不改 .env.local
+.\scripts\promote-rag-v070.ps1
+
+# 2. 人工确认后写入 ignored .env.local
+.\scripts\promote-rag-v070.ps1 -Apply
+
+# 3. 重启后验证 active runtime + production KB smoke
+.\scripts\verify-rag-promotion-v070.ps1
+```
+
+Promotion target：
+
+```text
+Query Rewrite = OFF
+RRF k = 5
+Evaluation Harness = OFF by default
+Reranker = unchanged
+Answerability Judge = unchanged
+Embedding / ES index = unchanged
+```
+
+`promote-rag-v070.ps1` 只允许从已经验收过的 `REWRITE + k=60` Control 状态晋级，并把原状态保存到 git-ignored `scripts/.state/`。如果 smoke 失败：
+
+```powershell
+.\scripts\rollback-rag-v070.ps1
+.\scripts\rollback-rag-v070.ps1 -Apply
+```
+
+然后重启 AgentForge。
+
+本切片当前只变更运行时配置，不提前修改 Java / application.yml 的 `rrfK=60` fallback default。只有实际 Promotion smoke 通过后，才考虑把 `k=5` codify 成新的 source-level default，避免“代码一拉下来尚未做 preflight 就发生参数切换”。
+
 ### Slice 1B-2 — Channel Disagreement + Stage Diagnostics
 
 GOLD-2 真实结果证明 Candidate Benchmark 已有区分度，但 20 documents 与 candidateWindow=20 使 Vector/RRF 仍接近全量排序，无法判断 RRF k。

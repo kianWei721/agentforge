@@ -110,7 +110,7 @@ public class SystemController {
         result.put("name", "AgentForge");
         result.put("version", "0.3.0-SNAPSHOT");
         result.put("status", infrastructure.ready() ? "UP" : "DEGRADED");
-        result.put("milestone", "V0.7-slice1b3-e2e-confirmation-v2");
+        result.put("milestone", "V0.7-slice1b4-production-promotion");
         result.put("mysql", infrastructure.mysqlUp() ? "UP" : "DOWN");
         result.put("redis", infrastructure.redisUp() ? "UP" : "DOWN");
         result.put("activeModelProvider", modelGatewayCatalog.activeProvider());
@@ -227,6 +227,34 @@ public class SystemController {
         result.put(
                 "knowledgeProductionRrfK",
                 knowledgeHybridProperties.getRrfK());
+        String productionQueryStrategy =
+                knowledgeQueryRewriteProperties.isEnabled()
+                        ? "REWRITE"
+                        : "ORIGINAL";
+        result.put(
+                "knowledgeProductionQueryStrategy",
+                productionQueryStrategy);
+        result.put(
+                "knowledgeProductionBaseline",
+                productionQueryStrategy
+                        + "+RRF_K"
+                        + knowledgeHybridProperties.getRrfK());
+        String promotionState;
+        if (!knowledgeQueryRewriteProperties.isEnabled()
+                && knowledgeHybridProperties.getRrfK() == 5) {
+            promotionState = "PROMOTED_ORIGINAL_K5";
+        } else if (knowledgeQueryRewriteProperties.isEnabled()
+                && knowledgeHybridProperties.getRrfK() == 60) {
+            promotionState = "LEGACY_CONTROL_REWRITE_K60";
+        } else {
+            promotionState = "CUSTOM";
+        }
+        result.put(
+                "knowledgeProductionPromotionState",
+                promotionState);
+        result.put(
+                "knowledgeProductionPromotionTarget",
+                "ORIGINAL+RRF_K5");
         result.put(
                 "knowledgeEvaluationChannelStrategies",
                 List.of(
@@ -245,10 +273,10 @@ public class SystemController {
                 "EVALUATION_PROMOTION_GATE_MANUAL_PRODUCTION_CHANGE_REQUIRED");
         result.put(
                 "knowledgeEndToEndControl",
-                "REWRITE+PRODUCTION_RRF_K");
+                "LEGACY_REWRITE+RRF_K60");
         result.put(
                 "knowledgeEndToEndChallenger",
-                "UNIQUE_CANDIDATE_LEADER");
+                "PROMOTION_TARGET_ORIGINAL+RRF_K5");
         result.put(
                 "knowledgeEndToEndRegressionRecheckTrials",
                 3);

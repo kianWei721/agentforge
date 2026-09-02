@@ -22,3 +22,6 @@ application-local.yml
 # Logs
 *.log
 logs/
+
+# Local promotion / rollback state
+scripts/.state/
