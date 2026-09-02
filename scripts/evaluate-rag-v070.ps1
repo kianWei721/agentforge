@@ -35,8 +35,8 @@ function Invoke-Utf8JsonPost {
 
 $health = Invoke-RestMethod -Method GET -Uri ($root + "/api/v1/system/health")
 
-if ($health.milestone -ne "V0.7-slice1b3-e2e-confirmation") {
-    throw "Expected V0.7 Slice 1B-3 End-to-End Confirmation milestone. Actual: $($health.milestone)"
+if ($health.milestone -ne "V0.7-slice1b3-e2e-confirmation-v2") {
+    throw "Expected V0.7 Slice 1B-3 End-to-End Confirmation v2 milestone. Actual: $($health.milestone)"
 }
 if ($health.knowledgeEvaluationEnabled -ne $true -or $health.knowledgeEvaluationConfigured -ne $true) {
     throw "Knowledge evaluation is not enabled/configured. Run .\scripts\configure-knowledge-evaluation.ps1 and restart AgentForge."
@@ -135,8 +135,11 @@ $e2e = $report.endToEndConfirmation
     ChallengerQueryMode = $e2e.challengerQueryMode
     ChallengerRrfK = $e2e.challengerRrfK
     ProductionRrfK = $e2e.productionRrfK
+    InitialNewFailureCases = ($e2e.initialNewFailureCases -join ", ")
     NewFailureCases = ($e2e.newFailureCases -join ", ")
     ResolvedFailureCases = ($e2e.resolvedFailureCases -join ", ")
+    ConfirmedRegressionCases = ($e2e.confirmedRegressionCases -join ", ")
+    UnstableRecheckCases = ($e2e.unstableRecheckCases -join ", ")
     RecallAt1Delta = [math]::Round([double]$e2e.recallAt1Delta, 4)
     RecallAt3Delta = [math]::Round([double]$e2e.recallAt3Delta, 4)
     RecallAt5Delta = [math]::Round([double]$e2e.recallAt5Delta, 4)
@@ -144,6 +147,18 @@ $e2e = $report.endToEndConfirmation
     NoAnswerAccuracyDelta = [math]::Round([double]$e2e.noAnswerAccuracyDelta, 4)
     OverallAccuracyDelta = [math]::Round([double]$e2e.overallAccuracyDelta, 4)
 } | Format-List
+
+Write-Host ""
+Write-Host "=== Targeted Regression Rechecks ==="
+if ($e2e.regressionRechecks.Count -eq 0) {
+    Write-Host "No initial challenger-only failure; targeted recheck was not required."
+}
+else {
+    $e2e.regressionRechecks |
+    Select-Object caseName, trials, initialControlPassed, initialChallengerPassed,
+        controlPasses, challengerPasses, status |
+    Format-Table -AutoSize
+}
 
 Write-Host ""
 Write-Host "=== End-to-End Control vs Challenger ==="
@@ -284,7 +299,7 @@ Select-Object name, category, passed, noAnswerExpected, noAnswerActual, firstRel
 Format-Table -Wrap -AutoSize
 
 Write-Host ""
-Write-Host "V0.7 Slice 1B-3 End-to-End Confirmation report generated."
-Write-Host "Candidate-stage selection and end-to-end promotion are separate gates."
-Write-Host "PROMOTION_ELIGIBLE means the evaluation gate passed; it never changes production configuration automatically."
-Write-Host "Any production change remains manual and must be followed by a runtime smoke/regression check."
+Write-Host "V0.7 Slice 1B-3 End-to-End Confirmation v2 report generated."
+Write-Host "Only initial challenger-only failures receive three paired targeted rechecks."
+Write-Host "Mixed recheck outcomes produce HOLD_FOR_STABILITY; a transient regression clears only when both control and challenger pass 3/3."
+Write-Host "PROMOTION_ELIGIBLE is evaluation-only and never changes production configuration automatically."

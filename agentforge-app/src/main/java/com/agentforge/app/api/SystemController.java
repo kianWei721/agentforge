@@ -110,7 +110,7 @@ public class SystemController {
         result.put("name", "AgentForge");
         result.put("version", "0.3.0-SNAPSHOT");
         result.put("status", infrastructure.ready() ? "UP" : "DEGRADED");
-        result.put("milestone", "V0.7-slice1b3-e2e-confirmation");
+        result.put("milestone", "V0.7-slice1b3-e2e-confirmation-v2");
         result.put("mysql", infrastructure.mysqlUp() ? "UP" : "DOWN");
         result.put("redis", infrastructure.redisUp() ? "UP" : "DOWN");
         result.put("activeModelProvider", modelGatewayCatalog.activeProvider());
@@ -249,6 +249,15 @@ public class SystemController {
         result.put(
                 "knowledgeEndToEndChallenger",
                 "UNIQUE_CANDIDATE_LEADER");
+        result.put(
+                "knowledgeEndToEndRegressionRecheckTrials",
+                3);
+        result.put(
+                "knowledgeEndToEndRegressionRecheckPolicy",
+                "TARGET_INITIAL_NEW_FAILURES_ONLY");
+        result.put(
+                "knowledgeEndToEndRegressionClearRule",
+                "CONTROL_3_OF_3_PASS_AND_CHALLENGER_3_OF_3_PASS");
         result.put(
                 "knowledgeEvaluationCandidateWindow",
                 Math.min(
