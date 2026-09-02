@@ -15,7 +15,7 @@ class ElasticsearchGoldDatasetKnowledgeEvaluatorTest {
     @Test
     void shouldRejectCaseThatReferencesMissingDocument() {
         List<KnowledgeEvaluationDocument> documents = new ArrayList<>();
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < 10; i++) {
             documents.add(
                     new KnowledgeEvaluationDocument(
                             "doc-" + i,
@@ -32,7 +32,7 @@ class ElasticsearchGoldDatasetKnowledgeEvaluatorTest {
                         "test",
                         "query",
                         List.of("missing-doc")));
-        for (int i = 0; i < 8; i++) {
+        for (int i = 0; i < 16; i++) {
             cases.add(
                     new KnowledgeEvaluationCase(
                             "answer-" + i,
@@ -42,9 +42,21 @@ class ElasticsearchGoldDatasetKnowledgeEvaluatorTest {
         }
         cases.add(
                 new KnowledgeEvaluationCase(
-                        "no-answer",
+                        "no-answer-1",
                         "test",
-                        "unknown",
+                        "unknown 1",
+                        List.of()));
+        cases.add(
+                new KnowledgeEvaluationCase(
+                        "no-answer-2",
+                        "test",
+                        "unknown 2",
+                        List.of()));
+        cases.add(
+                new KnowledgeEvaluationCase(
+                        "no-answer-3",
+                        "test",
+                        "unknown 3",
                         List.of()));
 
         KnowledgeEvaluationDataset dataset =

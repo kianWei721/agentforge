@@ -35,8 +35,8 @@ function Invoke-Utf8JsonPost {
 
 $health = Invoke-RestMethod -Method GET -Uri ($root + "/api/v1/system/health")
 
-if ($health.milestone -ne "V0.7-production-knowledge-platform") {
-    throw "Expected V0.7 milestone. Actual: $($health.milestone)"
+if ($health.milestone -ne "V0.7-slice1b-candidate-benchmark") {
+    throw "Expected V0.7 Slice 1B milestone. Actual: $($health.milestone)"
 }
 if ($health.knowledgeEvaluationEnabled -ne $true -or $health.knowledgeEvaluationConfigured -ne $true) {
     throw "Knowledge evaluation is not enabled/configured. Run .\scripts\configure-knowledge-evaluation.ps1 and restart AgentForge."
@@ -48,8 +48,56 @@ if ($health.knowledgeEvaluationIndex -eq $health.knowledgeElasticsearchIndex) {
 Write-Host ("Running isolated V0.7 gold evaluation with client timeout {0}s. This can make multiple embedding/rerank/judge requests..." -f $RequestTimeoutSeconds)
 $report = Invoke-Utf8JsonPost -Uri ($root + "/api/v1/knowledge/evaluation/run")
 
-if ($report.documentCount -lt 5 -or $report.caseCount -lt 10) {
+if ($report.documentCount -lt 10 -or $report.caseCount -lt 20) {
     throw "Gold dataset is unexpectedly small."
+}
+if ($null -eq $report.candidateBenchmark -or $report.candidateBenchmark.variants.Count -lt 8) {
+    throw "Candidate-stage benchmark report is missing or incomplete."
+}
+
+Write-Host ""
+Write-Host "=== Candidate-stage Benchmark ==="
+Write-Host ("CandidateWindow: {0}" -f $report.candidateBenchmark.candidateWindow)
+Write-Host ("RRF k sweep: {0}" -f (($report.candidateBenchmark.rrfKValues | ForEach-Object { [string]$_ }) -join ", "))
+
+$candidateRows = @(
+    $report.candidateBenchmark.variants | ForEach-Object {
+        [PSCustomObject]@{
+            Variant = $_.variant
+            QueryMode = $_.queryMode
+            Strategy = $_.retrievalStrategy
+            RrfK = $_.rrfK
+            RecallAt1 = [math]::Round([double]$_.recallAt1, 4)
+            RecallAt3 = [math]::Round([double]$_.recallAt3, 4)
+            RecallAt5 = [math]::Round([double]$_.recallAt5, 4)
+            MRR = [math]::Round([double]$_.meanReciprocalRank, 4)
+        }
+    }
+)
+$candidateRows | Format-Table -AutoSize
+
+Write-Host ""
+Write-Host "=== Candidate-stage Non-Rank1 / Miss Audit ==="
+$hardRows = @(
+    foreach ($variant in $report.candidateBenchmark.variants) {
+        foreach ($case in $variant.cases) {
+            if ($null -eq $case.firstRelevantRank -or $case.firstRelevantRank -gt 1) {
+                [PSCustomObject]@{
+                    Variant = $variant.variant
+                    Case = $case.name
+                    Rank = $case.firstRelevantRank
+                    Expected = ($case.expectedDocumentIds -join ",")
+                    ActualTop = if ($case.actualDocumentIds.Count -gt 0) { $case.actualDocumentIds[0] } else { "" }
+                }
+            }
+        }
+    }
+)
+if ($hardRows.Count -eq 0) {
+    Write-Host "All candidate variants ranked every answerable case at position 1; dataset still has a ceiling effect."
+}
+else {
+    $hardRows | Format-Table -Wrap -AutoSize
 }
 
 $variants = @(
@@ -108,5 +156,6 @@ Select-Object name, category, passed, noAnswerExpected, noAnswerActual, firstRel
 Format-Table -Wrap -AutoSize
 
 Write-Host ""
-Write-Host "V0.7 calibration report generated."
-Write-Host "Do not set production quality thresholds until this first multi-document baseline has been reviewed."
+Write-Host "V0.7 Slice 1B calibration report generated."
+Write-Host "Candidate-stage metrics are pre-reranker/pre-judge. End-to-end metrics remain separate."
+Write-Host "Do not choose a production RRF k from one metric alone; review Recall@K, MRR, hard cases, and rewrite stability together."

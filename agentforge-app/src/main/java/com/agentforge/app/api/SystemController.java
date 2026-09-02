@@ -108,7 +108,7 @@ public class SystemController {
         result.put("name", "AgentForge");
         result.put("version", "0.3.0-SNAPSHOT");
         result.put("status", infrastructure.ready() ? "UP" : "DEGRADED");
-        result.put("milestone", "V0.7-production-knowledge-platform");
+        result.put("milestone", "V0.7-slice1b-candidate-benchmark");
         result.put("mysql", infrastructure.mysqlUp() ? "UP" : "DOWN");
         result.put("redis", infrastructure.redisUp() ? "UP" : "DOWN");
         result.put("activeModelProvider", modelGatewayCatalog.activeProvider());
@@ -219,6 +219,20 @@ public class SystemController {
         result.put(
                 "knowledgeEvaluationTopK",
                 knowledgeEvaluationProperties.getTopK());
+        result.put(
+                "knowledgeEvaluationRrfKValues",
+                knowledgeEvaluationProperties.getRrfKValues());
+        result.put(
+                "knowledgeProductionRrfK",
+                knowledgeHybridProperties.getRrfK());
+        result.put(
+                "knowledgeEvaluationCandidateWindow",
+                Math.min(
+                        100,
+                        Math.max(
+                                20,
+                                knowledgeEvaluationProperties.getTopK()
+                                        * knowledgeHybridProperties.getCandidateMultiplier())));
         result.put("retrievalBudgetEnabled", retrievalBudgetProperties.isEnabled());
         result.put(
                 "retrievalBudgetMaxCallsPerExecution",

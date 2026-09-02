@@ -1,5 +1,7 @@
 package com.agentforge.infrastructure.config;
 
+import java.util.HashSet;
+import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.util.StringUtils;
 
@@ -8,8 +10,12 @@ public class KnowledgeEvaluationProperties {
 
     private boolean enabled;
     private String indexName = "agentforge-knowledge-eval-v070";
-    private String datasetResource = "classpath:knowledge/eval/v070-gold-dataset.json";
+    private String datasetResource = "classpath:knowledge/eval/v070-gold-dataset-v2.json";
     private int topK = 5;
+    // Sweep spans materially different rank-decay regimes for the current
+    // candidate window (20): head-heavy (5), window-scale (20), literature
+    // baseline (60), and near-flat stress point (120).
+    private List<Integer> rrfKValues = List.of(5, 20, 60, 120);
 
     public boolean isEnabled() {
         return enabled;
@@ -43,12 +49,22 @@ public class KnowledgeEvaluationProperties {
         this.topK = topK;
     }
 
+    public List<Integer> getRrfKValues() {
+        return rrfKValues;
+    }
+
+    public void setRrfKValues(List<Integer> rrfKValues) {
+        this.rrfKValues =
+                rrfKValues == null ? List.of() : List.copyOf(rrfKValues);
+    }
+
     public boolean isConfigured() {
         return enabled
                 && StringUtils.hasText(indexName)
                 && StringUtils.hasText(datasetResource)
                 && topK >= 5
-                && topK <= 20;
+                && topK <= 20
+                && !rrfKValues.isEmpty();
     }
 
     public void validate(KnowledgeHybridProperties hybridProperties) {
@@ -66,6 +82,20 @@ public class KnowledgeEvaluationProperties {
         }
         if (topK < 5 || topK > 20) {
             throw new IllegalStateException("Knowledge evaluation topK must be between 5 and 20.");
+        }
+        if (rrfKValues == null || rrfKValues.size() < 3 || rrfKValues.size() > 8) {
+            throw new IllegalStateException(
+                    "Knowledge evaluation rrfKValues must contain between 3 and 8 values.");
+        }
+        if (new HashSet<>(rrfKValues).size() != rrfKValues.size()) {
+            throw new IllegalStateException(
+                    "Knowledge evaluation rrfKValues must be unique.");
+        }
+        for (Integer value : rrfKValues) {
+            if (value == null || value < 1 || value > 1000) {
+                throw new IllegalStateException(
+                        "Knowledge evaluation rrfKValues must be between 1 and 1000.");
+            }
         }
         if (hybridProperties == null || !hybridProperties.isConfigured()) {
             throw new IllegalStateException(

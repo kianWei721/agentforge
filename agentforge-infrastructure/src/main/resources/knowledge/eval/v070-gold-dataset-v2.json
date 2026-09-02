@@ -1,0 +1,409 @@
+{
+  "version": "V0.7-GOLD-2",
+  "description": "Evaluation-only synthetic hard-negative corpus for candidate-stage retrieval benchmarking. English documents intentionally overlap within topic clusters; Chinese, English, mixed-language, and exact-token queries test lexical, vector, rewrite, and RRF behavior. Never treat this corpus as production device truth.",
+  "documents": [
+    {
+      "id": "eval-offline-procedure",
+      "title": "Prolonged Device Offline Troubleshooting Procedure",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/offline-procedure",
+      "content": "Evaluation-only synthetic knowledge. For a device that has remained offline for a prolonged period, troubleshoot in this order: verify power supply, verify SIM and data-plan status, check cellular coverage, then inspect firmware and runtime health. The procedure is diagnostic guidance and is not proof of a root cause."
+    },
+    {
+      "id": "eval-offline-threshold-policy",
+      "title": "Offline Duration Threshold Policy",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/offline-threshold",
+      "content": "Evaluation-only synthetic knowledge. A prolonged-offline duration threshold is deployment policy, not a universal constant. A tenant or product may configure a duration before the platform labels a device prolonged offline. This document intentionally provides no concrete tenant value."
+    },
+    {
+      "id": "eval-offline-alarm-policy",
+      "title": "Offline Alarm Debounce Policy",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/offline-alarm",
+      "content": "Evaluation-only synthetic knowledge. Offline alarms may apply debounce, repeated-observation windows, notification suppression, and recovery clearing. Alarm policy controls notification behavior and does not define the troubleshooting order or establish a hardware root cause."
+    },
+    {
+      "id": "eval-offline-statistics",
+      "title": "Historical Offline Statistics",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/offline-statistics",
+      "content": "Evaluation-only synthetic knowledge. Historical offline statistics aggregate availability periods, disconnect counts, downtime duration, and recovery time. Historical statistics describe past behavior and do not specify the current troubleshooting sequence."
+    },
+    {
+      "id": "eval-shadow-conflict",
+      "title": "shadowStatus CONFLICT Semantics",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/shadow-conflict",
+      "content": "Evaluation-only synthetic knowledge. shadowStatus CONFLICT means the reported device state and the desired platform shadow state disagree. It is a state-consistency indicator. CONFLICT alone does not prove the device is offline, the broker failed, or a write command failed."
+    },
+    {
+      "id": "eval-shadow-resync",
+      "title": "Device Shadow Resynchronization",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/shadow-resync",
+      "content": "Evaluation-only synthetic knowledge. Shadow resynchronization re-reads authoritative device state and reconciles desired and reported values after a mismatch. Resynchronization is a recovery workflow, not the definition of shadowStatus CONFLICT."
+    },
+    {
+      "id": "eval-shadow-storage",
+      "title": "Device Shadow Persistence Model",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/shadow-storage",
+      "content": "Evaluation-only synthetic knowledge. Device shadow persistence stores desired state, reported state, update timestamps, and revision metadata. This evaluation passage intentionally does not name a concrete MySQL table or physical schema."
+    },
+    {
+      "id": "eval-command-verification",
+      "title": "Device Command Submission and Verification",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/command-verification",
+      "content": "Evaluation-only synthetic knowledge. Successful command submission is not the same as verified device state. After a write command, query authoritative device state with bounded verification attempts. If the expected state is not observed, report verification timeout or mismatch instead of claiming success."
+    },
+    {
+      "id": "eval-signal-strength",
+      "title": "SignalStrength Field Semantics",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/signal-semantics",
+      "content": "Evaluation-only synthetic knowledge. SignalStrength is a stored telemetry field. SignalStrength=0 means the stored field value is zero. Without protocol-specific encoding and freshness rules, zero alone must not be promoted to confirmed no-signal, modem failure, or disconnection."
+    },
+    {
+      "id": "eval-signal-calibration",
+      "title": "Signal Strength Calibration and Units",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/signal-calibration",
+      "content": "Evaluation-only synthetic knowledge. Signal calibration maps raw modem measurements to protocol-specific signal units such as RSSI or RSRP. The mapping and valid ranges depend on the device protocol. This passage intentionally provides no universal conversion formula."
+    },
+    {
+      "id": "eval-signal-alarm-threshold",
+      "title": "Weak Signal Alarm Threshold Policy",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/signal-alarm",
+      "content": "Evaluation-only synthetic knowledge. Weak-signal alarms compare fresh signal measurements with a configured threshold and may require consecutive breaches before alerting. Alarm thresholds are policy and do not define the semantic meaning of SignalStrength=0."
+    },
+    {
+      "id": "eval-cellular-diagnosis",
+      "title": "SIM and Cellular Connectivity Diagnosis",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/cellular-diagnosis",
+      "content": "Evaluation-only synthetic knowledge. For cellular connectivity diagnosis, verify SIM presence and activation, data-plan validity, account suspension, cellular coverage, and modem registration. This passage intentionally does not define a carrier HTTP API endpoint."
+    },
+    {
+      "id": "eval-peripheral-bits",
+      "title": "PeripheralStatus Bit Semantics",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/peripheral-bits",
+      "content": "Evaluation-only synthetic knowledge. PeripheralStatus uses binary flags in this corpus: bit0 is the lure-lamp circuit and bit1 is the camera circuit. For each defined bit, 0 means inactive and 1 means active. No semantics are defined for bit7."
+    },
+    {
+      "id": "eval-peripheral-capability",
+      "title": "Peripheral Capability Matrix",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/peripheral-capability",
+      "content": "Evaluation-only synthetic knowledge. A product capability matrix states whether a device model supports camera, lure lamp, environmental sensor, or other peripherals. Capability means supported hardware or function, not the current 0/1 state of PeripheralStatus."
+    },
+    {
+      "id": "eval-peripheral-health",
+      "title": "Peripheral Health Diagnosis",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/peripheral-health",
+      "content": "Evaluation-only synthetic knowledge. Peripheral health diagnosis checks supply voltage, communication response, recent state transitions, error counters, and physical connection. Health diagnosis does not redefine the bit layout of PeripheralStatus."
+    },
+    {
+      "id": "eval-firmware-runtime",
+      "title": "Firmware and Runtime Health Inspection",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/firmware-runtime",
+      "content": "Evaluation-only synthetic knowledge. Firmware and runtime health inspection reviews reboot counters, watchdog resets, crash logs, process uptime, memory pressure, and the most recent successful telemetry cycle. These observations support diagnosis but do not independently prove root cause."
+    },
+    {
+      "id": "eval-property-snapshot",
+      "title": "Last-saved Property Snapshot Semantics",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/property-snapshot",
+      "content": "Evaluation-only synthetic knowledge. A property snapshot is the last saved state known to the platform. Historical snapshot values are not live telemetry unless timestamps are fresh. queriedAt is query time; snapshotUpdatedAt is the stored snapshot update time."
+    },
+    {
+      "id": "eval-event-history",
+      "title": "Thing-model Event History Semantics",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/event-history",
+      "content": "Evaluation-only synthetic knowledge. Thing-model event history contains device event records returned by the event feed. It is not an alarm feed. An empty result means no event records were returned by that query; it is not proof that no alarm condition ever occurred."
+    },
+    {
+      "id": "eval-alarm-feed",
+      "title": "Alarm Feed Semantics",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/alarm-feed",
+      "content": "Evaluation-only synthetic knowledge. An alarm feed contains alarm records generated by alarm rules, notification state, severity, and recovery information. Alarm records are distinct from generic thing-model device event history."
+    },
+    {
+      "id": "eval-reconnect-backoff",
+      "title": "Connection Retry and Reconnect Backoff",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/reconnect-backoff",
+      "content": "Evaluation-only synthetic knowledge. After unexpected connection loss, retry with bounded backoff instead of a tight reconnect loop. Increase delay across repeated failures up to a configured ceiling and reset delay after stable reconnection. This passage intentionally provides no exact ceiling in seconds."
+    }
+  ],
+  "cases": [
+    {
+      "name": "offline-order-zh",
+      "category": "offline",
+      "query": "设备长期离线时，应该按什么顺序排查？",
+      "expectedDocumentIds": [
+        "eval-offline-procedure"
+      ]
+    },
+    {
+      "name": "offline-order-colloquial",
+      "category": "offline",
+      "query": "设备掉线很久了，先查电还是先查网络，完整顺序是什么？",
+      "expectedDocumentIds": [
+        "eval-offline-procedure"
+      ]
+    },
+    {
+      "name": "offline-threshold-policy",
+      "category": "offline",
+      "query": "长期离线的时间阈值是固定常量还是部署策略？",
+      "expectedDocumentIds": [
+        "eval-offline-threshold-policy"
+      ]
+    },
+    {
+      "name": "offline-alarm-debounce",
+      "category": "offline",
+      "query": "离线告警为什么要做 debounce 和重复观察窗口？",
+      "expectedDocumentIds": [
+        "eval-offline-alarm-policy"
+      ]
+    },
+    {
+      "name": "offline-history-purpose",
+      "category": "offline",
+      "query": "disconnect count、downtime duration 这些历史指标属于哪类知识？",
+      "expectedDocumentIds": [
+        "eval-offline-statistics"
+      ]
+    },
+    {
+      "name": "shadow-conflict-meaning",
+      "category": "shadow",
+      "query": "shadowStatus CONFLICT 的准确语义是什么？",
+      "expectedDocumentIds": [
+        "eval-shadow-conflict"
+      ]
+    },
+    {
+      "name": "shadow-conflict-offline-proof",
+      "category": "shadow",
+      "query": "shadowStatus CONFLICT 能直接证明设备已经离线吗？",
+      "expectedDocumentIds": [
+        "eval-shadow-conflict"
+      ]
+    },
+    {
+      "name": "shadow-resync-purpose",
+      "category": "shadow",
+      "query": "desired state 和 reported state 不一致后，shadow resynchronization 是做什么的？",
+      "expectedDocumentIds": [
+        "eval-shadow-resync"
+      ]
+    },
+    {
+      "name": "shadow-storage-fields",
+      "category": "shadow",
+      "query": "设备 shadow 持久化通常保存 desired、reported、revision 这类什么信息？",
+      "expectedDocumentIds": [
+        "eval-shadow-storage"
+      ]
+    },
+    {
+      "name": "command-submit-vs-verify",
+      "category": "command",
+      "query": "命令提交成功是否等于设备最终状态已经验证成功？",
+      "expectedDocumentIds": [
+        "eval-command-verification"
+      ]
+    },
+    {
+      "name": "command-verification-flow",
+      "category": "command",
+      "query": "write command 之后应该怎样做 bounded verification？",
+      "expectedDocumentIds": [
+        "eval-command-verification"
+      ]
+    },
+    {
+      "name": "signal-zero-meaning",
+      "category": "signal",
+      "query": "SignalStrength=0 在当前知识语义里到底代表什么？",
+      "expectedDocumentIds": [
+        "eval-signal-strength"
+      ]
+    },
+    {
+      "name": "signal-zero-disconnect-proof",
+      "category": "signal",
+      "query": "SignalStrength=0 能不能直接确认 modem failure 或断网？",
+      "expectedDocumentIds": [
+        "eval-signal-strength"
+      ]
+    },
+    {
+      "name": "signal-calibration",
+      "category": "signal",
+      "query": "raw modem measurement 到 RSSI 或 RSRP 的 calibration 属于什么规则？",
+      "expectedDocumentIds": [
+        "eval-signal-calibration"
+      ]
+    },
+    {
+      "name": "weak-signal-alarm",
+      "category": "signal",
+      "query": "弱信号告警为什么会用 threshold 和 consecutive breaches？",
+      "expectedDocumentIds": [
+        "eval-signal-alarm-threshold"
+      ]
+    },
+    {
+      "name": "sim-connectivity-checks",
+      "category": "cellular",
+      "query": "蜂窝连接异常时 SIM、套餐、覆盖和 modem registration 应该检查哪些内容？",
+      "expectedDocumentIds": [
+        "eval-cellular-diagnosis"
+      ]
+    },
+    {
+      "name": "peripheral-bit-layout",
+      "category": "peripheral",
+      "query": "PeripheralStatus 的 bit0 和 bit1 分别对应什么？",
+      "expectedDocumentIds": [
+        "eval-peripheral-bits"
+      ]
+    },
+    {
+      "name": "peripheral-zero-one",
+      "category": "peripheral",
+      "query": "PeripheralStatus 已定义 bit 的 0/1 是 active 还是 supported capability？",
+      "expectedDocumentIds": [
+        "eval-peripheral-bits"
+      ]
+    },
+    {
+      "name": "capability-vs-state",
+      "category": "peripheral",
+      "query": "device capability matrix 表示支持 camera，是否等同于 camera 当前状态为 1？",
+      "expectedDocumentIds": [
+        "eval-peripheral-capability"
+      ]
+    },
+    {
+      "name": "peripheral-health-checks",
+      "category": "peripheral",
+      "query": "外设健康排查要看 supply voltage、error counters 和 physical connection 吗？",
+      "expectedDocumentIds": [
+        "eval-peripheral-health"
+      ]
+    },
+    {
+      "name": "firmware-runtime-health",
+      "category": "runtime",
+      "query": "watchdog reset、crash log、process uptime 属于哪类运行健康检查？",
+      "expectedDocumentIds": [
+        "eval-firmware-runtime"
+      ]
+    },
+    {
+      "name": "snapshot-not-live",
+      "category": "snapshot",
+      "query": "last saved property snapshot 为什么不能直接当实时 telemetry？",
+      "expectedDocumentIds": [
+        "eval-property-snapshot"
+      ]
+    },
+    {
+      "name": "snapshot-timestamp-difference",
+      "category": "snapshot",
+      "query": "queriedAt 与 snapshotUpdatedAt 的时间语义有什么区别？",
+      "expectedDocumentIds": [
+        "eval-property-snapshot"
+      ]
+    },
+    {
+      "name": "event-history-vs-alarm",
+      "category": "event",
+      "query": "thing-model event history 和 alarm feed 是一回事吗？",
+      "expectedDocumentIds": [
+        "eval-event-history",
+        "eval-alarm-feed"
+      ]
+    },
+    {
+      "name": "event-empty-boundary",
+      "category": "event",
+      "query": "event history 返回空能证明历史上从来没有告警吗？",
+      "expectedDocumentIds": [
+        "eval-event-history"
+      ]
+    },
+    {
+      "name": "alarm-feed-purpose",
+      "category": "alarm",
+      "query": "severity、notification state、recovery information 属于 event history 还是 alarm feed？",
+      "expectedDocumentIds": [
+        "eval-alarm-feed"
+      ]
+    },
+    {
+      "name": "reconnect-backoff-purpose",
+      "category": "network",
+      "query": "unexpected connection loss 后为什么不应该 tight reconnect loop？",
+      "expectedDocumentIds": [
+        "eval-reconnect-backoff"
+      ]
+    },
+    {
+      "name": "reconnect-backoff-reset",
+      "category": "network",
+      "query": "什么时候应该 reset reconnect backoff delay？",
+      "expectedDocumentIds": [
+        "eval-reconnect-backoff"
+      ]
+    },
+    {
+      "name": "noanswer-tenant-offline-minutes",
+      "category": "no-answer",
+      "query": "tenant 135 的长期离线阈值具体配置为多少分钟？",
+      "expectedDocumentIds": []
+    },
+    {
+      "name": "noanswer-shadow-table",
+      "category": "no-answer",
+      "query": "shadowStatus CONFLICT 具体存在哪一张 MySQL 表？",
+      "expectedDocumentIds": []
+    },
+    {
+      "name": "noanswer-carrier-api",
+      "category": "no-answer",
+      "query": "查询 SIM 剩余流量的 carrier HTTP API endpoint 是什么？",
+      "expectedDocumentIds": []
+    },
+    {
+      "name": "noanswer-peripheral-bit7",
+      "category": "no-answer",
+      "query": "PeripheralStatus 的 bit7 精确表示什么？",
+      "expectedDocumentIds": []
+    },
+    {
+      "name": "noanswer-signal-formula",
+      "category": "no-answer",
+      "query": "SignalStrength raw value 转 RSRP 的通用精确公式是什么？",
+      "expectedDocumentIds": []
+    },
+    {
+      "name": "noanswer-backoff-ceiling",
+      "category": "no-answer",
+      "query": "reconnect backoff ceiling 精确是多少秒？",
+      "expectedDocumentIds": []
+    }
+  ]
+}

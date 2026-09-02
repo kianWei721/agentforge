@@ -91,13 +91,34 @@ AGENTFORGE_RETRIEVAL_BUDGET_MAX_CALLS_PER_EXECUTION=3
 
 V0.7 第一阶段先解决“如何证明 RAG 质量”的问题，而不是继续堆模型组件。
 
-### Slice 1 — Multi-document Gold Dataset + Evaluation Harness
+### Slice 1A — Multi-document Gold Dataset + Evaluation Harness
 
-新增独立 Gold Dataset：10 个 synthetic evaluation documents、24 个 gold queries（20 answerable + 4 explicit no-answer）。
+V0.7-GOLD-1 已完成真实运行，但 Baseline / Rewrite 均达到 100%，出现 Ceiling Effect（天花板效应）。这证明 Harness 可用，不足以证明检索参数最优。
 
-Evaluation 使用独立 Elasticsearch index `agentforge-knowledge-eval-v070`，不写 MySQL Knowledge 表，也不碰生产索引。
+### Slice 1B — Candidate-stage Retrieval Benchmark + RRF k Sweep + Harder Gold Dataset
 
-一次运行同时比较 Query Rewrite OFF / ON，输出 Recall@1/3/5、MRR、No-answer Accuracy、Overall Accuracy 以及 Rewrite Delta。
+当前评测升级到 V0.7-GOLD-2：20 个 topic-overlapping synthetic documents、34 个 gold queries（28 answerable + 6 explicit no-answer）。文档按主题簇加入 Hard Negatives，避免每个 Query 只有一个明显候选。
+
+Candidate-stage 在 Reranker / Answerability Judge 之前独立比较：
+
+```text
+BM25 only
+Vector only
+Hybrid RRF
+```
+
+并分别跑 Original Query / Rewritten Query。
+
+默认 RRF sweep 不是围绕某个预设“最佳值”挑选，而是按当前 candidate window=20 覆盖四种 rank-decay regime：
+
+```text
+k=5   -> head-heavy
+k=20  -> candidate-window scale
+k=60  -> literature / Elasticsearch baseline
+k=120 -> near-flat stress point
+```
+
+最终是否保留生产 `k=60` 只由 Gold Dataset 的 Recall@K、MRR 和具体 Hard Case 决定。
 
 配置：
 
