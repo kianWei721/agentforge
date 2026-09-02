@@ -69,7 +69,7 @@ $rrfKValues = ($rrfParts -join ",")
 Set-EnvFileValue $localEnvPath "AGENTFORGE_KNOWLEDGE_EVALUATION_ENABLED" "true"
 Set-EnvFileValue $localEnvPath "AGENTFORGE_KNOWLEDGE_EVALUATION_INDEX" $indexName
 Set-EnvFileValue $localEnvPath "AGENTFORGE_KNOWLEDGE_EVALUATION_TOP_K" $topK
-Set-EnvFileValue $localEnvPath "AGENTFORGE_KNOWLEDGE_EVALUATION_DATASET" "classpath:knowledge/eval/v070-gold-dataset-v2.json"
+Set-EnvFileValue $localEnvPath "AGENTFORGE_KNOWLEDGE_EVALUATION_DATASET" "classpath:knowledge/eval/v070-gold-dataset-v3.json"
 Set-EnvFileValue $localEnvPath "AGENTFORGE_KNOWLEDGE_EVALUATION_RRF_K_VALUES" $rrfKValues
 
 Write-Host ""
@@ -77,5 +77,5 @@ Write-Host "Knowledge evaluation configuration saved."
 Write-Host ("Index: {0}" -f $indexName)
 Write-Host ("topK: {0}" -f $topK)
 Write-Host ("RRF k sweep: {0}" -f $rrfKValues)
-Write-Host "Dataset: classpath:knowledge/eval/v070-gold-dataset-v2.json"
+Write-Host "Dataset: classpath:knowledge/eval/v070-gold-dataset-v3.json"
 Write-Host "Next: restart .\scripts\run-dashscope.ps1, then run .\scripts\evaluate-rag-v070.ps1"

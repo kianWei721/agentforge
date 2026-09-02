@@ -120,6 +120,25 @@ k=120 -> near-flat stress point
 
 最终是否保留生产 `k=60` 只由 Gold Dataset 的 Recall@K、MRR 和具体 Hard Case 决定。
 
+### Slice 1B-2 — Channel Disagreement + Stage Diagnostics
+
+GOLD-2 真实结果证明 Candidate Benchmark 已有区分度，但 20 documents 与 candidateWindow=20 使 Vector/RRF 仍接近全量排序，无法判断 RRF k。
+
+GOLD-3 将 corpus 扩展到 80 documents，candidateWindow 保持 20，并新增 60 个 topic-overlapping lexical hard negatives。评测仍使用同一组 k sweep，不修改 production k。
+
+对 end-to-end failure、BM25/Vector rank disagreement、production-k 非 Rank1 case，额外重放选中 Case 并记录：
+
+```text
+BM25 rank / top3
+Vector rank / top3
+Production RRF rank / top5
+Rerank rank / top5
+Answerability decision + expected-doc reasonCode
+Final rank / no-answer
+```
+
+Stage Diagnostics 只对选中 Case 重放，避免对全部 34 Case 再做一轮昂贵的 Rerank/Judge。
+
 配置：
 
 ```powershell
