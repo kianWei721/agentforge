@@ -248,6 +248,15 @@ public class SystemController {
                                 20,
                                 knowledgeEvaluationProperties.getTopK()
                                         * knowledgeHybridProperties.getCandidateMultiplier())));
+        result.put(
+                "knowledgeEvaluationElasticsearchConnectTimeoutFloor",
+                "PT5S");
+        result.put(
+                "knowledgeEvaluationElasticsearchRequestTimeoutFloor",
+                "PT15S");
+        result.put(
+                "knowledgeEvaluationElasticsearchSearchAttempts",
+                2);
         result.put("retrievalBudgetEnabled", retrievalBudgetProperties.isEnabled());
         result.put(
                 "retrievalBudgetMaxCallsPerExecution",
