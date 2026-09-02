@@ -357,7 +357,7 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
         List<KnowledgeEvaluationStageDiagnostic> diagnostics = new ArrayList<>();
 
         for (KnowledgeEvaluationCase testCase : dataset.cases()) {
-            if (!selected.contains(testCase.name()) || testCase.noAnswerExpected()) {
+            if (!selected.contains(testCase.name())) {
                 continue;
             }
             diagnostics.add(
@@ -388,12 +388,12 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
         Set<String> selected = new LinkedHashSet<>();
 
         for (KnowledgeEvaluationCaseResult result : baseline.cases()) {
-            if (!result.noAnswerExpected() && !result.passed()) {
+            if (!result.passed()) {
                 selected.add(result.name());
             }
         }
         for (KnowledgeEvaluationCaseResult result : rewrite.cases()) {
-            if (!result.noAnswerExpected() && !result.passed()) {
+            if (!result.passed()) {
                 selected.add(result.name());
             }
         }
