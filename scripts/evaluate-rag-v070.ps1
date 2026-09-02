@@ -1,7 +1,7 @@
 param(
     [string]$BaseUrl = "http://localhost:8080",
     [ValidateRange(60, 3600)]
-    [int]$RequestTimeoutSeconds = 900
+    [int]$RequestTimeoutSeconds = 1200
 )
 
 $ErrorActionPreference = "Stop"
@@ -35,8 +35,8 @@ function Invoke-Utf8JsonPost {
 
 $health = Invoke-RestMethod -Method GET -Uri ($root + "/api/v1/system/health")
 
-if ($health.milestone -ne "V0.7-slice1b-candidate-benchmark") {
-    throw "Expected V0.7 Slice 1B milestone. Actual: $($health.milestone)"
+if ($health.milestone -ne "V0.7-slice1b2-stage-diagnostics") {
+    throw "Expected V0.7 Slice 1B-2 milestone. Actual: $($health.milestone)"
 }
 if ($health.knowledgeEvaluationEnabled -ne $true -or $health.knowledgeEvaluationConfigured -ne $true) {
     throw "Knowledge evaluation is not enabled/configured. Run .\scripts\configure-knowledge-evaluation.ps1 and restart AgentForge."
@@ -53,6 +53,12 @@ if ($report.documentCount -lt 10 -or $report.caseCount -lt 20) {
 }
 if ($null -eq $report.candidateBenchmark -or $report.candidateBenchmark.variants.Count -lt 8) {
     throw "Candidate-stage benchmark report is missing or incomplete."
+}
+if ($report.documentCount -le $report.candidateBenchmark.candidateWindow) {
+    throw "GOLD corpus must be larger than the candidate window."
+}
+if ($null -eq $report.stageDiagnostics) {
+    throw "Retrieval stage diagnostics are missing."
 }
 
 Write-Host ""
@@ -99,6 +105,30 @@ if ($hardRows.Count -eq 0) {
 else {
     $hardRows | Format-Table -Wrap -AutoSize
 }
+
+Write-Host ""
+Write-Host "=== Selected Retrieval Stage Diagnostics ==="
+Write-Host ("ProductionRrfK: {0}" -f $report.stageDiagnostics.productionRrfK)
+Write-Host ("SelectedCases: {0}" -f (($report.stageDiagnostics.selectedCases | ForEach-Object { [string]$_ }) -join ", "))
+
+$report.stageDiagnostics.diagnostics |
+Select-Object caseName, queryMode, bm25Rank, vectorRank, rrfRank, rerankRank, finalRank,
+    judgeDecision, judgeSupportedExpected,
+    @{Name="JudgeReason";Expression={($_.judgeExpectedReasonCodes -join ",")}},
+    @{Name="RrfTop";Expression={if ($_.rrfTop5.Count -gt 0) { $_.rrfTop5[0] } else { "" }}},
+    @{Name="RerankTop";Expression={if ($_.rerankTop5.Count -gt 0) { $_.rerankTop5[0] } else { "" }}},
+    @{Name="FinalTop";Expression={if ($_.finalDocumentIds.Count -gt 0) { $_.finalDocumentIds[0] } else { "" }}} |
+Format-Table -Wrap -AutoSize
+
+Write-Host ""
+Write-Host "=== Stage Top-K Audit ==="
+$report.stageDiagnostics.diagnostics |
+Select-Object caseName, queryMode, retrievalQuery,
+    @{Name="BM25Top3";Expression={($_.bm25Top3 -join " > ")}},
+    @{Name="VectorTop3";Expression={($_.vectorTop3 -join " > ")}},
+    @{Name="RRFTop5";Expression={($_.rrfTop5 -join " > ")}},
+    @{Name="RerankTop5";Expression={($_.rerankTop5 -join " > ")}} |
+Format-Table -Wrap -AutoSize
 
 $variants = @(
     [PSCustomObject]@{
@@ -156,6 +186,6 @@ Select-Object name, category, passed, noAnswerExpected, noAnswerActual, firstRel
 Format-Table -Wrap -AutoSize
 
 Write-Host ""
-Write-Host "V0.7 Slice 1B calibration report generated."
+Write-Host "V0.7 Slice 1B-2 calibration report generated."
 Write-Host "Candidate-stage metrics are pre-reranker/pre-judge. End-to-end metrics remain separate."
 Write-Host "Do not choose a production RRF k from one metric alone; review Recall@K, MRR, hard cases, and rewrite stability together."

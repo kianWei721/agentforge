@@ -1,0 +1,829 @@
+{
+  "version": "V0.7-GOLD-3",
+  "description": "Evaluation-only synthetic channel-disagreement corpus for V0.7 Slice 1B-2. The corpus is intentionally much larger than the candidate window and contains dense topic-overlapping lexical traps. It is used only for candidate-stage/RRF diagnostics and must never be treated as production device truth.",
+  "documents": [
+    {
+      "id": "eval-offline-procedure",
+      "title": "Prolonged Device Offline Troubleshooting Procedure",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/offline-procedure",
+      "content": "Evaluation-only synthetic knowledge. For a device that has remained offline for a prolonged period, troubleshoot in this order: verify power supply, verify SIM and data-plan status, check cellular coverage, then inspect firmware and runtime health. The procedure is diagnostic guidance and is not proof of a root cause."
+    },
+    {
+      "id": "eval-offline-threshold-policy",
+      "title": "Offline Duration Threshold Policy",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/offline-threshold",
+      "content": "Evaluation-only synthetic knowledge. A prolonged-offline duration threshold is deployment policy, not a universal constant. A tenant or product may configure a duration before the platform labels a device prolonged offline. This document intentionally provides no concrete tenant value."
+    },
+    {
+      "id": "eval-offline-alarm-policy",
+      "title": "Offline Alarm Debounce Policy",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/offline-alarm",
+      "content": "Evaluation-only synthetic knowledge. Offline alarms may apply debounce, repeated-observation windows, notification suppression, and recovery clearing. Alarm policy controls notification behavior and does not define the troubleshooting order or establish a hardware root cause."
+    },
+    {
+      "id": "eval-offline-statistics",
+      "title": "Historical Offline Statistics",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/offline-statistics",
+      "content": "Evaluation-only synthetic knowledge. Historical offline statistics aggregate availability periods, disconnect counts, downtime duration, and recovery time. Historical statistics describe past behavior and do not specify the current troubleshooting sequence."
+    },
+    {
+      "id": "eval-shadow-conflict",
+      "title": "shadowStatus CONFLICT Semantics",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/shadow-conflict",
+      "content": "Evaluation-only synthetic knowledge. shadowStatus CONFLICT means the reported device state and the desired platform shadow state disagree. It is a state-consistency indicator. CONFLICT alone does not prove the device is offline, the broker failed, or a write command failed."
+    },
+    {
+      "id": "eval-shadow-resync",
+      "title": "Device Shadow Resynchronization",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/shadow-resync",
+      "content": "Evaluation-only synthetic knowledge. Shadow resynchronization re-reads authoritative device state and reconciles desired and reported values after a mismatch. Resynchronization is a recovery workflow, not the definition of shadowStatus CONFLICT."
+    },
+    {
+      "id": "eval-shadow-storage",
+      "title": "Device Shadow Persistence Model",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/shadow-storage",
+      "content": "Evaluation-only synthetic knowledge. Device shadow persistence stores desired state, reported state, update timestamps, and revision metadata. This evaluation passage intentionally does not name a concrete MySQL table or physical schema."
+    },
+    {
+      "id": "eval-command-verification",
+      "title": "Device Command Submission and Verification",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/command-verification",
+      "content": "Evaluation-only synthetic knowledge. Successful command submission is not the same as verified device state. After a write command, query authoritative device state with bounded verification attempts. If the expected state is not observed, report verification timeout or mismatch instead of claiming success."
+    },
+    {
+      "id": "eval-signal-strength",
+      "title": "SignalStrength Field Semantics",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/signal-semantics",
+      "content": "Evaluation-only synthetic knowledge. SignalStrength is a stored telemetry field. SignalStrength=0 means the stored field value is zero. Without protocol-specific encoding and freshness rules, zero alone must not be promoted to confirmed no-signal, modem failure, or disconnection."
+    },
+    {
+      "id": "eval-signal-calibration",
+      "title": "Signal Strength Calibration and Units",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/signal-calibration",
+      "content": "Evaluation-only synthetic knowledge. Signal calibration maps raw modem measurements to protocol-specific signal units such as RSSI or RSRP. The mapping and valid ranges depend on the device protocol. This passage intentionally provides no universal conversion formula."
+    },
+    {
+      "id": "eval-signal-alarm-threshold",
+      "title": "Weak Signal Alarm Threshold Policy",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/signal-alarm",
+      "content": "Evaluation-only synthetic knowledge. Weak-signal alarms compare fresh signal measurements with a configured threshold and may require consecutive breaches before alerting. Alarm thresholds are policy and do not define the semantic meaning of SignalStrength=0."
+    },
+    {
+      "id": "eval-cellular-diagnosis",
+      "title": "SIM and Cellular Connectivity Diagnosis",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/cellular-diagnosis",
+      "content": "Evaluation-only synthetic knowledge. For cellular connectivity diagnosis, verify SIM presence and activation, data-plan validity, account suspension, cellular coverage, and modem registration. This passage intentionally does not define a carrier HTTP API endpoint."
+    },
+    {
+      "id": "eval-peripheral-bits",
+      "title": "PeripheralStatus Bit Semantics",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/peripheral-bits",
+      "content": "Evaluation-only synthetic knowledge. PeripheralStatus uses binary flags in this corpus: bit0 is the lure-lamp circuit and bit1 is the camera circuit. For each defined bit, 0 means inactive and 1 means active. No semantics are defined for bit7."
+    },
+    {
+      "id": "eval-peripheral-capability",
+      "title": "Peripheral Capability Matrix",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/peripheral-capability",
+      "content": "Evaluation-only synthetic knowledge. A product capability matrix states whether a device model supports camera, lure lamp, environmental sensor, or other peripherals. Capability means supported hardware or function, not the current 0/1 state of PeripheralStatus."
+    },
+    {
+      "id": "eval-peripheral-health",
+      "title": "Peripheral Health Diagnosis",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/peripheral-health",
+      "content": "Evaluation-only synthetic knowledge. Peripheral health diagnosis checks supply voltage, communication response, recent state transitions, error counters, and physical connection. Health diagnosis does not redefine the bit layout of PeripheralStatus."
+    },
+    {
+      "id": "eval-firmware-runtime",
+      "title": "Firmware and Runtime Health Inspection",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/firmware-runtime",
+      "content": "Evaluation-only synthetic knowledge. Firmware and runtime health inspection reviews reboot counters, watchdog resets, crash logs, process uptime, memory pressure, and the most recent successful telemetry cycle. These observations support diagnosis but do not independently prove root cause."
+    },
+    {
+      "id": "eval-property-snapshot",
+      "title": "Last-saved Property Snapshot Semantics",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/property-snapshot",
+      "content": "Evaluation-only synthetic knowledge. A property snapshot is the last saved state known to the platform. Historical snapshot values are not live telemetry unless timestamps are fresh. queriedAt is query time; snapshotUpdatedAt is the stored snapshot update time."
+    },
+    {
+      "id": "eval-event-history",
+      "title": "Thing-model Event History Semantics",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/event-history",
+      "content": "Evaluation-only synthetic knowledge. Thing-model event history contains device event records returned by the event feed. It is not an alarm feed. An empty result means no event records were returned by that query; it is not proof that no alarm condition ever occurred."
+    },
+    {
+      "id": "eval-alarm-feed",
+      "title": "Alarm Feed Semantics",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/alarm-feed",
+      "content": "Evaluation-only synthetic knowledge. An alarm feed contains alarm records generated by alarm rules, notification state, severity, and recovery information. Alarm records are distinct from generic thing-model device event history."
+    },
+    {
+      "id": "eval-reconnect-backoff",
+      "title": "Connection Retry and Reconnect Backoff",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold2/reconnect-backoff",
+      "content": "Evaluation-only synthetic knowledge. After unexpected connection loss, retry with bounded backoff instead of a tight reconnect loop. Increase delay across repeated failures up to a configured ceiling and reset delay after stable reconnection. This passage intentionally provides no exact ceiling in seconds."
+    },
+    {
+      "id": "eval-offline-trap-01",
+      "title": "Dashboard Badge Copy — offline prolonged offline duration",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/offline-trap/1",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about dashboard badge copy and intentionally repeats retrieval terms: offline prolonged offline duration alarm debounce troubleshooting power SIM network recovery. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the actual troubleshooting order, a concrete duration threshold, alarm debounce semantics, or historical availability formulas."
+    },
+    {
+      "id": "eval-offline-trap-02",
+      "title": "Export Column Mapping — offline prolonged offline duration",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/offline-trap/2",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about export column mapping and intentionally repeats retrieval terms: offline prolonged offline duration alarm debounce troubleshooting power SIM network recovery. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the actual troubleshooting order, a concrete duration threshold, alarm debounce semantics, or historical availability formulas."
+    },
+    {
+      "id": "eval-offline-trap-03",
+      "title": "Notification Template — offline prolonged offline duration",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/offline-trap/3",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about notification template and intentionally repeats retrieval terms: offline prolonged offline duration alarm debounce troubleshooting power SIM network recovery. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the actual troubleshooting order, a concrete duration threshold, alarm debounce semantics, or historical availability formulas."
+    },
+    {
+      "id": "eval-offline-trap-04",
+      "title": "Maintenance Calendar Note — offline prolonged offline duration",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/offline-trap/4",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about maintenance calendar note and intentionally repeats retrieval terms: offline prolonged offline duration alarm debounce troubleshooting power SIM network recovery. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the actual troubleshooting order, a concrete duration threshold, alarm debounce semantics, or historical availability formulas."
+    },
+    {
+      "id": "eval-offline-trap-05",
+      "title": "Availability SLA Label — offline prolonged offline duration",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/offline-trap/5",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about availability sla label and intentionally repeats retrieval terms: offline prolonged offline duration alarm debounce troubleshooting power SIM network recovery. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the actual troubleshooting order, a concrete duration threshold, alarm debounce semantics, or historical availability formulas."
+    },
+    {
+      "id": "eval-offline-trap-06",
+      "title": "Operator Search Synonyms — offline prolonged offline duration",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/offline-trap/6",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about operator search synonyms and intentionally repeats retrieval terms: offline prolonged offline duration alarm debounce troubleshooting power SIM network recovery. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the actual troubleshooting order, a concrete duration threshold, alarm debounce semantics, or historical availability formulas."
+    },
+    {
+      "id": "eval-offline-trap-07",
+      "title": "Retention Policy Metadata — offline prolonged offline duration",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/offline-trap/7",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about retention policy metadata and intentionally repeats retrieval terms: offline prolonged offline duration alarm debounce troubleshooting power SIM network recovery. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the actual troubleshooting order, a concrete duration threshold, alarm debounce semantics, or historical availability formulas."
+    },
+    {
+      "id": "eval-offline-trap-08",
+      "title": "Report Header Localization — offline prolonged offline duration",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/offline-trap/8",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about report header localization and intentionally repeats retrieval terms: offline prolonged offline duration alarm debounce troubleshooting power SIM network recovery. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the actual troubleshooting order, a concrete duration threshold, alarm debounce semantics, or historical availability formulas."
+    },
+    {
+      "id": "eval-offline-trap-09",
+      "title": "Device Tag Taxonomy — offline prolonged offline duration",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/offline-trap/9",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about device tag taxonomy and intentionally repeats retrieval terms: offline prolonged offline duration alarm debounce troubleshooting power SIM network recovery. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the actual troubleshooting order, a concrete duration threshold, alarm debounce semantics, or historical availability formulas."
+    },
+    {
+      "id": "eval-offline-trap-10",
+      "title": "Offline Queue Audit — offline prolonged offline duration",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/offline-trap/10",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about offline queue audit and intentionally repeats retrieval terms: offline prolonged offline duration alarm debounce troubleshooting power SIM network recovery. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the actual troubleshooting order, a concrete duration threshold, alarm debounce semantics, or historical availability formulas."
+    },
+    {
+      "id": "eval-shadow-trap-01",
+      "title": "Audit Log Presentation — shadowStatus CONFLICT desired reported",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/shadow-trap/1",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about audit log presentation and intentionally repeats retrieval terms: shadowStatus CONFLICT desired reported state mismatch revision resynchronization write command. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the definition of CONFLICT, the resynchronization procedure, a physical MySQL table, or command verification semantics."
+    },
+    {
+      "id": "eval-shadow-trap-02",
+      "title": "UI Conflict Badge — shadowStatus CONFLICT desired reported",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/shadow-trap/2",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about ui conflict badge and intentionally repeats retrieval terms: shadowStatus CONFLICT desired reported state mismatch revision resynchronization write command. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the definition of CONFLICT, the resynchronization procedure, a physical MySQL table, or command verification semantics."
+    },
+    {
+      "id": "eval-shadow-trap-03",
+      "title": "Export Schema — shadowStatus CONFLICT desired reported",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/shadow-trap/3",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about export schema and intentionally repeats retrieval terms: shadowStatus CONFLICT desired reported state mismatch revision resynchronization write command. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the definition of CONFLICT, the resynchronization procedure, a physical MySQL table, or command verification semantics."
+    },
+    {
+      "id": "eval-shadow-trap-04",
+      "title": "Revision Dashboard — shadowStatus CONFLICT desired reported",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/shadow-trap/4",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about revision dashboard and intentionally repeats retrieval terms: shadowStatus CONFLICT desired reported state mismatch revision resynchronization write command. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the definition of CONFLICT, the resynchronization procedure, a physical MySQL table, or command verification semantics."
+    },
+    {
+      "id": "eval-shadow-trap-05",
+      "title": "Search Synonym Map — shadowStatus CONFLICT desired reported",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/shadow-trap/5",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about search synonym map and intentionally repeats retrieval terms: shadowStatus CONFLICT desired reported state mismatch revision resynchronization write command. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the definition of CONFLICT, the resynchronization procedure, a physical MySQL table, or command verification semantics."
+    },
+    {
+      "id": "eval-shadow-trap-06",
+      "title": "Permission Matrix — shadowStatus CONFLICT desired reported",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/shadow-trap/6",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about permission matrix and intentionally repeats retrieval terms: shadowStatus CONFLICT desired reported state mismatch revision resynchronization write command. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the definition of CONFLICT, the resynchronization procedure, a physical MySQL table, or command verification semantics."
+    },
+    {
+      "id": "eval-shadow-trap-07",
+      "title": "Conflict Counter Widget — shadowStatus CONFLICT desired reported",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/shadow-trap/7",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about conflict counter widget and intentionally repeats retrieval terms: shadowStatus CONFLICT desired reported state mismatch revision resynchronization write command. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the definition of CONFLICT, the resynchronization procedure, a physical MySQL table, or command verification semantics."
+    },
+    {
+      "id": "eval-shadow-trap-08",
+      "title": "Change History View — shadowStatus CONFLICT desired reported",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/shadow-trap/8",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about change history view and intentionally repeats retrieval terms: shadowStatus CONFLICT desired reported state mismatch revision resynchronization write command. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the definition of CONFLICT, the resynchronization procedure, a physical MySQL table, or command verification semantics."
+    },
+    {
+      "id": "eval-shadow-trap-09",
+      "title": "Operator Notification Copy — shadowStatus CONFLICT desired reported",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/shadow-trap/9",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about operator notification copy and intentionally repeats retrieval terms: shadowStatus CONFLICT desired reported state mismatch revision resynchronization write command. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the definition of CONFLICT, the resynchronization procedure, a physical MySQL table, or command verification semantics."
+    },
+    {
+      "id": "eval-shadow-trap-10",
+      "title": "Shadow Cache Metrics — shadowStatus CONFLICT desired reported",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/shadow-trap/10",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about shadow cache metrics and intentionally repeats retrieval terms: shadowStatus CONFLICT desired reported state mismatch revision resynchronization write command. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the definition of CONFLICT, the resynchronization procedure, a physical MySQL table, or command verification semantics."
+    },
+    {
+      "id": "eval-signal-trap-01",
+      "title": "Chart Legend — SignalStrength=0 SignalStrength signal zero",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/signal-trap/1",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about chart legend and intentionally repeats retrieval terms: SignalStrength=0 SignalStrength signal zero modem failure disconnect weak signal threshold RSSI RSRP calibration. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the semantic meaning of SignalStrength=0, a universal RSSI/RSRP conversion, weak-signal alarm policy, or cellular diagnosis procedure."
+    },
+    {
+      "id": "eval-signal-trap-02",
+      "title": "CSV Export Mapping — SignalStrength=0 SignalStrength signal zero",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/signal-trap/2",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about csv export mapping and intentionally repeats retrieval terms: SignalStrength=0 SignalStrength signal zero modem failure disconnect weak signal threshold RSSI RSRP calibration. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the semantic meaning of SignalStrength=0, a universal RSSI/RSRP conversion, weak-signal alarm policy, or cellular diagnosis procedure."
+    },
+    {
+      "id": "eval-signal-trap-03",
+      "title": "UI Zero-value Formatting — SignalStrength=0 SignalStrength signal zero",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/signal-trap/3",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about ui zero-value formatting and intentionally repeats retrieval terms: SignalStrength=0 SignalStrength signal zero modem failure disconnect weak signal threshold RSSI RSRP calibration. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the semantic meaning of SignalStrength=0, a universal RSSI/RSRP conversion, weak-signal alarm policy, or cellular diagnosis procedure."
+    },
+    {
+      "id": "eval-signal-trap-04",
+      "title": "Histogram Report — SignalStrength=0 SignalStrength signal zero",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/signal-trap/4",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about histogram report and intentionally repeats retrieval terms: SignalStrength=0 SignalStrength signal zero modem failure disconnect weak signal threshold RSSI RSRP calibration. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the semantic meaning of SignalStrength=0, a universal RSSI/RSRP conversion, weak-signal alarm policy, or cellular diagnosis procedure."
+    },
+    {
+      "id": "eval-signal-trap-05",
+      "title": "Data Retention Metadata — SignalStrength=0 SignalStrength signal zero",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/signal-trap/5",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about data retention metadata and intentionally repeats retrieval terms: SignalStrength=0 SignalStrength signal zero modem failure disconnect weak signal threshold RSSI RSRP calibration. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the semantic meaning of SignalStrength=0, a universal RSSI/RSRP conversion, weak-signal alarm policy, or cellular diagnosis procedure."
+    },
+    {
+      "id": "eval-signal-trap-06",
+      "title": "Telemetry Search Keywords — SignalStrength=0 SignalStrength signal zero",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/signal-trap/6",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about telemetry search keywords and intentionally repeats retrieval terms: SignalStrength=0 SignalStrength signal zero modem failure disconnect weak signal threshold RSSI RSRP calibration. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the semantic meaning of SignalStrength=0, a universal RSSI/RSRP conversion, weak-signal alarm policy, or cellular diagnosis procedure."
+    },
+    {
+      "id": "eval-signal-trap-07",
+      "title": "Alarm Message Copy — SignalStrength=0 SignalStrength signal zero",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/signal-trap/7",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about alarm message copy and intentionally repeats retrieval terms: SignalStrength=0 SignalStrength signal zero modem failure disconnect weak signal threshold RSSI RSRP calibration. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the semantic meaning of SignalStrength=0, a universal RSSI/RSRP conversion, weak-signal alarm policy, or cellular diagnosis procedure."
+    },
+    {
+      "id": "eval-signal-trap-08",
+      "title": "Dashboard Card — SignalStrength=0 SignalStrength signal zero",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/signal-trap/8",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about dashboard card and intentionally repeats retrieval terms: SignalStrength=0 SignalStrength signal zero modem failure disconnect weak signal threshold RSSI RSRP calibration. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the semantic meaning of SignalStrength=0, a universal RSSI/RSRP conversion, weak-signal alarm policy, or cellular diagnosis procedure."
+    },
+    {
+      "id": "eval-signal-trap-09",
+      "title": "Null-versus-Zero Display — SignalStrength=0 SignalStrength signal zero",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/signal-trap/9",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about null-versus-zero display and intentionally repeats retrieval terms: SignalStrength=0 SignalStrength signal zero modem failure disconnect weak signal threshold RSSI RSRP calibration. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the semantic meaning of SignalStrength=0, a universal RSSI/RSRP conversion, weak-signal alarm policy, or cellular diagnosis procedure."
+    },
+    {
+      "id": "eval-signal-trap-10",
+      "title": "Signal Field Localization — SignalStrength=0 SignalStrength signal zero",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/signal-trap/10",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about signal field localization and intentionally repeats retrieval terms: SignalStrength=0 SignalStrength signal zero modem failure disconnect weak signal threshold RSSI RSRP calibration. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the semantic meaning of SignalStrength=0, a universal RSSI/RSRP conversion, weak-signal alarm policy, or cellular diagnosis procedure."
+    },
+    {
+      "id": "eval-peripheral-trap-01",
+      "title": "Inventory Export — PeripheralStatus bit0 bit1 bit7",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/peripheral-trap/1",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about inventory export and intentionally repeats retrieval terms: PeripheralStatus bit0 bit1 bit7 0/1 camera lure lamp capability active supported health. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the bit layout, the 0/1 runtime state semantics, the capability-versus-state distinction, or peripheral health procedure."
+    },
+    {
+      "id": "eval-peripheral-trap-02",
+      "title": "UI Label Mapping — PeripheralStatus bit0 bit1 bit7",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/peripheral-trap/2",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about ui label mapping and intentionally repeats retrieval terms: PeripheralStatus bit0 bit1 bit7 0/1 camera lure lamp capability active supported health. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the bit layout, the 0/1 runtime state semantics, the capability-versus-state distinction, or peripheral health procedure."
+    },
+    {
+      "id": "eval-peripheral-trap-03",
+      "title": "Capability Search Keywords — PeripheralStatus bit0 bit1 bit7",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/peripheral-trap/3",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about capability search keywords and intentionally repeats retrieval terms: PeripheralStatus bit0 bit1 bit7 0/1 camera lure lamp capability active supported health. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the bit layout, the 0/1 runtime state semantics, the capability-versus-state distinction, or peripheral health procedure."
+    },
+    {
+      "id": "eval-peripheral-trap-04",
+      "title": "Maintenance Ticket Template — PeripheralStatus bit0 bit1 bit7",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/peripheral-trap/4",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about maintenance ticket template and intentionally repeats retrieval terms: PeripheralStatus bit0 bit1 bit7 0/1 camera lure lamp capability active supported health. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the bit layout, the 0/1 runtime state semantics, the capability-versus-state distinction, or peripheral health procedure."
+    },
+    {
+      "id": "eval-peripheral-trap-05",
+      "title": "Dashboard Tile — PeripheralStatus bit0 bit1 bit7",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/peripheral-trap/5",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about dashboard tile and intentionally repeats retrieval terms: PeripheralStatus bit0 bit1 bit7 0/1 camera lure lamp capability active supported health. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the bit layout, the 0/1 runtime state semantics, the capability-versus-state distinction, or peripheral health procedure."
+    },
+    {
+      "id": "eval-peripheral-trap-06",
+      "title": "State History Column — PeripheralStatus bit0 bit1 bit7",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/peripheral-trap/6",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about state history column and intentionally repeats retrieval terms: PeripheralStatus bit0 bit1 bit7 0/1 camera lure lamp capability active supported health. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the bit layout, the 0/1 runtime state semantics, the capability-versus-state distinction, or peripheral health procedure."
+    },
+    {
+      "id": "eval-peripheral-trap-07",
+      "title": "Alert Message Copy — PeripheralStatus bit0 bit1 bit7",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/peripheral-trap/7",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about alert message copy and intentionally repeats retrieval terms: PeripheralStatus bit0 bit1 bit7 0/1 camera lure lamp capability active supported health. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the bit layout, the 0/1 runtime state semantics, the capability-versus-state distinction, or peripheral health procedure."
+    },
+    {
+      "id": "eval-peripheral-trap-08",
+      "title": "Analytics Dimension — PeripheralStatus bit0 bit1 bit7",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/peripheral-trap/8",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about analytics dimension and intentionally repeats retrieval terms: PeripheralStatus bit0 bit1 bit7 0/1 camera lure lamp capability active supported health. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the bit layout, the 0/1 runtime state semantics, the capability-versus-state distinction, or peripheral health procedure."
+    },
+    {
+      "id": "eval-peripheral-trap-09",
+      "title": "Localization Glossary — PeripheralStatus bit0 bit1 bit7",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/peripheral-trap/9",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about localization glossary and intentionally repeats retrieval terms: PeripheralStatus bit0 bit1 bit7 0/1 camera lure lamp capability active supported health. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the bit layout, the 0/1 runtime state semantics, the capability-versus-state distinction, or peripheral health procedure."
+    },
+    {
+      "id": "eval-peripheral-trap-10",
+      "title": "Peripheral Filter Preset — PeripheralStatus bit0 bit1 bit7",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/peripheral-trap/10",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about peripheral filter preset and intentionally repeats retrieval terms: PeripheralStatus bit0 bit1 bit7 0/1 camera lure lamp capability active supported health. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the bit layout, the 0/1 runtime state semantics, the capability-versus-state distinction, or peripheral health procedure."
+    },
+    {
+      "id": "eval-event-trap-01",
+      "title": "Event Search Index — thing-model event history alarm",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/event-trap/1",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about event search index and intentionally repeats retrieval terms: thing-model event history alarm feed severity notification state recovery empty result event records. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define event-history semantics, alarm-feed semantics, the meaning of an empty event query, or alarm rule behavior."
+    },
+    {
+      "id": "eval-event-trap-02",
+      "title": "CSV Export Columns — thing-model event history alarm",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/event-trap/2",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about csv export columns and intentionally repeats retrieval terms: thing-model event history alarm feed severity notification state recovery empty result event records. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define event-history semantics, alarm-feed semantics, the meaning of an empty event query, or alarm rule behavior."
+    },
+    {
+      "id": "eval-event-trap-03",
+      "title": "Retention Metadata — thing-model event history alarm",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/event-trap/3",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about retention metadata and intentionally repeats retrieval terms: thing-model event history alarm feed severity notification state recovery empty result event records. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define event-history semantics, alarm-feed semantics, the meaning of an empty event query, or alarm rule behavior."
+    },
+    {
+      "id": "eval-event-trap-04",
+      "title": "UI Tab Labels — thing-model event history alarm",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/event-trap/4",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about ui tab labels and intentionally repeats retrieval terms: thing-model event history alarm feed severity notification state recovery empty result event records. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define event-history semantics, alarm-feed semantics, the meaning of an empty event query, or alarm rule behavior."
+    },
+    {
+      "id": "eval-event-trap-05",
+      "title": "Dashboard Counter — thing-model event history alarm",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/event-trap/5",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about dashboard counter and intentionally repeats retrieval terms: thing-model event history alarm feed severity notification state recovery empty result event records. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define event-history semantics, alarm-feed semantics, the meaning of an empty event query, or alarm rule behavior."
+    },
+    {
+      "id": "eval-event-trap-06",
+      "title": "Notification Copy — thing-model event history alarm",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/event-trap/6",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about notification copy and intentionally repeats retrieval terms: thing-model event history alarm feed severity notification state recovery empty result event records. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define event-history semantics, alarm-feed semantics, the meaning of an empty event query, or alarm rule behavior."
+    },
+    {
+      "id": "eval-event-trap-07",
+      "title": "Severity Color Legend — thing-model event history alarm",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/event-trap/7",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about severity color legend and intentionally repeats retrieval terms: thing-model event history alarm feed severity notification state recovery empty result event records. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define event-history semantics, alarm-feed semantics, the meaning of an empty event query, or alarm rule behavior."
+    },
+    {
+      "id": "eval-event-trap-08",
+      "title": "Recovery Summary Header — thing-model event history alarm",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/event-trap/8",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about recovery summary header and intentionally repeats retrieval terms: thing-model event history alarm feed severity notification state recovery empty result event records. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define event-history semantics, alarm-feed semantics, the meaning of an empty event query, or alarm rule behavior."
+    },
+    {
+      "id": "eval-event-trap-09",
+      "title": "Correlation Report — thing-model event history alarm",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/event-trap/9",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about correlation report and intentionally repeats retrieval terms: thing-model event history alarm feed severity notification state recovery empty result event records. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define event-history semantics, alarm-feed semantics, the meaning of an empty event query, or alarm rule behavior."
+    },
+    {
+      "id": "eval-event-trap-10",
+      "title": "Operator Filter Preset — thing-model event history alarm",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/event-trap/10",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about operator filter preset and intentionally repeats retrieval terms: thing-model event history alarm feed severity notification state recovery empty result event records. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define event-history semantics, alarm-feed semantics, the meaning of an empty event query, or alarm rule behavior."
+    },
+    {
+      "id": "eval-network-trap-01",
+      "title": "Connection Log Columns — unexpected connection loss reconnect",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/network-trap/1",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about connection log columns and intentionally repeats retrieval terms: unexpected connection loss reconnect backoff retry tight reconnect loop ceiling reset delay stable connection command timeout verification. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the reconnect-backoff procedure, the exact ceiling, the reset condition, or device command verification workflow."
+    },
+    {
+      "id": "eval-network-trap-02",
+      "title": "Retry Dashboard — unexpected connection loss reconnect",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/network-trap/2",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about retry dashboard and intentionally repeats retrieval terms: unexpected connection loss reconnect backoff retry tight reconnect loop ceiling reset delay stable connection command timeout verification. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the reconnect-backoff procedure, the exact ceiling, the reset condition, or device command verification workflow."
+    },
+    {
+      "id": "eval-network-trap-03",
+      "title": "Timeout Metric Label — unexpected connection loss reconnect",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/network-trap/3",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about timeout metric label and intentionally repeats retrieval terms: unexpected connection loss reconnect backoff retry tight reconnect loop ceiling reset delay stable connection command timeout verification. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the reconnect-backoff procedure, the exact ceiling, the reset condition, or device command verification workflow."
+    },
+    {
+      "id": "eval-network-trap-04",
+      "title": "Connection History Export — unexpected connection loss reconnect",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/network-trap/4",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about connection history export and intentionally repeats retrieval terms: unexpected connection loss reconnect backoff retry tight reconnect loop ceiling reset delay stable connection command timeout verification. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the reconnect-backoff procedure, the exact ceiling, the reset condition, or device command verification workflow."
+    },
+    {
+      "id": "eval-network-trap-05",
+      "title": "Operator Search Terms — unexpected connection loss reconnect",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/network-trap/5",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about operator search terms and intentionally repeats retrieval terms: unexpected connection loss reconnect backoff retry tight reconnect loop ceiling reset delay stable connection command timeout verification. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the reconnect-backoff procedure, the exact ceiling, the reset condition, or device command verification workflow."
+    },
+    {
+      "id": "eval-network-trap-06",
+      "title": "SLA Report — unexpected connection loss reconnect",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/network-trap/6",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about sla report and intentionally repeats retrieval terms: unexpected connection loss reconnect backoff retry tight reconnect loop ceiling reset delay stable connection command timeout verification. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the reconnect-backoff procedure, the exact ceiling, the reset condition, or device command verification workflow."
+    },
+    {
+      "id": "eval-network-trap-07",
+      "title": "Alert Copy — unexpected connection loss reconnect",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/network-trap/7",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about alert copy and intentionally repeats retrieval terms: unexpected connection loss reconnect backoff retry tight reconnect loop ceiling reset delay stable connection command timeout verification. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the reconnect-backoff procedure, the exact ceiling, the reset condition, or device command verification workflow."
+    },
+    {
+      "id": "eval-network-trap-08",
+      "title": "Configuration UI Help — unexpected connection loss reconnect",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/network-trap/8",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about configuration ui help and intentionally repeats retrieval terms: unexpected connection loss reconnect backoff retry tight reconnect loop ceiling reset delay stable connection command timeout verification. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the reconnect-backoff procedure, the exact ceiling, the reset condition, or device command verification workflow."
+    },
+    {
+      "id": "eval-network-trap-09",
+      "title": "Retry Counter Widget — unexpected connection loss reconnect",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/network-trap/9",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about retry counter widget and intentionally repeats retrieval terms: unexpected connection loss reconnect backoff retry tight reconnect loop ceiling reset delay stable connection command timeout verification. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the reconnect-backoff procedure, the exact ceiling, the reset condition, or device command verification workflow."
+    },
+    {
+      "id": "eval-network-trap-10",
+      "title": "Network Session Audit — unexpected connection loss reconnect",
+      "sourceType": "TEST",
+      "sourceRef": "eval://v0.7/gold3/network-trap/10",
+      "content": "Evaluation-only synthetic lexical hard negative. This document is about network session audit and intentionally repeats retrieval terms: unexpected connection loss reconnect backoff retry tight reconnect loop ceiling reset delay stable connection command timeout verification. It is metadata, UI, reporting, or operational presentation material. It explicitly does not define the reconnect-backoff procedure, the exact ceiling, the reset condition, or device command verification workflow."
+    }
+  ],
+  "cases": [
+    {
+      "name": "offline-order-zh",
+      "category": "offline",
+      "query": "设备长期离线时，应该按什么顺序排查？",
+      "expectedDocumentIds": [
+        "eval-offline-procedure"
+      ]
+    },
+    {
+      "name": "offline-order-colloquial",
+      "category": "offline",
+      "query": "设备掉线很久了，先查电还是先查网络，完整顺序是什么？",
+      "expectedDocumentIds": [
+        "eval-offline-procedure"
+      ]
+    },
+    {
+      "name": "offline-threshold-policy",
+      "category": "offline",
+      "query": "长期离线的时间阈值是固定常量还是部署策略？",
+      "expectedDocumentIds": [
+        "eval-offline-threshold-policy"
+      ]
+    },
+    {
+      "name": "offline-alarm-debounce",
+      "category": "offline",
+      "query": "离线告警为什么要做 debounce 和重复观察窗口？",
+      "expectedDocumentIds": [
+        "eval-offline-alarm-policy"
+      ]
+    },
+    {
+      "name": "offline-history-purpose",
+      "category": "offline",
+      "query": "disconnect count、downtime duration 这些历史指标属于哪类知识？",
+      "expectedDocumentIds": [
+        "eval-offline-statistics"
+      ]
+    },
+    {
+      "name": "shadow-conflict-meaning",
+      "category": "shadow",
+      "query": "shadowStatus CONFLICT 的准确语义是什么？",
+      "expectedDocumentIds": [
+        "eval-shadow-conflict"
+      ]
+    },
+    {
+      "name": "shadow-conflict-offline-proof",
+      "category": "shadow",
+      "query": "shadowStatus CONFLICT 能直接证明设备已经离线吗？",
+      "expectedDocumentIds": [
+        "eval-shadow-conflict"
+      ]
+    },
+    {
+      "name": "shadow-resync-purpose",
+      "category": "shadow",
+      "query": "desired state 和 reported state 不一致后，shadow resynchronization 是做什么的？",
+      "expectedDocumentIds": [
+        "eval-shadow-resync"
+      ]
+    },
+    {
+      "name": "shadow-storage-fields",
+      "category": "shadow",
+      "query": "设备 shadow 持久化通常保存 desired、reported、revision 这类什么信息？",
+      "expectedDocumentIds": [
+        "eval-shadow-storage"
+      ]
+    },
+    {
+      "name": "command-submit-vs-verify",
+      "category": "command",
+      "query": "命令提交成功是否等于设备最终状态已经验证成功？",
+      "expectedDocumentIds": [
+        "eval-command-verification"
+      ]
+    },
+    {
+      "name": "command-verification-flow",
+      "category": "command",
+      "query": "write command 之后应该怎样做 bounded verification？",
+      "expectedDocumentIds": [
+        "eval-command-verification"
+      ]
+    },
+    {
+      "name": "signal-zero-meaning",
+      "category": "signal",
+      "query": "SignalStrength=0 在当前知识语义里到底代表什么？",
+      "expectedDocumentIds": [
+        "eval-signal-strength"
+      ]
+    },
+    {
+      "name": "signal-zero-disconnect-proof",
+      "category": "signal",
+      "query": "SignalStrength=0 能不能直接确认 modem failure 或断网？",
+      "expectedDocumentIds": [
+        "eval-signal-strength"
+      ]
+    },
+    {
+      "name": "signal-calibration",
+      "category": "signal",
+      "query": "raw modem measurement 到 RSSI 或 RSRP 的 calibration 属于什么规则？",
+      "expectedDocumentIds": [
+        "eval-signal-calibration"
+      ]
+    },
+    {
+      "name": "weak-signal-alarm",
+      "category": "signal",
+      "query": "弱信号告警为什么会用 threshold 和 consecutive breaches？",
+      "expectedDocumentIds": [
+        "eval-signal-alarm-threshold"
+      ]
+    },
+    {
+      "name": "sim-connectivity-checks",
+      "category": "cellular",
+      "query": "蜂窝连接异常时 SIM、套餐、覆盖和 modem registration 应该检查哪些内容？",
+      "expectedDocumentIds": [
+        "eval-cellular-diagnosis"
+      ]
+    },
+    {
+      "name": "peripheral-bit-layout",
+      "category": "peripheral",
+      "query": "PeripheralStatus 的 bit0 和 bit1 分别对应什么？",
+      "expectedDocumentIds": [
+        "eval-peripheral-bits"
+      ]
+    },
+    {
+      "name": "peripheral-zero-one",
+      "category": "peripheral",
+      "query": "PeripheralStatus 已定义 bit 的 0/1 是 active 还是 supported capability？",
+      "expectedDocumentIds": [
+        "eval-peripheral-bits"
+      ]
+    },
+    {
+      "name": "capability-vs-state",
+      "category": "peripheral",
+      "query": "device capability matrix 表示支持 camera，是否等同于 camera 当前状态为 1？",
+      "expectedDocumentIds": [
+        "eval-peripheral-capability"
+      ]
+    },
+    {
+      "name": "peripheral-health-checks",
+      "category": "peripheral",
+      "query": "外设健康排查要看 supply voltage、error counters 和 physical connection 吗？",
+      "expectedDocumentIds": [
+        "eval-peripheral-health"
+      ]
+    },
+    {
+      "name": "firmware-runtime-health",
+      "category": "runtime",
+      "query": "watchdog reset、crash log、process uptime 属于哪类运行健康检查？",
+      "expectedDocumentIds": [
+        "eval-firmware-runtime"
+      ]
+    },
+    {
+      "name": "snapshot-not-live",
+      "category": "snapshot",
+      "query": "last saved property snapshot 为什么不能直接当实时 telemetry？",
+      "expectedDocumentIds": [
+        "eval-property-snapshot"
+      ]
+    },
+    {
+      "name": "snapshot-timestamp-difference",
+      "category": "snapshot",
+      "query": "queriedAt 与 snapshotUpdatedAt 的时间语义有什么区别？",
+      "expectedDocumentIds": [
+        "eval-property-snapshot"
+      ]
+    },
+    {
+      "name": "event-history-vs-alarm",
+      "category": "event",
+      "query": "thing-model event history 和 alarm feed 是一回事吗？",
+      "expectedDocumentIds": [
+        "eval-event-history",
+        "eval-alarm-feed"
+      ]
+    },
+    {
+      "name": "event-empty-boundary",
+      "category": "event",
+      "query": "event history 返回空能证明历史上从来没有告警吗？",
+      "expectedDocumentIds": [
+        "eval-event-history"
+      ]
+    },
+    {
+      "name": "alarm-feed-purpose",
+      "category": "alarm",
+      "query": "severity、notification state、recovery information 属于 event history 还是 alarm feed？",
+      "expectedDocumentIds": [
+        "eval-alarm-feed"
+      ]
+    },
+    {
+      "name": "reconnect-backoff-purpose",
+      "category": "network",
+      "query": "unexpected connection loss 后为什么不应该 tight reconnect loop？",
+      "expectedDocumentIds": [
+        "eval-reconnect-backoff"
+      ]
+    },
+    {
+      "name": "reconnect-backoff-reset",
+      "category": "network",
+      "query": "什么时候应该 reset reconnect backoff delay？",
+      "expectedDocumentIds": [
+        "eval-reconnect-backoff"
+      ]
+    },
+    {
+      "name": "noanswer-tenant-offline-minutes",
+      "category": "no-answer",
+      "query": "tenant 135 的长期离线阈值具体配置为多少分钟？",
+      "expectedDocumentIds": []
+    },
+    {
+      "name": "noanswer-shadow-table",
+      "category": "no-answer",
+      "query": "shadowStatus CONFLICT 具体存在哪一张 MySQL 表？",
+      "expectedDocumentIds": []
+    },
+    {
+      "name": "noanswer-carrier-api",
+      "category": "no-answer",
+      "query": "查询 SIM 剩余流量的 carrier HTTP API endpoint 是什么？",
+      "expectedDocumentIds": []
+    },
+    {
+      "name": "noanswer-peripheral-bit7",
+      "category": "no-answer",
+      "query": "PeripheralStatus 的 bit7 精确表示什么？",
+      "expectedDocumentIds": []
+    },
+    {
+      "name": "noanswer-signal-formula",
+      "category": "no-answer",
+      "query": "SignalStrength raw value 转 RSRP 的通用精确公式是什么？",
+      "expectedDocumentIds": []
+    },
+    {
+      "name": "noanswer-backoff-ceiling",
+      "category": "no-answer",
+      "query": "reconnect backoff ceiling 精确是多少秒？",
+      "expectedDocumentIds": []
+    }
+  ]
+}

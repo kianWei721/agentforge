@@ -10,7 +10,7 @@ public class KnowledgeEvaluationProperties {
 
     private boolean enabled;
     private String indexName = "agentforge-knowledge-eval-v070";
-    private String datasetResource = "classpath:knowledge/eval/v070-gold-dataset-v2.json";
+    private String datasetResource = "classpath:knowledge/eval/v070-gold-dataset-v3.json";
     private int topK = 5;
     // Sweep spans materially different rank-decay regimes for the current
     // candidate window (20): head-heavy (5), window-scale (20), literature
