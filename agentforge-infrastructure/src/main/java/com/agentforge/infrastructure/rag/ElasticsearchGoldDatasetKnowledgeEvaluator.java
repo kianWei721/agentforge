@@ -1036,7 +1036,7 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
 
         return summarizeVariant(
                 variant,
-                retrievalMode,
+                retriever.mode(),
                 results);
     }
 
@@ -1096,7 +1096,7 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
 
         return new KnowledgeEvaluationVariantReport(
                 variant,
-                retriever.mode(),
+                retrievalMode,
                 answerableCases,
                 noAnswerCases,
                 ratio(hitAt1, answerableCases),
