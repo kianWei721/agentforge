@@ -46,6 +46,9 @@ import org.springframework.core.io.ResourceLoader;
 
 public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEvaluator {
 
+    private static final int EVALUATION_REWRITE_MAX_ATTEMPTS = 2;
+    private static final long EVALUATION_REWRITE_RETRY_DELAY_MS = 500L;
+
     private final EmbeddingProvider embeddingProvider;
     private final KnowledgeSearchBackend backend;
     private final KnowledgeHybridProperties hybridProperties;
@@ -104,10 +107,17 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
     @Override
     public KnowledgeEvaluationReport run() {
         long started = System.nanoTime();
+
+        // Build one deterministic rewrite plan before mutating the isolated evaluation index.
+        // The same rewritten query is replayed across candidate, end-to-end, and diagnostics
+        // so controlled A/B comparisons do not depend on repeated provider calls.
+        Map<String, KnowledgeQueryRewriteResult> rewritePlan =
+                prepareRewritePlan();
+
         indexDataset();
 
         KnowledgeCandidateBenchmarkReport candidateBenchmark =
-                evaluateCandidateBenchmark();
+                evaluateCandidateBenchmark(rewritePlan);
 
         KnowledgeChannelStrategyConfirmationReport channelStrategyConfirmation =
                 KnowledgeChannelStrategyAnalyzer.analyze(
@@ -120,10 +130,16 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
         KnowledgeEvaluationVariantReport baseline =
                 evaluateVariant("HYBRID_BASELINE", null);
         KnowledgeEvaluationVariantReport rewrite =
-                evaluateVariant("HYBRID_REWRITE", queryRewriter);
+                evaluateVariant(
+                        "HYBRID_REWRITE",
+                        replayRewriter(rewritePlan));
 
         KnowledgeStageDiagnosticsReport stageDiagnostics =
-                evaluateStageDiagnostics(candidateBenchmark, baseline, rewrite);
+                evaluateStageDiagnostics(
+                        candidateBenchmark,
+                        baseline,
+                        rewrite,
+                        rewritePlan);
 
         return new KnowledgeEvaluationReport(
                 dataset.version(),
@@ -195,7 +211,8 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
         backend.refresh();
     }
 
-    private KnowledgeCandidateBenchmarkReport evaluateCandidateBenchmark() {
+    private KnowledgeCandidateBenchmarkReport evaluateCandidateBenchmark(
+            Map<String, KnowledgeQueryRewriteResult> rewritePlan) {
         int candidateWindow =
                 Math.min(
                         100,
@@ -221,7 +238,8 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
 
             CandidateChannels original =
                     candidateChannels(testCase.query(), candidateWindow);
-            String rewrittenQuery = rewriteForEvaluation(testCase.query());
+            String rewrittenQuery =
+                    rewriteForEvaluation(testCase, rewritePlan);
             CandidateChannels rewritten =
                     candidateChannels(rewrittenQuery, candidateWindow);
 
@@ -368,20 +386,121 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
                 backend.searchVector(vectors.get(0), candidateWindow));
     }
 
-    private String rewriteForEvaluation(String originalQuery) {
-        try {
-            KnowledgeQueryRewriteResult result = queryRewriter.rewrite(originalQuery);
-            if (result == null
-                    || result.retrievalQuery() == null
-                    || result.retrievalQuery().isBlank()) {
-                throw new IllegalStateException("query rewriter returned invalid result");
+    private Map<String, KnowledgeQueryRewriteResult> prepareRewritePlan() {
+        Map<String, KnowledgeQueryRewriteResult> plan = new LinkedHashMap<>();
+        for (KnowledgeEvaluationCase testCase : dataset.cases()) {
+            String originalQuery = testCase.query();
+            if (plan.containsKey(originalQuery)) {
+                continue;
             }
-            return result.retrievalQuery();
-        } catch (RuntimeException exception) {
+            plan.put(
+                    originalQuery,
+                    rewriteWithEvaluationRetry(testCase));
+        }
+        return Map.copyOf(plan);
+    }
+
+    private KnowledgeQueryRewriteResult rewriteWithEvaluationRetry(
+            KnowledgeEvaluationCase testCase) {
+        RuntimeException lastFailure = null;
+
+        for (int attempt = 1; attempt <= EVALUATION_REWRITE_MAX_ATTEMPTS; attempt++) {
+            try {
+                KnowledgeQueryRewriteResult result =
+                        queryRewriter.rewrite(testCase.query());
+                validateRewriteResult(result);
+                return result;
+            } catch (IllegalArgumentException exception) {
+                throw rewriteFailure(testCase, attempt, exception);
+            } catch (RuntimeException exception) {
+                lastFailure = exception;
+                if (attempt < EVALUATION_REWRITE_MAX_ATTEMPTS) {
+                    sleepBeforeRewriteRetry();
+                }
+            }
+        }
+
+        throw rewriteFailure(
+                testCase,
+                EVALUATION_REWRITE_MAX_ATTEMPTS,
+                lastFailure == null
+                        ? new IllegalStateException("unknown query rewrite failure")
+                        : lastFailure);
+    }
+
+    private static void validateRewriteResult(
+            KnowledgeQueryRewriteResult result) {
+        if (result == null
+                || result.retrievalQuery() == null
+                || result.retrievalQuery().isBlank()) {
             throw new IllegalStateException(
-                    "Candidate benchmark requires successful Query Rewrite for controlled A/B",
+                    "query rewriter returned invalid result");
+        }
+    }
+
+    private static IllegalStateException rewriteFailure(
+            KnowledgeEvaluationCase testCase,
+            int attempts,
+            RuntimeException cause) {
+        String detail =
+                cause == null || cause.getMessage() == null
+                        ? cause == null
+                                ? "unknown failure"
+                                : cause.getClass().getSimpleName()
+                        : cause.getMessage();
+        return new IllegalStateException(
+                "Controlled Query Rewrite failed for case="
+                        + testCase.name()
+                        + " after "
+                        + attempts
+                        + " attempt(s): "
+                        + detail,
+                cause);
+    }
+
+    private static void sleepBeforeRewriteRetry() {
+        try {
+            Thread.sleep(EVALUATION_REWRITE_RETRY_DELAY_MS);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(
+                    "Controlled Query Rewrite retry interrupted",
                     exception);
         }
+    }
+
+    private KnowledgeQueryRewriter replayRewriter(
+            Map<String, KnowledgeQueryRewriteResult> rewritePlan) {
+        return new KnowledgeQueryRewriter() {
+            @Override
+            public KnowledgeQueryRewriteResult rewrite(String query) {
+                KnowledgeQueryRewriteResult result = rewritePlan.get(query);
+                if (result == null) {
+                    throw new IllegalStateException(
+                            "Evaluation rewrite plan missing query");
+                }
+                return result;
+            }
+
+            @Override
+            public String mode() {
+                return queryRewriter.mode() + "_EVAL_REPLAY";
+            }
+        };
+    }
+
+    private static String rewriteForEvaluation(
+            KnowledgeEvaluationCase testCase,
+            Map<String, KnowledgeQueryRewriteResult> rewritePlan) {
+        KnowledgeQueryRewriteResult result =
+                rewritePlan.get(testCase.query());
+        if (result == null) {
+            throw new IllegalStateException(
+                    "Evaluation rewrite plan missing case="
+                            + testCase.name());
+        }
+        validateRewriteResult(result);
+        return result.retrievalQuery();
     }
 
     private KnowledgeCandidateEvaluationCaseResult candidateResult(
@@ -420,7 +539,8 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
     private KnowledgeStageDiagnosticsReport evaluateStageDiagnostics(
             KnowledgeCandidateBenchmarkReport candidateBenchmark,
             KnowledgeEvaluationVariantReport baseline,
-            KnowledgeEvaluationVariantReport rewrite) {
+            KnowledgeEvaluationVariantReport rewrite,
+            Map<String, KnowledgeQueryRewriteResult> rewritePlan) {
         Set<String> selected = selectDiagnosticCases(candidateBenchmark, baseline, rewrite);
         int candidateWindow = candidateBenchmark.candidateWindow();
         List<KnowledgeEvaluationStageDiagnostic> diagnostics = new ArrayList<>();
@@ -439,7 +559,7 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
                     stageDiagnostic(
                             testCase,
                             "REWRITE",
-                            rewriteForEvaluation(testCase.query()),
+                            rewriteForEvaluation(testCase, rewritePlan),
                             candidateWindow));
         }
 
