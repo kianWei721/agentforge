@@ -7,6 +7,7 @@ public record KnowledgeEvaluationReport(
         int caseCount,
         KnowledgeCandidateBenchmarkReport candidateBenchmark,
         KnowledgeChannelStrategyConfirmationReport channelStrategyConfirmation,
+        KnowledgeEndToEndConfirmationReport endToEndConfirmation,
         KnowledgeStageDiagnosticsReport stageDiagnostics,
         KnowledgeEvaluationVariantReport baseline,
         KnowledgeEvaluationVariantReport rewrite,

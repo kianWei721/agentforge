@@ -35,8 +35,8 @@ function Invoke-Utf8JsonPost {
 
 $health = Invoke-RestMethod -Method GET -Uri ($root + "/api/v1/system/health")
 
-if ($health.milestone -ne "V0.7-slice1b3-channel-strategy") {
-    throw "Expected V0.7 Slice 1B-3 milestone. Actual: $($health.milestone)"
+if ($health.milestone -ne "V0.7-slice1b3-e2e-confirmation") {
+    throw "Expected V0.7 Slice 1B-3 End-to-End Confirmation milestone. Actual: $($health.milestone)"
 }
 if ($health.knowledgeEvaluationEnabled -ne $true -or $health.knowledgeEvaluationConfigured -ne $true) {
     throw "Knowledge evaluation is not enabled/configured. Run .\scripts\configure-knowledge-evaluation.ps1 and restart AgentForge."
@@ -56,6 +56,9 @@ if ($null -eq $report.candidateBenchmark -or $report.candidateBenchmark.variants
 }
 if ($null -eq $report.channelStrategyConfirmation) {
     throw "Channel strategy confirmation report is missing."
+}
+if ($null -eq $report.endToEndConfirmation) {
+    throw "End-to-end confirmation report is missing."
 }
 if ($report.documentCount -le $report.candidateBenchmark.candidateWindow) {
     throw "GOLD corpus must be larger than the candidate window."
@@ -119,6 +122,63 @@ $confirmation = $report.channelStrategyConfirmation
     RecallAt5Delta = [math]::Round([double]$confirmation.recallAt5Delta, 4)
     MRRDelta = [math]::Round([double]$confirmation.meanReciprocalRankDelta, 4)
 } | Format-List
+
+Write-Host ""
+Write-Host "=== End-to-End Production Promotion Confirmation ==="
+$e2e = $report.endToEndConfirmation
+[PSCustomObject]@{
+    DecisionBoundary = $e2e.decisionBoundary
+    Decision = $e2e.decision
+    PromotionEligible = $e2e.promotionEligible
+    CandidateLeaderConfirmed = $e2e.candidateLeaderConfirmed
+    CandidateLeaderVariant = $e2e.candidateLeaderVariant
+    ChallengerQueryMode = $e2e.challengerQueryMode
+    ChallengerRrfK = $e2e.challengerRrfK
+    ProductionRrfK = $e2e.productionRrfK
+    NewFailureCases = ($e2e.newFailureCases -join ", ")
+    ResolvedFailureCases = ($e2e.resolvedFailureCases -join ", ")
+    RecallAt1Delta = [math]::Round([double]$e2e.recallAt1Delta, 4)
+    RecallAt3Delta = [math]::Round([double]$e2e.recallAt3Delta, 4)
+    RecallAt5Delta = [math]::Round([double]$e2e.recallAt5Delta, 4)
+    MRRDelta = [math]::Round([double]$e2e.meanReciprocalRankDelta, 4)
+    NoAnswerAccuracyDelta = [math]::Round([double]$e2e.noAnswerAccuracyDelta, 4)
+    OverallAccuracyDelta = [math]::Round([double]$e2e.overallAccuracyDelta, 4)
+} | Format-List
+
+Write-Host ""
+Write-Host "=== End-to-End Control vs Challenger ==="
+@(
+    [PSCustomObject]@{
+        Role = "CONTROL"
+        Variant = $e2e.control.variant
+        Mode = $e2e.control.retrievalMode
+        RecallAt1 = [math]::Round([double]$e2e.control.recallAt1, 4)
+        RecallAt3 = [math]::Round([double]$e2e.control.recallAt3, 4)
+        RecallAt5 = [math]::Round([double]$e2e.control.recallAt5, 4)
+        MRR = [math]::Round([double]$e2e.control.meanReciprocalRank, 4)
+        NoAnswerAccuracy = [math]::Round([double]$e2e.control.noAnswerAccuracy, 4)
+        OverallAccuracy = [math]::Round([double]$e2e.control.overallAccuracy, 4)
+    },
+    [PSCustomObject]@{
+        Role = "CHALLENGER"
+        Variant = $e2e.challenger.variant
+        Mode = $e2e.challenger.retrievalMode
+        RecallAt1 = [math]::Round([double]$e2e.challenger.recallAt1, 4)
+        RecallAt3 = [math]::Round([double]$e2e.challenger.recallAt3, 4)
+        RecallAt5 = [math]::Round([double]$e2e.challenger.recallAt5, 4)
+        MRR = [math]::Round([double]$e2e.challenger.meanReciprocalRank, 4)
+        NoAnswerAccuracy = [math]::Round([double]$e2e.challenger.noAnswerAccuracy, 4)
+        OverallAccuracy = [math]::Round([double]$e2e.challenger.overallAccuracy, 4)
+    }
+) | Format-Table -AutoSize
+
+Write-Host ""
+Write-Host "=== End-to-End Challenger Case Audit ==="
+$e2e.challenger.cases |
+Select-Object name, category, passed, noAnswerExpected, noAnswerActual, firstRelevantRank,
+    @{Name="Expected";Expression={($_.expectedDocumentIds -join ",")}},
+    @{Name="ActualTop";Expression={if ($_.actualDocumentIds.Count -gt 0) { $_.actualDocumentIds[0] } else { "" }}} |
+Format-Table -Wrap -AutoSize
 
 Write-Host ""
 Write-Host "=== Candidate-stage Non-Rank1 / Miss Audit ==="
@@ -224,7 +284,7 @@ Select-Object name, category, passed, noAnswerExpected, noAnswerActual, firstRel
 Format-Table -Wrap -AutoSize
 
 Write-Host ""
-Write-Host "V0.7 Slice 1B-3 calibration report generated."
-Write-Host "Candidate-stage metrics are pre-reranker/pre-judge. End-to-end metrics remain separate."
-Write-Host "The confirmation report is calibration-only and never changes production configuration automatically."
-Write-Host "A production change still requires a live end-to-end confirmation of the leading channel strategy."
+Write-Host "V0.7 Slice 1B-3 End-to-End Confirmation report generated."
+Write-Host "Candidate-stage selection and end-to-end promotion are separate gates."
+Write-Host "PROMOTION_ELIGIBLE means the evaluation gate passed; it never changes production configuration automatically."
+Write-Host "Any production change remains manual and must be followed by a runtime smoke/regression check."

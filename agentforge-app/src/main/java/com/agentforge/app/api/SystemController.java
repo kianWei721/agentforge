@@ -110,7 +110,7 @@ public class SystemController {
         result.put("name", "AgentForge");
         result.put("version", "0.3.0-SNAPSHOT");
         result.put("status", infrastructure.ready() ? "UP" : "DEGRADED");
-        result.put("milestone", "V0.7-slice1b3-channel-strategy");
+        result.put("milestone", "V0.7-slice1b3-e2e-confirmation");
         result.put("mysql", infrastructure.mysqlUp() ? "UP" : "DOWN");
         result.put("redis", infrastructure.redisUp() ? "UP" : "DOWN");
         result.put("activeModelProvider", modelGatewayCatalog.activeProvider());
@@ -240,6 +240,15 @@ public class SystemController {
         result.put(
                 "knowledgeEvaluationDecisionBoundary",
                 KnowledgeChannelStrategyAnalyzer.DECISION_BOUNDARY);
+        result.put(
+                "knowledgeEndToEndPromotionGate",
+                "EVALUATION_PROMOTION_GATE_MANUAL_PRODUCTION_CHANGE_REQUIRED");
+        result.put(
+                "knowledgeEndToEndControl",
+                "REWRITE+PRODUCTION_RRF_K");
+        result.put(
+                "knowledgeEndToEndChallenger",
+                "UNIQUE_CANDIDATE_LEADER");
         result.put(
                 "knowledgeEvaluationCandidateWindow",
                 Math.min(

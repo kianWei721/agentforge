@@ -1,6 +1,6 @@
 {
-  "version": "V0.7-GOLD-3",
-  "description": "Evaluation-only synthetic channel-disagreement corpus for V0.7 Slice 1B-2. The corpus is intentionally much larger than the candidate window and contains dense topic-overlapping lexical traps. It is used only for candidate-stage/RRF diagnostics and must never be treated as production device truth.",
+  "version": "V0.7-GOLD-3.1",
+  "description": "Evaluation-only synthetic channel-disagreement corpus for V0.7 Slice 1B-3 end-to-end confirmation. GOLD-3.1 corrects the offline debounce answerability mismatch while preserving the 80-document hard-negative structure. It must never be treated as production device truth.",
   "documents": [
     {
       "id": "eval-offline-procedure",
@@ -21,7 +21,7 @@
       "title": "Offline Alarm Debounce Policy",
       "sourceType": "TEST",
       "sourceRef": "eval://v0.7/gold2/offline-alarm",
-      "content": "Evaluation-only synthetic knowledge. Offline alarms may apply debounce, repeated-observation windows, notification suppression, and recovery clearing. Alarm policy controls notification behavior and does not define the troubleshooting order or establish a hardware root cause."
+      "content": "Evaluation-only synthetic knowledge. Offline alarms may apply debounce and repeated-observation windows to reduce false positives from transient connectivity loss or brief telemetry gaps: the condition should persist before notification. Notification suppression and recovery clearing control alert delivery and recovery behavior. Alarm policy does not define the troubleshooting order or establish a hardware root cause."
     },
     {
       "id": "eval-offline-statistics",

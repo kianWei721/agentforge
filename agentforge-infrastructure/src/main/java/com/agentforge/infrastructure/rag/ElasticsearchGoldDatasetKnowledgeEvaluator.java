@@ -14,6 +14,8 @@ import com.agentforge.rag.KnowledgeCandidateEvaluationCaseResult;
 import com.agentforge.rag.KnowledgeCandidateEvaluationVariantReport;
 import com.agentforge.rag.KnowledgeChannelStrategyAnalyzer;
 import com.agentforge.rag.KnowledgeChannelStrategyConfirmationReport;
+import com.agentforge.rag.KnowledgeEndToEndConfirmationAnalyzer;
+import com.agentforge.rag.KnowledgeEndToEndConfirmationReport;
 import com.agentforge.rag.KnowledgeEvaluationCase;
 import com.agentforge.rag.KnowledgeEvaluationCaseResult;
 import com.agentforge.rag.KnowledgeEvaluationDataset;
@@ -132,11 +134,37 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
                                 + "_REWRITE");
 
         KnowledgeEvaluationVariantReport baseline =
-                evaluateVariant("HYBRID_BASELINE", null);
+                evaluateVariant(
+                        "HYBRID_BASELINE",
+                        null,
+                        hybridProperties.getRrfK());
         KnowledgeEvaluationVariantReport rewrite =
                 evaluateVariant(
                         "HYBRID_REWRITE",
-                        replayRewriter(rewritePlan));
+                        replayRewriter(rewritePlan),
+                        hybridProperties.getRrfK());
+
+        KnowledgeCandidateEvaluationVariantReport candidateLeader =
+                uniqueCandidateLeader(
+                        candidateBenchmark,
+                        channelStrategyConfirmation);
+
+        KnowledgeEvaluationVariantReport challenger =
+                evaluateVariant(
+                        "E2E_CHALLENGER_"
+                                + candidateLeader.variant(),
+                        rewriterForQueryMode(
+                                candidateLeader.queryMode(),
+                                rewritePlan),
+                        candidateLeader.rrfK());
+
+        KnowledgeEndToEndConfirmationReport endToEndConfirmation =
+                KnowledgeEndToEndConfirmationAnalyzer.analyze(
+                        channelStrategyConfirmation,
+                        candidateLeader,
+                        rewrite,
+                        challenger,
+                        hybridProperties.getRrfK());
 
         KnowledgeStageDiagnosticsReport stageDiagnostics =
                 evaluateStageDiagnostics(
@@ -152,6 +180,7 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
                 dataset.cases().size(),
                 candidateBenchmark,
                 channelStrategyConfirmation,
+                endToEndConfirmation,
                 stageDiagnostics,
                 baseline,
                 rewrite,
@@ -540,6 +569,41 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
                 .toList();
     }
 
+    private KnowledgeCandidateEvaluationVariantReport uniqueCandidateLeader(
+            KnowledgeCandidateBenchmarkReport candidateBenchmark,
+            KnowledgeChannelStrategyConfirmationReport confirmation) {
+        if (!confirmation.uniqueLeader()
+                || confirmation.leadingVariant() == null) {
+            throw new IllegalStateException(
+                    "End-to-end confirmation requires one unique candidate-stage leader.");
+        }
+        return candidateBenchmark.variants().stream()
+                .filter(
+                        variant ->
+                                confirmation.leadingVariant().equals(variant.variant()))
+                .findFirst()
+                .orElseThrow(
+                        () ->
+                                new IllegalStateException(
+                                        "Candidate-stage leader report is missing: "
+                                                + confirmation.leadingVariant()));
+    }
+
+    private KnowledgeQueryRewriter rewriterForQueryMode(
+            String queryMode,
+            Map<String, KnowledgeQueryRewriteResult> rewritePlan) {
+        if ("ORIGINAL".equals(queryMode)) {
+            return null;
+        }
+        if ("REWRITE".equals(queryMode)) {
+            return replayRewriter(rewritePlan);
+        }
+        throw new IllegalStateException(
+                "End-to-end confirmation cannot promote asymmetric query strategy without "
+                        + "a production-capable channel-specific retriever: "
+                        + queryMode);
+    }
+
     private KnowledgeStageDiagnosticsReport evaluateStageDiagnostics(
             KnowledgeCandidateBenchmarkReport candidateBenchmark,
             KnowledgeEvaluationVariantReport baseline,
@@ -771,13 +835,14 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
 
     private KnowledgeEvaluationVariantReport evaluateVariant(
             String variant,
-            KnowledgeQueryRewriter rewriter) {
+            KnowledgeQueryRewriter rewriter,
+            int rrfK) {
         KnowledgeRetriever retriever =
                 new HybridKnowledgeRetriever(
                         embeddingProvider,
                         backend,
                         hybridProperties.getCandidateMultiplier(),
-                        hybridProperties.getRrfK(),
+                        rrfK,
                         hybridProperties.isRelevanceGateEnabled(),
                         hybridProperties.getMinVectorSimilarity(),
                         rewriter,
