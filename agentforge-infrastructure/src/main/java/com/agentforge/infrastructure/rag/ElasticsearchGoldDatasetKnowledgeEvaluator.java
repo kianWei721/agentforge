@@ -7,7 +7,11 @@ import com.agentforge.infrastructure.config.KnowledgeRerankProperties;
 import com.agentforge.rag.EmbeddingProvider;
 import com.agentforge.rag.HybridKnowledgeRetriever;
 import com.agentforge.rag.KnowledgeAnswerabilityJudge;
+import com.agentforge.rag.KnowledgeBackendHit;
 import com.agentforge.rag.KnowledgeCandidate;
+import com.agentforge.rag.KnowledgeCandidateBenchmarkReport;
+import com.agentforge.rag.KnowledgeCandidateEvaluationCaseResult;
+import com.agentforge.rag.KnowledgeCandidateEvaluationVariantReport;
 import com.agentforge.rag.KnowledgeEvaluationCase;
 import com.agentforge.rag.KnowledgeEvaluationCaseResult;
 import com.agentforge.rag.KnowledgeEvaluationDataset;
@@ -16,18 +20,22 @@ import com.agentforge.rag.KnowledgeEvaluationReport;
 import com.agentforge.rag.KnowledgeEvaluationVariantReport;
 import com.agentforge.rag.KnowledgeEvaluator;
 import com.agentforge.rag.KnowledgeIndexedChunk;
+import com.agentforge.rag.KnowledgeQueryRewriteResult;
 import com.agentforge.rag.KnowledgeQueryRewriter;
 import com.agentforge.rag.KnowledgeReranker;
 import com.agentforge.rag.KnowledgeRetriever;
 import com.agentforge.rag.KnowledgeSearchBackend;
 import com.agentforge.rag.KnowledgeSearchHit;
+import com.agentforge.rag.RrfFusion;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.InputStream;
 import java.net.http.HttpClient;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
@@ -94,6 +102,9 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
         long started = System.nanoTime();
         indexDataset();
 
+        KnowledgeCandidateBenchmarkReport candidateBenchmark =
+                evaluateCandidateBenchmark();
+
         KnowledgeEvaluationVariantReport baseline =
                 evaluateVariant("HYBRID_BASELINE", null);
         KnowledgeEvaluationVariantReport rewrite =
@@ -104,6 +115,7 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
                 backend.indexName(),
                 dataset.documents().size(),
                 dataset.cases().size(),
+                candidateBenchmark,
                 baseline,
                 rewrite,
                 rewrite.recallAt1() - baseline.recallAt1(),
@@ -159,12 +171,175 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
             }
         }
 
-        // The evaluation corpus is bounded and isolated from the production index.
-        // Precompute all embeddings before recreating the evaluation index so provider
-        // failures never destroy a previously inspectable evaluation index.
+        // Evaluation is bounded and isolated. Finish all embeddings before
+        // recreating the dedicated evaluation index.
         backend.recreateIndex(embeddingProvider.dimensions());
         backend.indexBatch(indexed);
         backend.refresh();
+    }
+
+    private KnowledgeCandidateBenchmarkReport evaluateCandidateBenchmark() {
+        int candidateWindow =
+                Math.min(
+                        100,
+                        Math.max(
+                                20,
+                                evaluationProperties.getTopK()
+                                        * hybridProperties.getCandidateMultiplier()));
+
+        Map<String, VariantAccumulator> variants = new LinkedHashMap<>();
+        registerCandidateVariants(variants, "ORIGINAL");
+        registerCandidateVariants(variants, "REWRITE");
+
+        for (KnowledgeEvaluationCase testCase : dataset.cases()) {
+            if (testCase.noAnswerExpected()) {
+                continue;
+            }
+
+            CandidateChannels original =
+                    candidateChannels(testCase.query(), candidateWindow);
+            String rewrittenQuery = rewriteForEvaluation(testCase.query());
+            CandidateChannels rewritten =
+                    candidateChannels(rewrittenQuery, candidateWindow);
+
+            evaluateCandidateChannels(
+                    variants,
+                    "ORIGINAL",
+                    testCase,
+                    original);
+            evaluateCandidateChannels(
+                    variants,
+                    "REWRITE",
+                    testCase,
+                    rewritten);
+        }
+
+        List<KnowledgeCandidateEvaluationVariantReport> reports =
+                variants.values().stream()
+                        .map(VariantAccumulator::report)
+                        .toList();
+
+        return new KnowledgeCandidateBenchmarkReport(
+                candidateWindow,
+                evaluationProperties.getRrfKValues(),
+                reports);
+    }
+
+    private void registerCandidateVariants(
+            Map<String, VariantAccumulator> variants,
+            String queryMode) {
+        variants.put(
+                "BM25_" + queryMode,
+                new VariantAccumulator(
+                        "BM25_" + queryMode,
+                        queryMode,
+                        "BM25",
+                        null));
+        variants.put(
+                "VECTOR_" + queryMode,
+                new VariantAccumulator(
+                        "VECTOR_" + queryMode,
+                        queryMode,
+                        "VECTOR",
+                        null));
+        for (Integer k : evaluationProperties.getRrfKValues()) {
+            String name = "HYBRID_RRF_K" + k + "_" + queryMode;
+            variants.put(
+                    name,
+                    new VariantAccumulator(
+                            name,
+                            queryMode,
+                            "HYBRID_RRF",
+                            k));
+        }
+    }
+
+    private void evaluateCandidateChannels(
+            Map<String, VariantAccumulator> variants,
+            String queryMode,
+            KnowledgeEvaluationCase testCase,
+            CandidateChannels channels) {
+        variants.get("BM25_" + queryMode)
+                .add(candidateResult(testCase, documentIds(channels.lexical())));
+        variants.get("VECTOR_" + queryMode)
+                .add(candidateResult(testCase, documentIds(channels.vector())));
+
+        for (Integer k : evaluationProperties.getRrfKValues()) {
+            List<KnowledgeSearchHit> fused =
+                    RrfFusion.fuse(
+                            channels.lexical(),
+                            channels.vector(),
+                            k,
+                            backend::normalizeVectorScore);
+            variants.get("HYBRID_RRF_K" + k + "_" + queryMode)
+                    .add(
+                            candidateResult(
+                                    testCase,
+                                    fused.stream()
+                                            .map(KnowledgeSearchHit::documentId)
+                                            .distinct()
+                                            .toList()));
+        }
+    }
+
+    private CandidateChannels candidateChannels(String query, int candidateWindow) {
+        List<float[]> vectors = embeddingProvider.embed(List.of(query));
+        if (vectors.size() != 1) {
+            throw new IllegalStateException(
+                    "evaluation query embedding must return exactly one vector");
+        }
+        return new CandidateChannels(
+                backend.searchLexical(query, candidateWindow),
+                backend.searchVector(vectors.get(0), candidateWindow));
+    }
+
+    private String rewriteForEvaluation(String originalQuery) {
+        try {
+            KnowledgeQueryRewriteResult result = queryRewriter.rewrite(originalQuery);
+            if (result == null
+                    || result.retrievalQuery() == null
+                    || result.retrievalQuery().isBlank()) {
+                throw new IllegalStateException("query rewriter returned invalid result");
+            }
+            return result.retrievalQuery();
+        } catch (RuntimeException exception) {
+            throw new IllegalStateException(
+                    "Candidate benchmark requires successful Query Rewrite for controlled A/B",
+                    exception);
+        }
+    }
+
+    private KnowledgeCandidateEvaluationCaseResult candidateResult(
+            KnowledgeEvaluationCase testCase,
+            List<String> actualDocumentIds) {
+        Set<String> expected =
+                new LinkedHashSet<>(testCase.expectedDocumentIds());
+
+        Integer rank = firstRelevantRank(actualDocumentIds, expected);
+        boolean hitAt1 = rank != null && rank <= 1;
+        boolean hitAt3 = rank != null && rank <= 3;
+        boolean hitAt5 = rank != null && rank <= 5;
+        double reciprocalRank = rank == null ? 0d : 1.0d / rank;
+
+        return new KnowledgeCandidateEvaluationCaseResult(
+                testCase.name(),
+                testCase.category(),
+                testCase.query(),
+                testCase.expectedDocumentIds(),
+                actualDocumentIds,
+                rank,
+                reciprocalRank,
+                hitAt1,
+                hitAt3,
+                hitAt5,
+                rank != null && rank <= evaluationProperties.getTopK());
+    }
+
+    private static List<String> documentIds(List<KnowledgeBackendHit> hits) {
+        return hits.stream()
+                .map(KnowledgeBackendHit::documentId)
+                .distinct()
+                .toList();
     }
 
     private KnowledgeEvaluationVariantReport evaluateVariant(
@@ -248,18 +423,12 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
         List<String> actualDocumentIds =
                 hits.stream()
                         .map(KnowledgeSearchHit::documentId)
+                        .distinct()
                         .toList();
         Set<String> expected =
                 new LinkedHashSet<>(testCase.expectedDocumentIds());
 
-        Integer rank = null;
-        for (int i = 0; i < actualDocumentIds.size(); i++) {
-            if (expected.contains(actualDocumentIds.get(i))) {
-                rank = i + 1;
-                break;
-            }
-        }
-
+        Integer rank = firstRelevantRank(actualDocumentIds, expected);
         boolean noAnswerActual = hits.isEmpty();
         boolean noAnswerExpected = testCase.noAnswerExpected();
         boolean hitAt1 = rank != null && rank <= 1;
@@ -285,6 +454,17 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
                 hitAt3,
                 hitAt5,
                 passed);
+    }
+
+    private static Integer firstRelevantRank(
+            List<String> actualDocumentIds,
+            Set<String> expected) {
+        for (int i = 0; i < actualDocumentIds.size(); i++) {
+            if (expected.contains(actualDocumentIds.get(i))) {
+                return i + 1;
+            }
+        }
+        return null;
     }
 
     private static double ratio(int numerator, int denominator) {
@@ -315,13 +495,13 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
                 || dataset.version().isBlank()) {
             throw new IllegalStateException("Evaluation dataset version is required.");
         }
-        if (dataset.documents().size() < 5) {
+        if (dataset.documents().size() < 10) {
             throw new IllegalStateException(
-                    "Evaluation dataset must contain at least 5 documents.");
+                    "Evaluation dataset must contain at least 10 documents.");
         }
-        if (dataset.cases().size() < 10) {
+        if (dataset.cases().size() < 20) {
             throw new IllegalStateException(
-                    "Evaluation dataset must contain at least 10 cases.");
+                    "Evaluation dataset must contain at least 20 cases.");
         }
 
         Set<String> documentIds = new HashSet<>();
@@ -375,9 +555,9 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
             }
         }
 
-        if (answerable == 0 || noAnswer == 0) {
+        if (answerable < 10 || noAnswer < 3) {
             throw new IllegalStateException(
-                    "Evaluation dataset must contain answerable and no-answer cases.");
+                    "Evaluation dataset needs at least 10 answerable and 3 no-answer cases.");
         }
     }
 
@@ -394,5 +574,64 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
         copy.setConnectTimeout(source.getConnectTimeout());
         copy.setRequestTimeout(source.getRequestTimeout());
         return copy;
+    }
+
+    private record CandidateChannels(
+            List<KnowledgeBackendHit> lexical,
+            List<KnowledgeBackendHit> vector) {}
+
+    private static final class VariantAccumulator {
+
+        private final String variant;
+        private final String queryMode;
+        private final String retrievalStrategy;
+        private final Integer rrfK;
+        private final List<KnowledgeCandidateEvaluationCaseResult> cases =
+                new ArrayList<>();
+
+        private VariantAccumulator(
+                String variant,
+                String queryMode,
+                String retrievalStrategy,
+                Integer rrfK) {
+            this.variant = variant;
+            this.queryMode = queryMode;
+            this.retrievalStrategy = retrievalStrategy;
+            this.rrfK = rrfK;
+        }
+
+        private void add(KnowledgeCandidateEvaluationCaseResult result) {
+            cases.add(result);
+        }
+
+        private KnowledgeCandidateEvaluationVariantReport report() {
+            int hitAt1 = 0;
+            int hitAt3 = 0;
+            int hitAt5 = 0;
+            double reciprocalRank = 0d;
+            for (KnowledgeCandidateEvaluationCaseResult result : cases) {
+                if (result.hitAt1()) {
+                    hitAt1++;
+                }
+                if (result.hitAt3()) {
+                    hitAt3++;
+                }
+                if (result.hitAt5()) {
+                    hitAt5++;
+                }
+                reciprocalRank += result.reciprocalRank();
+            }
+            return new KnowledgeCandidateEvaluationVariantReport(
+                    variant,
+                    queryMode,
+                    retrievalStrategy,
+                    rrfK,
+                    cases.size(),
+                    ratio(hitAt1, cases.size()),
+                    ratio(hitAt3, cases.size()),
+                    ratio(hitAt5, cases.size()),
+                    cases.isEmpty() ? 0d : reciprocalRank / cases.size(),
+                    cases);
+        }
     }
 }
