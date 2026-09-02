@@ -34,6 +34,7 @@ import com.agentforge.rag.RrfFusion;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.InputStream;
 import java.net.http.HttpClient;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -97,11 +98,14 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
                         .connectTimeout(evalEs.getConnectTimeout())
                         .followRedirects(HttpClient.Redirect.NEVER)
                         .build();
-        this.backend =
+        KnowledgeSearchBackend elasticsearchBackend =
                 new ElasticsearchKnowledgeSearchBackend(
                         client,
                         objectMapper,
                         evalEs);
+        this.backend =
+                new EvaluationRetryingKnowledgeSearchBackend(
+                        elasticsearchBackend);
     }
 
     @Override
@@ -994,9 +998,122 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
         copy.setUsername(source.getUsername());
         copy.setPassword(source.getPassword());
         copy.setApiKey(source.getApiKey());
-        copy.setConnectTimeout(source.getConnectTimeout());
-        copy.setRequestTimeout(source.getRequestTimeout());
+        copy.setConnectTimeout(
+                maxDuration(
+                        source.getConnectTimeout(),
+                        Duration.ofSeconds(5)));
+        copy.setRequestTimeout(
+                maxDuration(
+                        source.getRequestTimeout(),
+                        Duration.ofSeconds(15)));
         return copy;
+    }
+
+    private static Duration maxDuration(
+            Duration configured,
+            Duration floor) {
+        if (configured == null) {
+            return floor;
+        }
+        return configured.compareTo(floor) >= 0
+                ? configured
+                : floor;
+    }
+
+    private static final class EvaluationRetryingKnowledgeSearchBackend
+            implements KnowledgeSearchBackend {
+
+        private static final int MAX_SEARCH_ATTEMPTS = 2;
+        private static final long RETRY_DELAY_MS = 200L;
+
+        private final KnowledgeSearchBackend delegate;
+
+        private EvaluationRetryingKnowledgeSearchBackend(
+                KnowledgeSearchBackend delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public void recreateIndex(int dimensions) {
+            delegate.recreateIndex(dimensions);
+        }
+
+        @Override
+        public void indexBatch(List<KnowledgeIndexedChunk> chunks) {
+            delegate.indexBatch(chunks);
+        }
+
+        @Override
+        public void refresh() {
+            delegate.refresh();
+        }
+
+        @Override
+        public List<KnowledgeBackendHit> searchLexical(
+                String query,
+                int limit) {
+            return searchWithRetry(
+                    () -> delegate.searchLexical(query, limit));
+        }
+
+        @Override
+        public List<KnowledgeBackendHit> searchVector(
+                float[] queryVector,
+                int limit) {
+            return searchWithRetry(
+                    () -> delegate.searchVector(queryVector, limit));
+        }
+
+        @Override
+        public String indexName() {
+            return delegate.indexName();
+        }
+
+        @Override
+        public String vectorSearchMode() {
+            return delegate.vectorSearchMode();
+        }
+
+        @Override
+        public double normalizeVectorScore(double backendScore) {
+            return delegate.normalizeVectorScore(backendScore);
+        }
+
+        private <T> T searchWithRetry(
+                java.util.concurrent.Callable<T> action) {
+            RuntimeException lastFailure = null;
+            for (int attempt = 1;
+                    attempt <= MAX_SEARCH_ATTEMPTS;
+                    attempt++) {
+                try {
+                    return action.call();
+                } catch (RuntimeException exception) {
+                    lastFailure = exception;
+                    if (attempt < MAX_SEARCH_ATTEMPTS) {
+                        sleepBeforeRetry();
+                    }
+                } catch (Exception exception) {
+                    throw new IllegalStateException(
+                            "Evaluation Elasticsearch search failed",
+                            exception);
+                }
+            }
+            throw lastFailure == null
+                    ? new IllegalStateException(
+                            "Evaluation Elasticsearch search failed")
+                    : lastFailure;
+        }
+
+        private static void sleepBeforeRetry() {
+            try {
+                Thread.sleep(RETRY_DELAY_MS);
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(
+                        "Evaluation Elasticsearch retry interrupted",
+                        exception);
+            }
+        }
     }
 
     private record CandidateChannels(

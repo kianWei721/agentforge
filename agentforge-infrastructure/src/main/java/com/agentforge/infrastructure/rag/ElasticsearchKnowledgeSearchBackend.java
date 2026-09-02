@@ -13,6 +13,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -306,12 +307,34 @@ public class ElasticsearchKnowledgeSearchBackend implements KnowledgeSearchBacke
                     HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            throw new IllegalStateException("Elasticsearch request interrupted", exception);
+            throw new IllegalStateException(
+                    "Elasticsearch "
+                            + method
+                            + " "
+                            + path
+                            + " request interrupted",
+                    exception);
+        } catch (HttpTimeoutException exception) {
+            throw new IllegalStateException(
+                    "Elasticsearch "
+                            + method
+                            + " "
+                            + path
+                            + " request timed out after "
+                            + properties.getRequestTimeout(),
+                    exception);
         } catch (Exception exception) {
             if (exception instanceof IllegalStateException stateException) {
                 throw stateException;
             }
-            throw new IllegalStateException("Elasticsearch request failed", exception);
+            throw new IllegalStateException(
+                    "Elasticsearch "
+                            + method
+                            + " "
+                            + path
+                            + " transport failed: "
+                            + exception.getClass().getSimpleName(),
+                    exception);
         }
     }
 
