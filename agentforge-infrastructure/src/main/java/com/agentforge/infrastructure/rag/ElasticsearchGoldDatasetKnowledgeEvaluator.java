@@ -12,6 +12,8 @@ import com.agentforge.rag.KnowledgeCandidate;
 import com.agentforge.rag.KnowledgeCandidateBenchmarkReport;
 import com.agentforge.rag.KnowledgeCandidateEvaluationCaseResult;
 import com.agentforge.rag.KnowledgeCandidateEvaluationVariantReport;
+import com.agentforge.rag.KnowledgeChannelStrategyAnalyzer;
+import com.agentforge.rag.KnowledgeChannelStrategyConfirmationReport;
 import com.agentforge.rag.KnowledgeEvaluationCase;
 import com.agentforge.rag.KnowledgeEvaluationCaseResult;
 import com.agentforge.rag.KnowledgeEvaluationDataset;
@@ -107,6 +109,14 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
         KnowledgeCandidateBenchmarkReport candidateBenchmark =
                 evaluateCandidateBenchmark();
 
+        KnowledgeChannelStrategyConfirmationReport channelStrategyConfirmation =
+                KnowledgeChannelStrategyAnalyzer.analyze(
+                        candidateBenchmark.variants(),
+                        hybridProperties.getRrfK(),
+                        "HYBRID_RRF_K"
+                                + hybridProperties.getRrfK()
+                                + "_REWRITE");
+
         KnowledgeEvaluationVariantReport baseline =
                 evaluateVariant("HYBRID_BASELINE", null);
         KnowledgeEvaluationVariantReport rewrite =
@@ -121,6 +131,7 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
                 dataset.documents().size(),
                 dataset.cases().size(),
                 candidateBenchmark,
+                channelStrategyConfirmation,
                 stageDiagnostics,
                 baseline,
                 rewrite,
@@ -196,6 +207,12 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
         Map<String, VariantAccumulator> variants = new LinkedHashMap<>();
         registerCandidateVariants(variants, "ORIGINAL");
         registerCandidateVariants(variants, "REWRITE");
+        registerHybridOnlyVariants(
+                variants,
+                "BM25_REWRITE_VECTOR_ORIGINAL");
+        registerHybridOnlyVariants(
+                variants,
+                "BM25_ORIGINAL_VECTOR_REWRITE");
 
         for (KnowledgeEvaluationCase testCase : dataset.cases()) {
             if (testCase.noAnswerExpected()) {
@@ -218,6 +235,19 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
                     "REWRITE",
                     testCase,
                     rewritten);
+
+            evaluateHybridChannels(
+                    variants,
+                    "BM25_REWRITE_VECTOR_ORIGINAL",
+                    testCase,
+                    rewritten.lexical(),
+                    original.vector());
+            evaluateHybridChannels(
+                    variants,
+                    "BM25_ORIGINAL_VECTOR_REWRITE",
+                    testCase,
+                    original.lexical(),
+                    rewritten.vector());
         }
 
         List<KnowledgeCandidateEvaluationVariantReport> reports =
@@ -257,6 +287,45 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
                             queryMode,
                             "HYBRID_RRF",
                             k));
+        }
+    }
+
+    private void registerHybridOnlyVariants(
+            Map<String, VariantAccumulator> variants,
+            String queryMode) {
+        for (Integer k : evaluationProperties.getRrfKValues()) {
+            String name = "HYBRID_RRF_K" + k + "_" + queryMode;
+            variants.put(
+                    name,
+                    new VariantAccumulator(
+                            name,
+                            queryMode,
+                            "HYBRID_RRF",
+                            k));
+        }
+    }
+
+    private void evaluateHybridChannels(
+            Map<String, VariantAccumulator> variants,
+            String queryMode,
+            KnowledgeEvaluationCase testCase,
+            List<KnowledgeBackendHit> lexical,
+            List<KnowledgeBackendHit> vector) {
+        for (Integer k : evaluationProperties.getRrfKValues()) {
+            List<KnowledgeSearchHit> fused =
+                    RrfFusion.fuse(
+                            lexical,
+                            vector,
+                            k,
+                            backend::normalizeVectorScore);
+            variants.get("HYBRID_RRF_K" + k + "_" + queryMode)
+                    .add(
+                            candidateResult(
+                                    testCase,
+                                    fused.stream()
+                                            .map(KnowledgeSearchHit::documentId)
+                                            .distinct()
+                                            .toList()));
         }
     }
 
