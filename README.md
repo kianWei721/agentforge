@@ -157,6 +157,31 @@ Recall@5
 
 当前 production 行为仍是 `REWRITE + k=60`。评测只输出 leading variant / deltas，不自动修改生产 Query Strategy 或 RRF k。
 
+
+### Slice 1B-3 End-to-End Confirmation
+
+Candidate-stage 2×2 Matrix 真实结果给出唯一 Leader：`HYBRID_RRF_K5_ORIGINAL`，当前 Production 对照为 `REWRITE + production rrfK=60`。本阶段不直接修改 Production，而是增加独立 promotion gate：
+
+```text
+CONTROL
+REWRITE + production rrfK
+-> Reranker
+-> Answerability
+-> final metrics
+
+CHALLENGER
+unique Candidate Leader
+-> Reranker
+-> Answerability
+-> final metrics
+```
+
+Promotion 必须同时满足：Candidate Leader 仍然唯一、Challenger 不新增失败 Case、Recall@1/3/5、MRR、No-answer Accuracy、Overall Accuracy 全部不低于 Control。
+
+决策仅输出 `PROMOTION_ELIGIBLE` 或 `HOLD_PRODUCTION`，不会自动写 Production 配置。
+
+GOLD-3 同时升级为 `V0.7-GOLD-3.1`：仅修正 `offline-alarm-debounce` 的 answerability mismatch，在 Offline Alarm Policy 中明确 debounce/repeated-observation window 是为了降低瞬时掉线/短暂 telemetry gap 导致的误报。没有放宽 Answerability Judge。
+
 ### Slice 1B-2 — Channel Disagreement + Stage Diagnostics
 
 GOLD-2 真实结果证明 Candidate Benchmark 已有区分度，但 20 documents 与 candidateWindow=20 使 Vector/RRF 仍接近全量排序，无法判断 RRF k。
