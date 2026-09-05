@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   test:
@@ -24,7 +25,7 @@ jobs:
         run: |
           set -euo pipefail
           pattern='60\.12\.4\.180|/admin-api/device/web|deviceId[[:space:]]*=[[:space:]]*(373|367)|commandId[[:space:]]*=[[:space:]]*(2881|2883)'
-          if git grep -nE "$pattern" -- . ':!PUBLIC_RELEASE.md'; then
+          if git grep -nE "$pattern" -- . ':!PUBLIC_RELEASE.md' ':!.github/workflows/ci.yml'; then
             echo "Public-release marker scan failed."
             exit 1
           fi
