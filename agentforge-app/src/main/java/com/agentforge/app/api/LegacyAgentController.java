@@ -1,5 +1,6 @@
 package com.agentforge.app.api;
 
+import com.agentforge.app.security.AuthenticatedUser;
 import com.agentforge.core.AgentForgeConstants;
 import com.agentforge.runtime.AgentConversationRuntimeService;
 import com.agentforge.runtime.AgentRuntimeRequest;
@@ -8,6 +9,7 @@ import jakarta.validation.Valid;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 
@@ -23,9 +25,11 @@ public class LegacyAgentController {
     }
 
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<ServerSentEvent<AgentStreamChunk>> stream(@Valid @RequestBody ChatRequest request) {
+    public Flux<ServerSentEvent<AgentStreamChunk>> stream(
+            @Valid @RequestBody ChatRequest request,
+            @AuthenticationPrincipal AuthenticatedUser user) {
         AgentRuntimeRequest runtimeRequest =
-                new AgentRuntimeRequest(request.userId(), request.sessionId(), request.message());
+                new AgentRuntimeRequest(user.userId(), request.sessionId(), request.message());
         return conversationRuntimeService
                 .stream("default", runtimeRequest)
                 .map(

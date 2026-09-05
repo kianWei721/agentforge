@@ -59,6 +59,22 @@ public class ExecutionService {
                 .orElseThrow(() -> new ExecutionNotFoundException(normalized));
     }
 
+    /**
+     * Reads an execution the given user owns.
+     *
+     * <p>An execution belonging to someone else is reported as not found rather than
+     * forbidden: execution ids are opaque, and answering "exists, but not yours"
+     * would let a caller enumerate other users' activity.
+     */
+    public AgentExecution getForUser(String executionId, String userId) {
+        String normalizedUserId = required(userId, "userId");
+        AgentExecution execution = get(executionId);
+        if (!execution.userId().equals(normalizedUserId)) {
+            throw new ExecutionNotFoundException(required(executionId, "executionId"));
+        }
+        return execution;
+    }
+
     public List<AgentExecution> listBySessionId(String sessionId) {
         return repository.findBySessionId(required(sessionId, "sessionId"));
     }
@@ -66,6 +82,12 @@ public class ExecutionService {
     public List<ExecutionTraceEvent> traces(String executionId) {
         get(executionId);
         return repository.findTraces(executionId);
+    }
+
+    /** Reads the trace of an execution the given user owns. See {@link #getForUser}. */
+    public List<ExecutionTraceEvent> tracesForUser(String executionId, String userId) {
+        AgentExecution execution = getForUser(executionId, userId);
+        return repository.findTraces(execution.id());
     }
 
     private static String required(String value, String field) {

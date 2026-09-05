@@ -41,19 +41,38 @@
 
 ## 2. 阶段 A — 安全基线（阻断上线）
 
-### A1. 认证与身份来源
+### A1. 认证与身份来源 — ✅ 已完成
 
-**问题**：`userId` 目前由客户端自报。`ToolConfirmationController.approve()`
+**问题**：`userId` 曾由客户端自报。`ToolConfirmationController.approve()`
 校验的 `userId` 就是攻击者自己传的那个，整个审批模型可被一条 curl 绕过。
 
-**要求**：
-- 引入 `spring-boot-starter-security`；公网入口全部需要认证
-- `userId` **只允许**从 `Authentication` 取，请求体/查询参数中的 `userId` 字段全部删除
-- `AgentController` / `ConversationController` / `ExecutionController` /
-  `ToolConfirmationController` 逐个改造
+**已实现**：
 
-**验收**：不带凭据请求任一 `/api/v1/**` 返回 401；
-带 A 的凭据无法读取或操作 B 的会话、执行、确认记录（返回 403/404，不泄露存在性）。
+- OAuth2 Resource Server（JWT）。JWT 校验不自己写——`alg=none`、漏校验 `exp`
+  这类洞几乎都出在手写实现里。
+- 两种验签来源，**启动时强制二选一**：`issuer-uri`（外部 IdP）或
+  `shared-secret`（HS256，≥32 字节，自托管）。都不配则拒绝启动——
+  没有任何默认值会让它以"无认证"状态起来，这正是本项要消灭的失败模式。
+- `AuthenticatedUser` 作为 principal，控制器用
+  `@AuthenticationPrincipal AuthenticatedUser` 取身份，与 token 格式解耦。
+- 请求体与查询参数中的 `userId` **全部删除**：`ChatRequest.userId` 去掉，
+  `ToolConfirmationActionRequest` 整个删除（审批不再接受任何请求体）。
+- 未在白名单内的路径一律 `denyAll()`，新增控制器不会因为被遗忘而变成公开。
+- 顺带修掉一个 IDOR：`GET /executions/{id}` 与 `/traces` 此前**无任何归属校验**，
+  任何人可读任意执行的完整 trace（含工具参数、设备数据）。现走
+  `ExecutionService.getForUser` / `tracesForUser`，非属主返回 404 而非 403，
+  避免通过状态码枚举他人活动。
+
+**验收**：`agentforge-app` 此前 0 测试，现有 13 个契约测试。全量 80 个测试通过。
+
+对两处做过变异检验，确认测试非空跑：
+
+| 变异 | 结果 |
+|---|---|
+| `.authenticated()` → `.permitAll()` | 无 token 用例失败 ✅ |
+| `getForUser` → `get`（退回修复前）| `expected:<404> but was:<200 OK>` ✅ |
+
+本地取 token：`scripts/dev-token.sh <userId> [role...]`（仅 shared-secret 模式）。
 
 ### A2. 端点分级
 
@@ -83,7 +102,7 @@
 - [x] `scripts/scan-sensitive.sh` 已替换 CI 里那条硬编码 4 模式正则
 
 旧 CI 检查用不带 revision 的 `git grep`，**只扫工作树**，所以对历史永远绿灯；
-且只硬编码了一个 IP，导致 `192.168.30.103` 漏网 24 个 commit。新脚本按
+且只硬编码了一个地址，导致另一个内网 ES 地址漏网 24 个 commit。新脚本按
 RFC1918 网段整体匹配，并支持 `--history` 全历史模式。
 
 > **注意**：CI 现在会跑 `--history` 模式，因此**在当前仓库上会是红的**。

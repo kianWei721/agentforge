@@ -2,4 +2,9 @@ package com.agentforge.app.api;
 
 import jakarta.validation.constraints.NotBlank;
 
-public record ChatRequest(String userId, String sessionId, @NotBlank(message = "message must not be blank") String message) {}
+/**
+ * Chat input. The caller's identity is taken from the access token, never from the
+ * body: an earlier {@code userId} field here made every ownership check bypassable.
+ */
+public record ChatRequest(
+        String sessionId, @NotBlank(message = "message must not be blank") String message) {}

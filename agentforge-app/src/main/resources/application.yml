@@ -27,6 +27,16 @@ server:
   port: ${SERVER_PORT:8080}
 
 agentforge:
+  security:
+    jwt:
+      # Set exactly one of issuer-uri (external IdP) or shared-secret (self-hosted).
+      # Neither set means the application refuses to start: there is deliberately no
+      # default that would let it come up accepting unauthenticated requests.
+      issuer-uri: ${AGENTFORGE_SECURITY_JWT_ISSUER_URI:}
+      shared-secret: ${AGENTFORGE_SECURITY_JWT_SHARED_SECRET:}
+      audience: ${AGENTFORGE_SECURITY_JWT_AUDIENCE:}
+      user-id-claim: ${AGENTFORGE_SECURITY_JWT_USER_ID_CLAIM:sub}
+      roles-claim: ${AGENTFORGE_SECURITY_JWT_ROLES_CLAIM:roles}
   model:
     provider: ${AGENTFORGE_MODEL_PROVIDER:mock}
     mock:
