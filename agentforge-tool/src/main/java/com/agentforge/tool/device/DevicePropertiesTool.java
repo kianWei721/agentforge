@@ -41,7 +41,7 @@ public class DevicePropertiesTool implements AgentTool {
                                 "deviceId",
                                 Map.of(
                                         "type", "string",
-                                        "description", "设备唯一标识，例如 373")),
+                                        "description", "设备唯一标识，例如 1001")),
                 "required", List.of("deviceId"),
                 "additionalProperties", false);
     }
