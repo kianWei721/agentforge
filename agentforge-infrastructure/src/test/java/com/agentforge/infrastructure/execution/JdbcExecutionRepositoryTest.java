@@ -188,7 +188,7 @@ class JdbcExecutionRepositoryTest {
                                 "tool-call-0",
                                 "FORBIDDEN",
                                 "HTTP",
-                                "yudao-device-web",
+                                "external-iot",
                                 1,
                                 200,
                                 403,
@@ -235,7 +235,7 @@ class JdbcExecutionRepositoryTest {
         assertEquals("tool-call-0", traces.get(3).blockedByToolCallId());
         assertEquals("FORBIDDEN", traces.get(3).blockedByFailureCode());
         assertEquals("HTTP", traces.get(3).outboundProtocol());
-        assertEquals("yudao-device-web", traces.get(3).downstreamSystem());
+        assertEquals("external-iot", traces.get(3).downstreamSystem());
         assertEquals(1, traces.get(3).outboundAttempts());
         assertEquals(200, traces.get(3).httpStatus());
         assertEquals(403, traces.get(3).businessCode());
