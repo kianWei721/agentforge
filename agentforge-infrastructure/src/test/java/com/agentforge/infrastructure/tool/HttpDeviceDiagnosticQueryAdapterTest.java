@@ -27,7 +27,7 @@ class HttpDeviceDiagnosticQueryAdapterTest {
     void shouldNormalizeLatestPropertiesFromTenantCheckedDetails() throws Exception {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext(
-                "/api/iot/devices/373/details",
+                "/api/iot/devices/1001/details",
                 exchange ->
                         respond(
                                 exchange,
@@ -76,7 +76,7 @@ class HttpDeviceDiagnosticQueryAdapterTest {
         List<String> requests = new ArrayList<>();
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext(
-                "/api/iot/devices/373/details",
+                "/api/iot/devices/1001/details",
                 exchange -> {
                     requests.add(exchange.getRequestURI().getPath());
                     respond(
@@ -84,7 +84,7 @@ class HttpDeviceDiagnosticQueryAdapterTest {
                             "{\"code\":200,\"data\":{\"deviceId\":1001},\"msg\":\"\"}");
                 });
         server.createContext(
-                "/api/iot/devices/373/events/history",
+                "/api/iot/devices/1001/events/history",
                 exchange -> {
                     requests.add(exchange.getRequestURI().toString());
                     respond(
@@ -101,7 +101,7 @@ class HttpDeviceDiagnosticQueryAdapterTest {
                             HttpClient.newHttpClient(), new ObjectMapper(), properties(server));
             DeviceEventsSnapshot snapshot = adapter.findRecentEvents("1001", 5).orElseThrow();
             assertEquals(2, requests.size());
-            assertEquals("/api/iot/devices/373/details", requests.get(0));
+            assertEquals("/api/iot/devices/1001/details", requests.get(0));
             assertTrue(requests.get(1).contains("pageNo=1"));
             assertTrue(requests.get(1).contains("pageSize=5"));
             assertEquals("外设状态", snapshot.events().get(0).eventName());
@@ -144,13 +144,13 @@ class HttpDeviceDiagnosticQueryAdapterTest {
         AtomicInteger historyCalls = new AtomicInteger();
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext(
-                "/api/iot/devices/373/details",
+                "/api/iot/devices/1001/details",
                 exchange ->
                         respond(
                                 exchange,
                                 "{\"code\":403,\"data\":null,\"msg\":\"forbidden\"}"));
         server.createContext(
-                "/api/iot/devices/373/events/history",
+                "/api/iot/devices/1001/events/history",
                 exchange -> {
                     historyCalls.incrementAndGet();
                     respond(
