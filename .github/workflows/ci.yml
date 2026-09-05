@@ -71,7 +71,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Gitleaks full history
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Gitleaks
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="8.24.3"
+          curl -fsSL "https://github.com/gitleaks/gitleaks/releases/download/v${version}/gitleaks_${version}_linux_x64.tar.gz" \
+            | tar -xz -C /tmp gitleaks
+
+      - name: Gitleaks full history and all refs
+        shell: bash
+        run: |
+          set -euo pipefail
+          /tmp/gitleaks detect --source . --redact --exit-code 1 --log-opts="--all"
