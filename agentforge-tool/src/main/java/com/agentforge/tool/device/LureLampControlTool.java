@@ -60,7 +60,7 @@ public class LureLampControlTool implements AgentTool {
                                 Map.of(
                                         "type", "string",
                                         "enum", List.of(ALLOWED_DEVICE_ID),
-                                        "description", "当前唯一允许控制的设备 ID，只能为 373"),
+                                        "description", "当前唯一允许控制的设备 ID，只能为 1001"),
                                 "enabled",
                                 Map.of(
                                         "type", "boolean",
