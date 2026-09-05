@@ -20,15 +20,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Reject known private integration markers
+      - name: Scan for sensitive data (working tree and full history)
         shell: bash
         run: |
           set -euo pipefail
-          pattern='60\.12\.4\.180|/admin-api/device/web|[Yy]udao|(^|[^0-9])(373|367|2881|2883)([^0-9]|$)'
-          if git grep -nE "$pattern" -- . ':!PUBLIC_RELEASE.md' ':!.github/workflows/ci.yml'; then
-            echo "Public-release marker scan failed."
-            exit 1
-          fi
+          scripts/scan-sensitive.sh
+          scripts/scan-sensitive.sh --history
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
