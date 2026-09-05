@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Test;
 class HttpDeviceStatusQueryAdapterTest {
 
     @Test
-    void shouldNormalizeRealYudaoDeviceDetailResponse() {
+    void shouldNormalizeSyntheticExternalDeviceDetailResponse() {
         HttpDeviceStatusQueryAdapter adapter = newAdapter();
 
         String body =
@@ -31,10 +31,10 @@ class HttpDeviceStatusQueryAdapterTest {
                 {
                   "code": 200,
                   "data": {
-                    "deviceId": 367,
+                    "deviceId": 1002,
                     "deviceName": "23091014",
                     "deviceNickname": "办公室测报灯",
-                    "productId": 25,
+                    "productId": 2001,
                     "state": "在线",
                     "location": "杭州市",
                     "longitude": 120.12,
@@ -55,7 +55,7 @@ class HttpDeviceStatusQueryAdapterTest {
         assertEquals("external-iot-http", snapshot.source());
         assertEquals("在线", snapshot.attributes().get("stateRaw"));
         assertEquals("办公室测报灯", snapshot.attributes().get("deviceNickname"));
-        assertEquals(25L, snapshot.attributes().get("productId"));
+        assertEquals(2001L, snapshot.attributes().get("productId"));
     }
 
     @Test
@@ -137,7 +137,7 @@ class HttpDeviceStatusQueryAdapterTest {
                 (java.util.Map<String, Object>) result.data().get("attributes");
         assertEquals("离线", attributes.get("stateRaw"));
         assertEquals("办公室测报灯", attributes.get("deviceNickname"));
-        assertEquals(25L, attributes.get("productId"));
+        assertEquals(2001L, attributes.get("productId"));
         assertFalse(attributes.containsKey("productKey"));
         assertFalse(attributes.containsKey("location"));
         assertFalse(attributes.containsKey("longitude"));
@@ -156,7 +156,7 @@ class HttpDeviceStatusQueryAdapterTest {
         ToolResult result =
                 tool.execute(
                         new ToolInvocationContext("default", "user", "session"),
-                        java.util.Map.of("deviceId", "../367"));
+                        java.util.Map.of("deviceId", "../1002"));
 
         assertFalse(result.success());
         assertEquals("deviceId must be a numeric identifier", result.message());
@@ -239,7 +239,7 @@ class HttpDeviceStatusQueryAdapterTest {
                         exchange.getResponseBody().write(body);
                     } else {
                         byte[] body =
-                                "{\"code\":200,\"data\":{\"deviceId\":367,\"state\":\"在线\",\"lastReceiveTime\":1786772323000},\"msg\":\"\"}"
+                                "{\"code\":200,\"data\":{\"deviceId\":1002,\"state\":\"在线\",\"lastReceiveTime\":1786772323000},\"msg\":\"\"}"
                                         .getBytes(StandardCharsets.UTF_8);
                         exchange.sendResponseHeaders(200, body.length);
                         exchange.getResponseBody().write(body);
