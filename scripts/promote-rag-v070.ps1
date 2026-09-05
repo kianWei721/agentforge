@@ -94,7 +94,7 @@ Write-Host ("Current: QueryStrategy={0}, RrfK={1}, EvaluationEnabled={2}" -f
     $health.knowledgeEvaluationEnabled)
 Write-Host "Target : QueryStrategy=ORIGINAL, RrfK=5"
 Write-Host ("Evaluation after promotion: {0}" -f $targetEvaluationEnabled)
-Write-Host "No Elasticsearch rebuild, MySQL migration, yudao change, or credential change is required."
+Write-Host "No Elasticsearch rebuild, MySQL migration, external IoT change, or credential change is required."
 
 if (-not $Apply) {
     Write-Host ""
