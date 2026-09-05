@@ -89,17 +89,17 @@ agentforge:
   iot:
     lure-lamp-control:
       enabled: ${AGENTFORGE_IOT_LURE_LAMP_CONTROL_ENABLED:false}
-      latest-properties-path: "${AGENTFORGE_IOT_LURE_LAMP_LATEST_PROPERTIES_PATH:/admin-api/device/web/devices/{deviceId}/properties/latest}"
-      command-path: "${AGENTFORGE_IOT_LURE_LAMP_COMMAND_PATH:/admin-api/device/web/devices/command/send}"
+      latest-properties-path: "${AGENTFORGE_IOT_LURE_LAMP_LATEST_PROPERTIES_PATH:/api/iot/devices/{deviceId}/properties/latest}"
+      command-path: "${AGENTFORGE_IOT_LURE_LAMP_COMMAND_PATH:/api/iot/device-commands}"
       request-timeout: ${AGENTFORGE_IOT_LURE_LAMP_REQUEST_TIMEOUT:3s}
       verify-attempts: ${AGENTFORGE_IOT_LURE_LAMP_VERIFY_ATTEMPTS:10}
       verify-interval: ${AGENTFORGE_IOT_LURE_LAMP_VERIFY_INTERVAL:500ms}
     device-status:
       mode: ${AGENTFORGE_IOT_DEVICE_STATUS_MODE:demo}
       base-url: ${AGENTFORGE_IOT_BASE_URL:}
-      detail-path: "${AGENTFORGE_IOT_DEVICE_DETAIL_PATH:/admin-api/device/web/devices/{deviceId}}"
-      details-path: "${AGENTFORGE_IOT_DEVICE_DETAILS_PATH:/admin-api/device/web/devices/{deviceId}/details}"
-      events-history-path: "${AGENTFORGE_IOT_DEVICE_EVENTS_HISTORY_PATH:/admin-api/device/web/devices/{deviceId}/events/history}"
+      detail-path: "${AGENTFORGE_IOT_DEVICE_DETAIL_PATH:/api/iot/devices/{deviceId}}"
+      details-path: "${AGENTFORGE_IOT_DEVICE_DETAILS_PATH:/api/iot/devices/{deviceId}/details}"
+      events-history-path: "${AGENTFORGE_IOT_DEVICE_EVENTS_HISTORY_PATH:/api/iot/devices/{deviceId}/events/history}"
       access-token: ${AGENTFORGE_IOT_ACCESS_TOKEN:}
       tenant-id: ${AGENTFORGE_IOT_TENANT_ID:}
       connect-timeout: ${AGENTFORGE_IOT_CONNECT_TIMEOUT:2s}

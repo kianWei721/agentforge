@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Optional;
 
 public class HttpDeviceEventsQueryAdapter implements DeviceEventsQueryPort {
-    private static final String SOURCE = "yudao-device-web-http";
+    private static final String SOURCE = "external-iot-http";
     private final IoTDeviceStatusProperties properties;
     private final YudaoDeviceReadHttpSupport http;
 

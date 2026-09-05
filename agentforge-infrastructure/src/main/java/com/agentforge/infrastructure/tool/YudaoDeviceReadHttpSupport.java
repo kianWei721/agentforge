@@ -22,7 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 final class YudaoDeviceReadHttpSupport {
-    private static final String DOWNSTREAM_SYSTEM = "yudao-device-web";
+    private static final String DOWNSTREAM_SYSTEM = "external-iot";
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
     private final IoTDeviceStatusProperties properties;

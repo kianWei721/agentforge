@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public class HttpDeviceStatusQueryAdapter implements DeviceStatusQueryPort {
 
     private static final int SUCCESS_CODE = 200;
-    private static final String DOWNSTREAM_SYSTEM = "yudao-device-web";
+    private static final String DOWNSTREAM_SYSTEM = "external-iot";
 
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
@@ -286,7 +286,7 @@ public class HttpDeviceStatusQueryAdapter implements DeviceStatusQueryPort {
                         responseDeviceId,
                         normalizedState,
                         lastSeenAt,
-                        "yudao-device-web-http",
+                        "external-iot-http",
                         attributes));
     }
 

@@ -14,7 +14,7 @@ import java.util.Map;
 import java.util.Optional;
 
 public class HttpDevicePropertiesQueryAdapter implements DevicePropertiesQueryPort {
-    private static final String SOURCE = "yudao-device-web-http";
+    private static final String SOURCE = "external-iot-http";
     private static final java.util.Set<String> SENSITIVE_IDENTIFIERS =
             java.util.Set.of("GeoLocation", "ManualGeoLocation", "ProduceInfo");
     private final IoTDeviceStatusProperties properties;

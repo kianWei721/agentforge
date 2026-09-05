@@ -13,8 +13,8 @@ import java.util.Optional;
 public class LureLampControlTool implements AgentTool {
 
     public static final String NAME = "set_lure_lamp_state";
-    public static final String ALLOWED_DEVICE_ID = "373";
-    public static final long EXPECTED_PRODUCT_ID = 25L;
+    public static final String ALLOWED_DEVICE_ID = "1001";
+    public static final long EXPECTED_PRODUCT_ID = 2001L;
 
     private final DeviceStatusQueryPort deviceStatusQueryPort;
     private final LureLampControlPort controlPort;
@@ -45,7 +45,7 @@ public class LureLampControlTool implements AgentTool {
 
     @Override
     public String description() {
-        return "将受控设备 373 的诱虫灯管设置为明确的开启或关闭目标状态。"
+        return "将受控演示设备 1001 的诱虫灯管设置为明确的开启或关闭目标状态。"
                 + "底层设备协议是无参数 TrapLight 切换动作；工具会在确认通过后的执行时刻重新读取状态，"
                 + "仅在当前状态与目标不一致时下发一次命令，禁止自动重复下发。";
     }
@@ -91,7 +91,7 @@ public class LureLampControlTool implements AgentTool {
                 enabled instanceof Boolean value && value
                         ? "打开"
                         : enabled instanceof Boolean ? "关闭" : "变更";
-        return "将设备 373 的诱虫灯管" + action + "。该操作会真实下发设备控制命令。";
+        return "将设备 1001 的诱虫灯管" + action + "。该操作会真实下发设备控制命令。";
     }
 
     @Override
@@ -101,7 +101,7 @@ public class LureLampControlTool implements AgentTool {
         String deviceId = readDeviceId(arguments);
         if (deviceId == null) {
             return ToolResult.failure(
-                    "deviceId must be exactly 373",
+                    "deviceId must be exactly 1001",
                     "DEVICE_NOT_ALLOWED",
                     false);
         }
@@ -135,7 +135,7 @@ public class LureLampControlTool implements AgentTool {
         DeviceStatusSnapshot deviceSnapshot = device.get();
         if (!"ONLINE".equals(deviceSnapshot.status())) {
             return ToolResult.failure(
-                    "device 373 is not online; control was not sent",
+                    "device 1001 is not online; control was not sent",
                     safeData(
                             desired,
                             null,
@@ -148,7 +148,7 @@ public class LureLampControlTool implements AgentTool {
         }
         if (!isExpectedProduct(deviceSnapshot)) {
             return ToolResult.failure(
-                    "device 373 no longer matches the approved product boundary",
+                    "device 1001 no longer matches the approved product boundary",
                     safeData(
                             desired,
                             null,
