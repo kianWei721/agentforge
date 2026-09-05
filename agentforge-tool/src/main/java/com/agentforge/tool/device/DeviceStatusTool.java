@@ -42,7 +42,7 @@ public class DeviceStatusTool implements AgentTool {
                                 "deviceId",
                                 Map.of(
                                         "type", "string",
-                                        "description", "设备唯一标识，例如 367")),
+                                        "description", "设备唯一标识，例如 1002")),
                 "required", List.of("deviceId"),
                 "additionalProperties", false);
     }

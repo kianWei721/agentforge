@@ -61,7 +61,7 @@ class ToolGovernanceStateTest {
                 new ToolGovernanceState(new ToolGovernanceOptions(true, true, 32));
 
         ToolGovernanceState.ToolGovernanceDecision first =
-                state.beforeInvocation("call-1", "query_device_status", Map.of("deviceId", "367"));
+                state.beforeInvocation("call-1", "query_device_status", Map.of("deviceId", "1002"));
         state.recordResult(
                 "call-1",
                 first,
@@ -75,7 +75,7 @@ class ToolGovernanceStateTest {
                 state.beforeInvocation(
                                 "call-2",
                                 "query_device_status",
-                                Map.of("deviceId", "367"))
+                                Map.of("deviceId", "1002"))
                         .allowed());
     }
 
@@ -171,7 +171,7 @@ class ToolGovernanceStateTest {
         ToolGovernanceState state =
                 new ToolGovernanceState(new ToolGovernanceOptions(true, true, 32));
         ToolGovernanceState.ToolGovernanceDecision decision =
-                state.beforeInvocation("call-http", "query_device_status", Map.of("deviceId", "367"));
+                state.beforeInvocation("call-http", "query_device_status", Map.of("deviceId", "1002"));
 
         state.recordResult(
                 "call-http",
@@ -180,7 +180,7 @@ class ToolGovernanceStateTest {
                 33L,
                 new OutboundHttpTelemetry(
                         "HTTP",
-                        "yudao-device-web",
+                        "external-iot",
                         2,
                         200,
                         200,
@@ -190,7 +190,7 @@ class ToolGovernanceStateTest {
         ToolGovernanceState.ToolInvocationTelemetry telemetry = state.telemetry("call-http");
         assertNotNull(telemetry);
         assertEquals("HTTP", telemetry.outboundProtocol());
-        assertEquals("yudao-device-web", telemetry.downstreamSystem());
+        assertEquals("external-iot", telemetry.downstreamSystem());
         assertEquals(2, telemetry.outboundAttempts());
         assertEquals(200, telemetry.httpStatus());
         assertEquals(200, telemetry.businessCode());

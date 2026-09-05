@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Test;
 class LureLampControlToolTest {
 
     @Test
-    void shouldRejectEveryDeviceExcept373BeforeBackendAccess() {
+    void shouldRejectEveryDeviceExcept1001BeforeBackendAccess() {
         AtomicInteger statusCalls = new AtomicInteger();
         DeviceStatusQueryPort statusPort =
                 deviceId -> {
@@ -35,7 +35,7 @@ class LureLampControlToolTest {
         ToolResult result =
                 tool.execute(
                         new ToolInvocationContext("agent", "user", "session"),
-                        Map.of("deviceId", "367", "enabled", true));
+                        Map.of("deviceId", "1002", "enabled", true));
 
         assertFalse(result.success());
         assertEquals("DEVICE_NOT_ALLOWED", result.failureCode());
@@ -46,7 +46,7 @@ class LureLampControlToolTest {
 
     @Test
     void shouldNoOpWhenCurrentStateAlreadyMatchesTarget() {
-        DeviceStatusQueryPort statusPort = onlineProduct25();
+        DeviceStatusQueryPort statusPort = onlineProduct2001();
         FakeControlPort controlPort = new FakeControlPort(LureLampState.OFF);
         LureLampControlTool tool =
                 new LureLampControlTool(statusPort, controlPort, 3, Duration.ZERO);
@@ -54,7 +54,7 @@ class LureLampControlToolTest {
         ToolResult result =
                 tool.execute(
                         new ToolInvocationContext("agent", "user", "session"),
-                        Map.of("deviceId", "373", "enabled", false));
+                        Map.of("deviceId", "1001", "enabled", false));
 
         assertTrue(result.success());
         assertEquals("NO_OP_ALREADY_DESIRED", result.data().get("outcome"));
@@ -65,7 +65,7 @@ class LureLampControlToolTest {
 
     @Test
     void shouldSendToggleExactlyOnceAndConfirmTargetState() {
-        DeviceStatusQueryPort statusPort = onlineProduct25();
+        DeviceStatusQueryPort statusPort = onlineProduct2001();
         FakeControlPort controlPort =
                 new FakeControlPort(
                         LureLampState.OFF,
@@ -77,19 +77,19 @@ class LureLampControlToolTest {
         ToolResult result =
                 tool.execute(
                         new ToolInvocationContext("agent", "user", "session"),
-                        Map.of("deviceId", "373", "enabled", true));
+                        Map.of("deviceId", "1001", "enabled", true));
 
         assertTrue(result.success());
         assertEquals("TARGET_STATE_CONFIRMED", result.data().get("outcome"));
         assertEquals("ON", result.data().get("observedState"));
         assertEquals(true, result.data().get("commandSent"));
-        assertEquals("2881", result.data().get("commandId"));
+        assertEquals("9001", result.data().get("commandId"));
         assertEquals(1, controlPort.toggleCalls.get());
     }
 
     @Test
     void shouldNeverRetryToggleWhenTargetStateCannotBeConfirmed() {
-        DeviceStatusQueryPort statusPort = onlineProduct25();
+        DeviceStatusQueryPort statusPort = onlineProduct2001();
         FakeControlPort controlPort =
                 new FakeControlPort(
                         LureLampState.OFF,
@@ -102,7 +102,7 @@ class LureLampControlToolTest {
         ToolResult result =
                 tool.execute(
                         new ToolInvocationContext("agent", "user", "session"),
-                        Map.of("deviceId", "373", "enabled", true));
+                        Map.of("deviceId", "1001", "enabled", true));
 
         assertFalse(result.success());
         assertEquals("TARGET_STATE_UNCONFIRMED", result.failureCode());
@@ -120,7 +120,7 @@ class LureLampControlToolTest {
                                         "OFFLINE",
                                         null,
                                         "test",
-                                        Map.of("productId", 25L)));
+                                        Map.of("productId", 2001L)));
         FakeControlPort controlPort = new FakeControlPort(LureLampState.OFF);
         LureLampControlTool tool =
                 new LureLampControlTool(offline, controlPort, 1, Duration.ZERO);
@@ -128,7 +128,7 @@ class LureLampControlToolTest {
         ToolResult offlineResult =
                 tool.execute(
                         new ToolInvocationContext("agent", "user", "session"),
-                        Map.of("deviceId", "373", "enabled", true));
+                        Map.of("deviceId", "1001", "enabled", true));
 
         assertFalse(offlineResult.success());
         assertEquals("DEVICE_OFFLINE", offlineResult.failureCode());
@@ -142,21 +142,21 @@ class LureLampControlToolTest {
                                         "ONLINE",
                                         null,
                                         "test",
-                                        Map.of("productId", 33L)));
+                                        Map.of("productId", 2002L)));
         LureLampControlTool wrongProductTool =
                 new LureLampControlTool(wrongProduct, controlPort, 1, Duration.ZERO);
 
         ToolResult productResult =
                 wrongProductTool.execute(
                         new ToolInvocationContext("agent", "user", "session"),
-                        Map.of("deviceId", "373", "enabled", true));
+                        Map.of("deviceId", "1001", "enabled", true));
 
         assertFalse(productResult.success());
         assertEquals("PRODUCT_MISMATCH", productResult.failureCode());
         assertEquals(0, controlPort.toggleCalls.get());
     }
 
-    private static DeviceStatusQueryPort onlineProduct25() {
+    private static DeviceStatusQueryPort onlineProduct2001() {
         return deviceId ->
                 Optional.of(
                         new DeviceStatusSnapshot(
@@ -164,7 +164,7 @@ class LureLampControlToolTest {
                                 "ONLINE",
                                 "2026-08-29T07:54:33Z",
                                 "test",
-                                Map.of("productId", 25L)));
+                                Map.of("productId", 2001L)));
     }
 
     private static final class FakeControlPort implements LureLampControlPort {
@@ -193,7 +193,7 @@ class LureLampControlToolTest {
                 ToolTelemetrySink telemetry) {
             toggleCalls.incrementAndGet();
             return new LureLampCommandReceipt(
-                    "2881",
+                    "9001",
                     "message-1",
                     "ACCEPTED",
                     "accepted");

@@ -14,16 +14,16 @@ import java.util.Map;
 import java.util.Optional;
 
 public class HttpDevicePropertiesQueryAdapter implements DevicePropertiesQueryPort {
-    private static final String SOURCE = "yudao-device-web-http";
+    private static final String SOURCE = "external-iot-http";
     private static final java.util.Set<String> SENSITIVE_IDENTIFIERS =
             java.util.Set.of("GeoLocation", "ManualGeoLocation", "ProduceInfo");
     private final IoTDeviceStatusProperties properties;
-    private final YudaoDeviceReadHttpSupport http;
+    private final ExternalIoTReadHttpSupport http;
 
     public HttpDevicePropertiesQueryAdapter(
             HttpClient httpClient, ObjectMapper objectMapper, IoTDeviceStatusProperties properties) {
         this.properties = properties;
-        this.http = new YudaoDeviceReadHttpSupport(httpClient, objectMapper, properties);
+        this.http = new ExternalIoTReadHttpSupport(httpClient, objectMapper, properties);
     }
 
     @Override
@@ -40,7 +40,7 @@ public class HttpDevicePropertiesQueryAdapter implements DevicePropertiesQueryPo
     }
 
     private DevicePropertiesSnapshot parse(JsonNode data, String requestedDeviceId) {
-        String responseDeviceId = YudaoDeviceReadHttpSupport.text(data, "deviceId");
+        String responseDeviceId = ExternalIoTReadHttpSupport.text(data, "deviceId");
         if (responseDeviceId == null || responseDeviceId.isBlank()) responseDeviceId = requestedDeviceId;
         if (!requestedDeviceId.equals(responseDeviceId)) {
             throw new DeviceDiagnosticQueryException(
@@ -53,18 +53,18 @@ public class HttpDevicePropertiesQueryAdapter implements DevicePropertiesQueryPo
         if (propertiesNode != null && propertiesNode.isArray()) {
             for (JsonNode item : propertiesNode) {
                 JsonNode model = item.get("model");
-                String identifier = YudaoDeviceReadHttpSupport.text(model, "identifier");
+                String identifier = ExternalIoTReadHttpSupport.text(model, "identifier");
                 if (identifier == null
                         || identifier.isBlank()
                         || SENSITIVE_IDENTIFIERS.contains(identifier)) {
                     continue;
                 }
                 values.put(identifier, new DevicePropertyValue(
-                        YudaoDeviceReadHttpSupport.text(model, "propertyName"),
+                        ExternalIoTReadHttpSupport.text(model, "propertyName"),
                         http.toJavaValue(item.get("latestValue")),
-                        YudaoDeviceReadHttpSupport.normalizeTime(item.get("latestTime")),
-                        YudaoDeviceReadHttpSupport.text(item, "source"),
-                        YudaoDeviceReadHttpSupport.text(item, "shadowStatus")));
+                        ExternalIoTReadHttpSupport.normalizeTime(item.get("latestTime")),
+                        ExternalIoTReadHttpSupport.text(item, "source"),
+                        ExternalIoTReadHttpSupport.text(item, "shadowStatus")));
             }
         }
 
@@ -72,9 +72,9 @@ public class HttpDevicePropertiesQueryAdapter implements DevicePropertiesQueryPo
                 ? data.path("productId").longValue() : null;
         return new DevicePropertiesSnapshot(
                 responseDeviceId,
-                YudaoDeviceReadHttpSupport.text(data, "deviceNickname"),
+                ExternalIoTReadHttpSupport.text(data, "deviceNickname"),
                 productId,
-                YudaoDeviceReadHttpSupport.normalizeTime(data.get("latestUpdateTime")),
+                ExternalIoTReadHttpSupport.normalizeTime(data.get("latestUpdateTime")),
                 SOURCE,
                 values);
     }

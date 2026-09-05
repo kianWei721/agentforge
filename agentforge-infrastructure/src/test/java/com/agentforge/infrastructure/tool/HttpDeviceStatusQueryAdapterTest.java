@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Test;
 class HttpDeviceStatusQueryAdapterTest {
 
     @Test
-    void shouldNormalizeRealYudaoDeviceDetailResponse() {
+    void shouldNormalizeSyntheticExternalDeviceDetailResponse() {
         HttpDeviceStatusQueryAdapter adapter = newAdapter();
 
         String body =
@@ -31,10 +31,10 @@ class HttpDeviceStatusQueryAdapterTest {
                 {
                   "code": 200,
                   "data": {
-                    "deviceId": 367,
+                    "deviceId": 1002,
                     "deviceName": "23091014",
                     "deviceNickname": "办公室测报灯",
-                    "productId": 25,
+                    "productId": 2001,
                     "state": "在线",
                     "location": "杭州市",
                     "longitude": 120.12,
@@ -46,16 +46,16 @@ class HttpDeviceStatusQueryAdapterTest {
                 """;
 
         DeviceStatusSnapshot snapshot =
-                adapter.parseResponse(200, body, "367").orElseThrow();
+                adapter.parseResponse(200, body, "1002").orElseThrow();
 
-        assertEquals("367", snapshot.deviceId());
+        assertEquals("1002", snapshot.deviceId());
         assertEquals("ONLINE", snapshot.status());
         assertEquals("2026-08-15T05:38:43Z", snapshot.lastSeenAt());
         assertEquals(1786772323000L, snapshot.attributes().get("lastReceiveTimeRaw"));
-        assertEquals("yudao-device-web-http", snapshot.source());
+        assertEquals("external-iot-http", snapshot.source());
         assertEquals("在线", snapshot.attributes().get("stateRaw"));
         assertEquals("办公室测报灯", snapshot.attributes().get("deviceNickname"));
-        assertEquals(25L, snapshot.attributes().get("productId"));
+        assertEquals(2001L, snapshot.attributes().get("productId"));
     }
 
     @Test
@@ -86,7 +86,7 @@ class HttpDeviceStatusQueryAdapterTest {
                                 adapter.parseResponse(
                                         200,
                                         "{\"code\":403,\"data\":null,\"msg\":\"当前租户无权查看该设备\"}",
-                                        "367"));
+                                        "1002"));
 
         assertEquals(DeviceStatusQueryException.Reason.FORBIDDEN, exception.reason());
         assertFalse(exception.retryable());
@@ -116,11 +116,11 @@ class HttpDeviceStatusQueryAdapterTest {
                                                 deviceId,
                                                 "OFFLINE",
                                                 "2026-08-15T05:38:43Z",
-                                                "yudao-device-web-http",
+                                                "external-iot-http",
                                                 java.util.Map.of(
                                                         "stateRaw", "离线",
                                                         "deviceNickname", "办公室测报灯",
-                                                        "productId", 25L,
+                                                        "productId", 2001L,
                                                         "productKey", "secret-like-business-key",
                                                         "location", "精确位置",
                                                         "longitude", 120.49,
@@ -129,7 +129,7 @@ class HttpDeviceStatusQueryAdapterTest {
         ToolResult result =
                 tool.execute(
                         new ToolInvocationContext("default", "user", "session"),
-                        java.util.Map.of("deviceId", "367"));
+                        java.util.Map.of("deviceId", "1002"));
 
         assertTrue(result.success());
         @SuppressWarnings("unchecked")
@@ -137,7 +137,7 @@ class HttpDeviceStatusQueryAdapterTest {
                 (java.util.Map<String, Object>) result.data().get("attributes");
         assertEquals("离线", attributes.get("stateRaw"));
         assertEquals("办公室测报灯", attributes.get("deviceNickname"));
-        assertEquals(25L, attributes.get("productId"));
+        assertEquals(2001L, attributes.get("productId"));
         assertFalse(attributes.containsKey("productKey"));
         assertFalse(attributes.containsKey("location"));
         assertFalse(attributes.containsKey("longitude"));
@@ -156,7 +156,7 @@ class HttpDeviceStatusQueryAdapterTest {
         ToolResult result =
                 tool.execute(
                         new ToolInvocationContext("default", "user", "session"),
-                        java.util.Map.of("deviceId", "../367"));
+                        java.util.Map.of("deviceId", "../1002"));
 
         assertFalse(result.success());
         assertEquals("deviceId must be a numeric identifier", result.message());
@@ -176,7 +176,7 @@ class HttpDeviceStatusQueryAdapterTest {
         ToolResult result =
                 tool.execute(
                         new ToolInvocationContext("default", "user", "session"),
-                        java.util.Map.of("deviceId", "367"));
+                        java.util.Map.of("deviceId", "1002"));
 
         assertFalse(result.success());
         assertEquals("device status query unavailable: TIMEOUT", result.message());
@@ -208,13 +208,13 @@ class HttpDeviceStatusQueryAdapterTest {
             DeviceStatusQueryException exception =
                     assertThrows(
                             DeviceStatusQueryException.class,
-                            () -> adapter.findByDeviceId("367", observed::set));
+                            () -> adapter.findByDeviceId("1002", observed::set));
 
             assertEquals(DeviceStatusQueryException.Reason.FORBIDDEN, exception.reason());
             OutboundHttpTelemetry telemetry = observed.get();
             assertNotNull(telemetry);
             assertEquals("HTTP", telemetry.protocol());
-            assertEquals("yudao-device-web", telemetry.downstreamSystem());
+            assertEquals("external-iot", telemetry.downstreamSystem());
             assertEquals(1, telemetry.attempts());
             assertEquals(200, telemetry.httpStatus());
             assertEquals(403, telemetry.businessCode());
@@ -239,7 +239,7 @@ class HttpDeviceStatusQueryAdapterTest {
                         exchange.getResponseBody().write(body);
                     } else {
                         byte[] body =
-                                "{\"code\":200,\"data\":{\"deviceId\":367,\"state\":\"在线\",\"lastReceiveTime\":1786772323000},\"msg\":\"\"}"
+                                "{\"code\":200,\"data\":{\"deviceId\":1002,\"state\":\"在线\",\"lastReceiveTime\":1786772323000},\"msg\":\"\"}"
                                         .getBytes(StandardCharsets.UTF_8);
                         exchange.sendResponseHeaders(200, body.length);
                         exchange.getResponseBody().write(body);
@@ -254,7 +254,7 @@ class HttpDeviceStatusQueryAdapterTest {
                     newAdapter("http://127.0.0.1:" + server.getAddress().getPort(), 2);
 
             DeviceStatusSnapshot snapshot =
-                    adapter.findByDeviceId("367", observed::set).orElseThrow();
+                    adapter.findByDeviceId("1002", observed::set).orElseThrow();
 
             assertEquals("ONLINE", snapshot.status());
             assertEquals(2, requests.get());

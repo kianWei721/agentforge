@@ -27,12 +27,12 @@ class HttpDeviceDiagnosticQueryAdapterTest {
     void shouldNormalizeLatestPropertiesFromTenantCheckedDetails() throws Exception {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext(
-                "/admin-api/device/web/devices/373/details",
+                "/api/iot/devices/1001/details",
                 exchange ->
                         respond(
                                 exchange,
-                                "{\"code\":200,\"data\":{\"deviceId\":373,"
-                                        + "\"deviceNickname\":\"测试测报灯\",\"productId\":25,"
+                                "{\"code\":200,\"data\":{\"deviceId\":1001,"
+                                        + "\"deviceNickname\":\"demo-device\",\"productId\":2001,"
                                         + "\"latestUpdateTime\":1788060000000,\"properties\":[{"
                                         + "\"model\":{\"identifier\":\"PeripheralStatus\",\"propertyName\":\"外设状态\"},"
                                         + "\"latestValue\":{\"TrapLight\":1,\"RainCompartment\":0},"
@@ -46,8 +46,8 @@ class HttpDeviceDiagnosticQueryAdapterTest {
             HttpDevicePropertiesQueryAdapter adapter =
                     new HttpDevicePropertiesQueryAdapter(
                             HttpClient.newHttpClient(), new ObjectMapper(), properties(server));
-            DevicePropertiesSnapshot snapshot = adapter.findByDeviceId("373").orElseThrow();
-            assertEquals("测试测报灯", snapshot.deviceNickname());
+            DevicePropertiesSnapshot snapshot = adapter.findByDeviceId("1001").orElseThrow();
+            assertEquals("demo-device", snapshot.deviceNickname());
             @SuppressWarnings("unchecked")
             var status =
                     (java.util.Map<String, Object>)
@@ -59,7 +59,7 @@ class HttpDeviceDiagnosticQueryAdapterTest {
                     new DevicePropertiesTool(id -> java.util.Optional.of(snapshot))
                             .execute(
                                     new ToolInvocationContext("a", "u", "s"),
-                                    java.util.Map.of("deviceId", "373"));
+                                    java.util.Map.of("deviceId", "1001"));
             assertTrue(result.success());
             assertEquals(1, result.data().get("propertyCount"));
             assertNotNull(result.data().get("queriedAt"));
@@ -76,21 +76,21 @@ class HttpDeviceDiagnosticQueryAdapterTest {
         List<String> requests = new ArrayList<>();
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext(
-                "/admin-api/device/web/devices/373/details",
+                "/api/iot/devices/1001/details",
                 exchange -> {
                     requests.add(exchange.getRequestURI().getPath());
                     respond(
                             exchange,
-                            "{\"code\":200,\"data\":{\"deviceId\":373},\"msg\":\"\"}");
+                            "{\"code\":200,\"data\":{\"deviceId\":1001},\"msg\":\"\"}");
                 });
         server.createContext(
-                "/admin-api/device/web/devices/373/events/history",
+                "/api/iot/devices/1001/events/history",
                 exchange -> {
                     requests.add(exchange.getRequestURI().toString());
                     respond(
                             exchange,
                             "{\"code\":200,\"data\":{\"list\":[{\"eventId\":169,"
-                                    + "\"eventName\":\"外设状态\",\"deviceId\":373,"
+                                    + "\"eventName\":\"外设状态\",\"deviceId\":1001,"
                                     + "\"eventData\":\"{\\\"TrapLight\\\":1}\","
                                     + "\"createTime\":1788060000000}],\"total\":1},\"msg\":\"\"}");
                 });
@@ -99,9 +99,9 @@ class HttpDeviceDiagnosticQueryAdapterTest {
             HttpDeviceEventsQueryAdapter adapter =
                     new HttpDeviceEventsQueryAdapter(
                             HttpClient.newHttpClient(), new ObjectMapper(), properties(server));
-            DeviceEventsSnapshot snapshot = adapter.findRecentEvents("373", 5).orElseThrow();
+            DeviceEventsSnapshot snapshot = adapter.findRecentEvents("1001", 5).orElseThrow();
             assertEquals(2, requests.size());
-            assertEquals("/admin-api/device/web/devices/373/details", requests.get(0));
+            assertEquals("/api/iot/devices/1001/details", requests.get(0));
             assertTrue(requests.get(1).contains("pageNo=1"));
             assertTrue(requests.get(1).contains("pageSize=5"));
             assertEquals("外设状态", snapshot.events().get(0).eventName());
@@ -111,7 +111,7 @@ class HttpDeviceDiagnosticQueryAdapterTest {
                                     (id, limit) -> java.util.Optional.of(snapshot))
                             .execute(
                                     new ToolInvocationContext("a", "u", "s"),
-                                    java.util.Map.of("deviceId", "373", "limit", 5));
+                                    java.util.Map.of("deviceId", "1001", "limit", 5));
             assertTrue(result.success());
             assertNotNull(result.data().get("queriedAt"));
             assertEquals(
@@ -125,12 +125,12 @@ class HttpDeviceDiagnosticQueryAdapterTest {
     @Test
     void shouldDescribeEmptyEventResultWithoutClaimingNoAlarms() {
         DeviceEventsSnapshot snapshot =
-                new DeviceEventsSnapshot("373", 0L, List.of(), "test");
+                new DeviceEventsSnapshot("1001", 0L, List.of(), "test");
         ToolResult result =
                 new DeviceEventsTool((id, limit) -> java.util.Optional.of(snapshot))
                         .execute(
                                 new ToolInvocationContext("a", "u", "s"),
-                                java.util.Map.of("deviceId", "373", "limit", 5));
+                                java.util.Map.of("deviceId", "1001", "limit", 5));
 
         assertTrue(result.success());
         assertEquals(0, result.data().get("count"));
@@ -144,13 +144,13 @@ class HttpDeviceDiagnosticQueryAdapterTest {
         AtomicInteger historyCalls = new AtomicInteger();
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext(
-                "/admin-api/device/web/devices/373/details",
+                "/api/iot/devices/1001/details",
                 exchange ->
                         respond(
                                 exchange,
                                 "{\"code\":403,\"data\":null,\"msg\":\"forbidden\"}"));
         server.createContext(
-                "/admin-api/device/web/devices/373/events/history",
+                "/api/iot/devices/1001/events/history",
                 exchange -> {
                     historyCalls.incrementAndGet();
                     respond(
@@ -165,7 +165,7 @@ class HttpDeviceDiagnosticQueryAdapterTest {
             DeviceDiagnosticQueryException exception =
                     assertThrows(
                             DeviceDiagnosticQueryException.class,
-                            () -> adapter.findRecentEvents("373", 10));
+                            () -> adapter.findRecentEvents("1001", 10));
             assertEquals(DeviceDiagnosticQueryException.Reason.FORBIDDEN, exception.reason());
             assertEquals(0, historyCalls.get());
         } finally {
@@ -184,7 +184,7 @@ class HttpDeviceDiagnosticQueryAdapterTest {
         ToolResult result =
                 tool.execute(
                         new ToolInvocationContext("a", "u", "s"),
-                        java.util.Map.of("deviceId", "373", "limit", 21));
+                        java.util.Map.of("deviceId", "1001", "limit", 21));
         assertFalse(result.success());
         assertEquals("INVALID_ARGUMENT", result.failureCode());
     }

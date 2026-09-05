@@ -66,7 +66,7 @@ try {
         Invoke-AgentForgeSse -Uri "$baseUrl/api/v1/agents/$($created.id)/stream" -Payload @{
             userId = "verify-user"
             sessionId = "verify-agent"
-            message = "What is the current status of device 367? Call query_device_status first, then answer from the tool result."
+            message = "What is the current status of device 1002? Call query_device_status first, then answer from the tool result."
         }
         Write-Host ""
     } else {

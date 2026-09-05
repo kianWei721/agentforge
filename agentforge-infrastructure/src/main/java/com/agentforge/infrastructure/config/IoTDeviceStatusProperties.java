@@ -14,9 +14,9 @@ public class IoTDeviceStatusProperties {
 
     private Mode mode = Mode.DEMO;
     private String baseUrl = "";
-    private String detailPath = "/admin-api/device/web/devices/{deviceId}";
-    private String detailsPath = "/admin-api/device/web/devices/{deviceId}/details";
-    private String eventsHistoryPath = "/admin-api/device/web/devices/{deviceId}/events/history";
+    private String detailPath = "/api/iot/devices/{deviceId}";
+    private String detailsPath = "/api/iot/devices/{deviceId}/details";
+    private String eventsHistoryPath = "/api/iot/devices/{deviceId}/events/history";
     private String accessToken = "";
     private String tenantId = "";
     private Duration connectTimeout = Duration.ofSeconds(2);

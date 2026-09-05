@@ -14,14 +14,14 @@ import java.util.List;
 import java.util.Optional;
 
 public class HttpDeviceEventsQueryAdapter implements DeviceEventsQueryPort {
-    private static final String SOURCE = "yudao-device-web-http";
+    private static final String SOURCE = "external-iot-http";
     private final IoTDeviceStatusProperties properties;
-    private final YudaoDeviceReadHttpSupport http;
+    private final ExternalIoTReadHttpSupport http;
 
     public HttpDeviceEventsQueryAdapter(
             HttpClient httpClient, ObjectMapper objectMapper, IoTDeviceStatusProperties properties) {
         this.properties = properties;
-        this.http = new YudaoDeviceReadHttpSupport(httpClient, objectMapper, properties);
+        this.http = new ExternalIoTReadHttpSupport(httpClient, objectMapper, properties);
     }
 
     @Override
@@ -38,7 +38,7 @@ public class HttpDeviceEventsQueryAdapter implements DeviceEventsQueryPort {
         Optional<JsonNode> guard = http.getData(details, telemetry);
         if (guard.isEmpty()) return Optional.empty();
 
-        String guardedDeviceId = YudaoDeviceReadHttpSupport.text(guard.get(), "deviceId");
+        String guardedDeviceId = ExternalIoTReadHttpSupport.text(guard.get(), "deviceId");
         if (guardedDeviceId != null
                 && !guardedDeviceId.isBlank()
                 && !deviceId.equals(guardedDeviceId)) {
@@ -58,7 +58,7 @@ public class HttpDeviceEventsQueryAdapter implements DeviceEventsQueryPort {
         JsonNode list = data.get("list");
         if (list != null && list.isArray()) {
             for (JsonNode item : list) {
-                String responseDeviceId = YudaoDeviceReadHttpSupport.text(item, "deviceId");
+                String responseDeviceId = ExternalIoTReadHttpSupport.text(item, "deviceId");
                 if (responseDeviceId != null
                         && !responseDeviceId.isBlank()
                         && !requestedDeviceId.equals(responseDeviceId)) {
@@ -70,9 +70,9 @@ public class HttpDeviceEventsQueryAdapter implements DeviceEventsQueryPort {
                         ? item.path("eventId").longValue() : null;
                 events.add(new DeviceEventRecord(
                         eventId,
-                        YudaoDeviceReadHttpSupport.text(item, "eventName"),
+                        ExternalIoTReadHttpSupport.text(item, "eventName"),
                         http.toJavaValue(item.get("eventData")),
-                        YudaoDeviceReadHttpSupport.normalizeTime(item.get("createTime"))));
+                        ExternalIoTReadHttpSupport.normalizeTime(item.get("createTime"))));
             }
         }
         return new DeviceEventsSnapshot(requestedDeviceId, total, events, SOURCE);

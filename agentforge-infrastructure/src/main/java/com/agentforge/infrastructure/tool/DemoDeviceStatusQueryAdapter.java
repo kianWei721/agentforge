@@ -9,24 +9,24 @@ public class DemoDeviceStatusQueryAdapter implements DeviceStatusQueryPort {
 
     private final Map<String, DeviceStatusSnapshot> demoData =
             Map.of(
-                    "367",
+                    "1002",
                     new DeviceStatusSnapshot(
-                            "367",
+                            "1002",
                             "ONLINE",
                             "2026-08-28T10:00:00Z",
                             "demo-adapter",
                             Map.of(
-                                    "product", "智能虫情测报灯",
+                                    "product", "synthetic-demo-device",
                                     "network", "MQTT",
                                     "note", "V0.2 deterministic demo data")),
-                    "343",
+                    "1003",
                     new DeviceStatusSnapshot(
-                            "343",
+                            "1003",
                             "OFFLINE",
                             "2026-08-28T08:12:00Z",
                             "demo-adapter",
                             Map.of(
-                                    "product", "智能虫情测报灯",
+                                    "product", "synthetic-demo-device",
                                     "network", "MQTT",
                                     "note", "V0.2 deterministic demo data")));
 

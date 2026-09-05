@@ -17,7 +17,7 @@ class DeviceStatusToolTest {
         ToolResult result =
                 tool.execute(
                         new ToolInvocationContext("agent-1", "user-1", "session-1"),
-                        Map.of("deviceId", "367"));
+                        Map.of("deviceId", "1002"));
 
         assertTrue(result.success());
         assertEquals("ONLINE", result.data().get("status"));

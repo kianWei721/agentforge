@@ -12,16 +12,29 @@ Thumbs.db
 
 # Local secrets
 .env
-.env.local
+.env.*
+!.env.example
 application-local.yml
 **/application-local.yml
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+credentials*.json
+secrets*.json
+secrets*.yml
+secrets*.yaml
 
 # AgentScope local state/workspace
 .agentscope/
 
-# Logs
+# Logs / local exports
 *.log
 logs/
+*.trace
+trace-exports/
 
 # Local promotion / rollback state
 scripts/.state/

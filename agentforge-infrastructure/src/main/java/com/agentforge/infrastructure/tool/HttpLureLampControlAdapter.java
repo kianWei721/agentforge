@@ -32,7 +32,7 @@ public class HttpLureLampControlAdapter implements LureLampControlPort {
     private static final String TRAP_LIGHT_FIELD = "TrapLight";
     private static final String COMMAND_TYPE = "SERVICE_INVOKE";
     private static final String SERVICE_IDENTIFIER = "TrapLight";
-    private static final String DOWNSTREAM_SYSTEM = "yudao-device-web";
+    private static final String DOWNSTREAM_SYSTEM = "external-iot";
 
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
@@ -197,14 +197,14 @@ public class HttpLureLampControlAdapter implements LureLampControlPort {
                     requestedDeviceId,
                     state,
                     text(item, "updateTime"),
-                    "yudao-device-web-latest-properties");
+                    "external-iot-latest-properties");
         }
 
         return new LureLampStateSnapshot(
                 requestedDeviceId,
                 LureLampState.UNKNOWN,
                 null,
-                "yudao-device-web-latest-properties");
+                "external-iot-latest-properties");
     }
 
     LureLampCommandReceipt parseCommandResponse(

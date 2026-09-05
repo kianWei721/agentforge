@@ -43,7 +43,7 @@ class HttpLureLampControlAdapterTest {
                 """;
 
         LureLampStateSnapshot snapshot =
-                adapter.parseStateResponse(200, body, "373");
+                adapter.parseStateResponse(200, body, "1001");
 
         assertEquals(LureLampState.ON, snapshot.state());
         assertEquals("2026-08-29 15:54:33", snapshot.observedAt());
@@ -55,7 +55,7 @@ class HttpLureLampControlAdapterTest {
         AtomicReference<JsonNode> requestBody = new AtomicReference<>();
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext(
-                "/admin-api/device/web/devices/command/send",
+                "/api/iot/device-commands",
                 exchange -> {
                     requests.incrementAndGet();
                     requestBody.set(
@@ -66,7 +66,7 @@ class HttpLureLampControlAdapterTest {
                                                     StandardCharsets.UTF_8)));
                     byte[] body =
                             """
-                            {"code":200,"data":{"commandId":2881,"messageId":"message-1","status":"ACCEPTED","message":"虫情灯命令已受理"}}
+                            {"code":200,"data":{"commandId":9001,"messageId":"message-1","status":"ACCEPTED","message":"虫情灯命令已受理"}}
                             """
                                     .getBytes(StandardCharsets.UTF_8);
                     exchange.sendResponseHeaders(200, body.length);
@@ -81,10 +81,10 @@ class HttpLureLampControlAdapterTest {
                     newAdapter("http://127.0.0.1:" + server.getAddress().getPort());
 
             LureLampCommandReceipt receipt =
-                    adapter.invokeToggle("373", observed::set);
+                    adapter.invokeToggle("1001", observed::set);
 
             assertEquals(1, requests.get());
-            assertEquals(373, requestBody.get().path("deviceId").asInt());
+            assertEquals(1001, requestBody.get().path("deviceId").asInt());
             assertEquals(
                     "SERVICE_INVOKE",
                     requestBody.get().path("commandType").asText());
@@ -92,7 +92,7 @@ class HttpLureLampControlAdapterTest {
             assertTrue(requestBody.get().path("params").isObject());
             assertEquals(0, requestBody.get().path("params").size());
 
-            assertEquals("2881", receipt.commandId());
+            assertEquals("9001", receipt.commandId());
             assertEquals("ACCEPTED", receipt.status());
 
             OutboundHttpTelemetry telemetry = observed.get();
@@ -111,7 +111,7 @@ class HttpLureLampControlAdapterTest {
         AtomicInteger requests = new AtomicInteger();
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext(
-                "/admin-api/device/web/devices/command/send",
+                "/api/iot/device-commands",
                 exchange -> {
                     requests.incrementAndGet();
                     byte[] body = "temporary".getBytes(StandardCharsets.UTF_8);
@@ -129,7 +129,7 @@ class HttpLureLampControlAdapterTest {
             LureLampControlException exception =
                     assertThrows(
                             LureLampControlException.class,
-                            () -> adapter.invokeToggle("373", observed::set));
+                            () -> adapter.invokeToggle("1001", observed::set));
 
             assertEquals(
                     LureLampControlException.Reason.BACKEND_UNAVAILABLE,
@@ -149,7 +149,7 @@ class HttpLureLampControlAdapterTest {
         LureLampControlException exception =
                 assertThrows(
                         LureLampControlException.class,
-                        () -> adapter.invokeToggle("367", telemetry -> {}));
+                        () -> adapter.invokeToggle("1002", telemetry -> {}));
 
         assertEquals(
                 LureLampControlException.Reason.DEVICE_NOT_ALLOWED,

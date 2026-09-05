@@ -8,9 +8,9 @@ public class IoTLureLampControlProperties {
 
     private boolean enabled = false;
     private String latestPropertiesPath =
-            "/admin-api/device/web/devices/{deviceId}/properties/latest";
+            "/api/iot/devices/{deviceId}/properties/latest";
     private String commandPath =
-            "/admin-api/device/web/devices/command/send";
+            "/api/iot/device-commands";
     private Duration requestTimeout = Duration.ofSeconds(3);
     private int verifyAttempts = 10;
     private Duration verifyInterval = Duration.ofMillis(500);

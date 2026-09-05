@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ master ]
 
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -13,6 +17,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reject known private integration markers
+        shell: bash
+        run: |
+          set -euo pipefail
+          pattern='60\.12\.4\.180|/admin-api/device/web|[Yy]udao|(^|[^0-9])(373|367|2881|2883)([^0-9]|$)'
+          if git grep -nE "$pattern" -- . ':!PUBLIC_RELEASE.md' ':!.github/workflows/ci.yml'; then
+            echo "Public-release marker scan failed."
+            exit 1
+          fi
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -45,3 +61,26 @@ jobs:
               exit 1
             }
           }
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Gitleaks
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="8.24.3"
+          curl -fsSL "https://github.com/gitleaks/gitleaks/releases/download/v${version}/gitleaks_${version}_linux_x64.tar.gz" \
+            | tar -xz -C /tmp gitleaks
+
+      - name: Gitleaks full history and all refs
+        shell: bash
+        run: |
+          set -euo pipefail
+          /tmp/gitleaks detect --source . --redact --exit-code 1 --log-opts="--all"
