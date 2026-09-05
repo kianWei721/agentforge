@@ -84,7 +84,7 @@ class HttpLureLampControlAdapterTest {
                     adapter.invokeToggle("1001", observed::set);
 
             assertEquals(1, requests.get());
-            assertEquals(373, requestBody.get().path("deviceId").asInt());
+            assertEquals(1001, requestBody.get().path("deviceId").asInt());
             assertEquals(
                     "SERVICE_INVOKE",
                     requestBody.get().path("commandType").asText());
