@@ -1,0 +1,41 @@
+name: Public Export Snapshot
+
+on:
+  push:
+    branches: [ public-export ]
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Reject known private integration markers
+        shell: bash
+        run: |
+          set -euo pipefail
+          pattern='60\.12\.4\.180|/admin-api/device/web|[Yy]udao|(^|[^0-9])(373|367|2881|2883)([^0-9]|$)'
+          if git grep -nE "$pattern" -- . ':!PUBLIC_RELEASE.md' ':!.github/workflows/ci.yml' ':!.github/workflows/public-export.yml'; then
+            echo "Public-release marker scan failed."
+            exit 1
+          fi
+
+      - name: Create tracked-file snapshot
+        shell: bash
+        run: |
+          git archive --format=zip --output=agentforge-public-snapshot.zip HEAD
+
+      - name: Upload snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentforge-public-snapshot
+          path: agentforge-public-snapshot.zip
+          if-no-files-found: error
+          retention-days: 1
