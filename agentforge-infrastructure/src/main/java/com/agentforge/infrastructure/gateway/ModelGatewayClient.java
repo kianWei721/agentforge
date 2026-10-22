@@ -4,6 +4,7 @@ import com.agentforge.core.model.ModelCallFailedException;
 import com.agentforge.infrastructure.config.ModelGatewayProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.MissingNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.net.ConnectException;
@@ -99,11 +100,17 @@ public class ModelGatewayClient {
         }
         JsonNode root;
         try {
-            root = objectMapper.readTree(response.body());
+            root = readJson(response.body());
         } catch (IOException exception) {
             throw new ModelCallFailedException(
                     "INVALID_GATEWAY_RESPONSE", false, requestId,
                     "model gateway returned a non-JSON body", exception);
+        }
+        // An empty 2xx is not an empty answer: the call may have been billed, so it is not retried.
+        if (!root.isObject()) {
+            throw new ModelCallFailedException(
+                    "INVALID_GATEWAY_RESPONSE", false, requestId,
+                    "model gateway returned an empty or non-object body");
         }
         return new Completion(
                 root,
@@ -117,11 +124,20 @@ public class ModelGatewayClient {
                 MAX_DEADLINE_MILLIS, Math.max(1, timeout.toMillis() - DEADLINE_MARGIN_MILLIS));
     }
 
+    /**
+     * The body as JSON, never null. Jackson 2.21 reads an empty body as a MissingNode, but some
+     * versions and overloads have returned null, so this does not depend on which.
+     */
+    private JsonNode readJson(String body) throws IOException {
+        JsonNode root = objectMapper.readTree(body == null ? "" : body);
+        return root == null ? MissingNode.getInstance() : root;
+    }
+
     private ModelCallFailedException failure(HttpResponse<String> response, String requestId) {
         String code = null;
         String message = null;
         try {
-            JsonNode error = objectMapper.readTree(response.body()).path("error");
+            JsonNode error = readJson(response.body()).path("error");
             code = text(error.path("code"));
             message = text(error.path("message"));
         } catch (IOException ignored) {
