@@ -63,6 +63,26 @@ class GatewayModelProviderTest {
     }
 
     @Test
+    void anEmptyErrorBodyStillReachesTheSubscriberAsAModelCallFailure() throws Exception {
+        // ChatController turns ModelCallFailedException into the SSE error event; anything else
+        // would end the stream without one.
+        try (FakeGateway gateway = FakeGateway.start()) {
+            gateway.respond(502, "", Map.of());
+            GatewayModelProvider provider =
+                    new GatewayModelProvider(gateway.client(), gateway.properties());
+
+            StepVerifier.create(provider.stream(new ModelRequest("user-a", "s", "hi")))
+                    .expectErrorSatisfies(
+                            error ->
+                                    assertEquals(
+                                            "HTTP_502",
+                                            assertInstanceOf(ModelCallFailedException.class, error)
+                                                    .errorCode()))
+                    .verify();
+        }
+    }
+
+    @Test
     void sessionIdsTheGatewayWouldRejectGetAFreshCorrelationId() {
         String correlationId =
                 GatewayModelProvider.correlationId(new ModelRequest("u", "会话 1", "hi"));

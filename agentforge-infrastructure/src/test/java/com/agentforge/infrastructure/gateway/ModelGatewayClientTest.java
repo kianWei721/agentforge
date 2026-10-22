@@ -74,6 +74,42 @@ class ModelGatewayClientTest {
     }
 
     @Test
+    void anEmptyErrorBodyFallsBackToTheHttpStatus() throws Exception {
+        // A proxy in front of the gateway may answer with no body at all.
+        try (FakeGateway gateway = FakeGateway.start()) {
+            for (String empty : new String[] {"", "   ", "\n"}) {
+                gateway.respond(502, empty, Map.of("X-Gateway-Request-Id", "gw-empty"));
+
+                ModelCallFailedException failure =
+                        assertThrows(
+                                ModelCallFailedException.class,
+                                () -> gateway.client().complete(body("standard"), "c-1", Duration.ofSeconds(2)));
+
+                assertEquals("HTTP_502", failure.errorCode());
+                assertFalse(failure.retryable());
+                assertEquals("gw-empty", failure.gatewayRequestId());
+            }
+        }
+    }
+
+    @Test
+    void anEmptySuccessBodyIsAnInvalidResponseNotAnEmptyAnswer() throws Exception {
+        try (FakeGateway gateway = FakeGateway.start()) {
+            gateway.respond(200, "", Map.of("X-Gateway-Request-Id", "gw-1"));
+
+            ModelCallFailedException failure =
+                    assertThrows(
+                            ModelCallFailedException.class,
+                            () -> gateway.client().complete(body("standard"), "c-1", Duration.ofSeconds(2)));
+
+            assertEquals("INVALID_GATEWAY_RESPONSE", failure.errorCode());
+            // The vendor may already have charged for it.
+            assertFalse(failure.retryable());
+            assertEquals("gw-1", failure.gatewayRequestId());
+        }
+    }
+
+    @Test
     void unreachableGatewayIsRetryableBecauseNothingWasSent() throws Exception {
         int closedPort;
         try (ServerSocket socket = new ServerSocket(0)) {
