@@ -19,7 +19,6 @@ import reactor.core.scheduler.Schedulers;
 
 public class AgentConversationRuntimeService {
 
-    private static final String USER_MESSAGE_SOURCE = "api";
     private static final String DEFAULT_ASSISTANT_SOURCE = "agentscope-harness";
 
     private final AgentDefinitionRepository agentRepository;
@@ -57,8 +56,12 @@ public class AgentConversationRuntimeService {
                             String userId = conversationService.normalizeUserId(request.userId());
                             String sessionKey =
                                     conversationService.normalizeSessionKey(request.sessionId());
+                            ChannelSessions.requireWriter(sessionKey, request.source());
                             ConversationSession session =
                                     conversationService.openSession(agentId, userId, sessionKey);
+                            // Again on the stored key: the collation can map a differently
+                            // written key (case, accents) onto an existing channel session.
+                            ChannelSessions.requireWriter(session.sessionKey(), request.source());
 
                             SessionContextRestoreService.ContextRestoreResult restoreResult =
                                     contextRestoreService.ensureContext(userId, session.id());
@@ -68,7 +71,7 @@ public class AgentConversationRuntimeService {
                                             session.id(),
                                             ConversationRole.USER,
                                             request.message(),
-                                            USER_MESSAGE_SOURCE);
+                                            request.source());
 
                             AgentExecution execution =
                                     executionService.start(
@@ -90,7 +93,8 @@ public class AgentConversationRuntimeService {
                                             userId,
                                             session.id(),
                                             request.message(),
-                                            execution.id());
+                                            execution.id(),
+                                            request.source());
 
                             Flux<AgentStreamChunk> executionStart =
                                     Flux.fromIterable(

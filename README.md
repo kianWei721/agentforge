@@ -47,6 +47,7 @@ agentforge-agent
 agentforge-tool
 agentforge-conversation
 agentforge-runtime
+agentforge-channel
 agentforge-rag
 agentforge-workflow
 agentforge-observability
@@ -134,6 +135,21 @@ one search -> correlation id kr-<uuid> -> rewrite + judge on route rag-json
 
 Agent runtime, embedding and rerank still call DashScope directly. See
 [docs/V0.9-model-gateway-client.md](docs/V0.9-model-gateway-client.md).
+
+## WeCom Channel
+
+Optional. A WeCom smart bot (HTTP callback at `/callbacks/wecom/bot`) answers through a dedicated
+agent, with sessions isolated per person and per group:
+
+```text
+signed + encrypted callback -> msgid dedup (unique key) -> server-derived session key
+  -> single chat runs as the mapped user; a group runs as its bound wecom-group:* user,
+     because everyone in the group reads the answer
+  -> same session strictly serial, different sessions in parallel -> pulled stream reply
+```
+
+Staff groups are refused by default, and the channel agent may only use allow-listed read-only
+tools. See [docs/V0.10-wecom-channel.md](docs/V0.10-wecom-channel.md).
 
 ## External IoT Integration
 

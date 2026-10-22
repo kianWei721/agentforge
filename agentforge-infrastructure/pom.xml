@@ -46,6 +46,11 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
+            <groupId>com.agentforge</groupId>
+            <artifactId>agentforge-channel</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
             <groupId>io.agentscope</groupId>
             <artifactId>agentscope-extensions-model-dashscope</artifactId>
             <version>${agentscope.version}</version>

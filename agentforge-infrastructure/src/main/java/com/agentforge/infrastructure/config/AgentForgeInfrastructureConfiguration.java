@@ -20,6 +20,7 @@ import org.springframework.context.annotation.Configuration;
     KnowledgeEvaluationProperties.class,
     RetrievalBudgetProperties.class,
     PrincipalDirectoryProperties.class,
-    ModelGatewayProperties.class
+    ModelGatewayProperties.class,
+    WeComChannelProperties.class
 })
 public class AgentForgeInfrastructureConfiguration {}
