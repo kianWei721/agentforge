@@ -62,6 +62,21 @@ public class KnowledgeQueryRewriteProperties {
         this.maxQueryChars = maxQueryChars;
     }
 
+    /**
+     * This configuration redirected to the model gateway: the gateway's URL and key, and its RAG
+     * route as the model. Nothing of the direct DashScope settings is used.
+     */
+    public KnowledgeQueryRewriteProperties viaGateway(ModelGatewayProperties gateway) {
+        KnowledgeQueryRewriteProperties copy = new KnowledgeQueryRewriteProperties();
+        copy.setEnabled(enabled);
+        copy.setBaseUrl(gateway.getBaseUrl());
+        copy.setApiKey(gateway.getApiKey());
+        copy.setModel(gateway.getRagRoute());
+        copy.setRequestTimeout(requestTimeout);
+        copy.setMaxQueryChars(maxQueryChars);
+        return copy;
+    }
+
     public boolean isConfigured() {
         return enabled
                 && StringUtils.hasText(baseUrl)

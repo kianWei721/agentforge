@@ -27,6 +27,7 @@
         <module>agentforge-tool</module>
         <module>agentforge-conversation</module>
         <module>agentforge-runtime</module>
+        <module>agentforge-channel</module>
         <module>agentforge-rag</module>
         <module>agentforge-workflow</module>
         <module>agentforge-observability</module>

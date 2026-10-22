@@ -2,6 +2,7 @@ package com.agentforge.rag;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.agentforge.core.model.ModelCallFailedException;
 import com.agentforge.core.security.AccessPrincipal;
 import java.util.ArrayList;
 import java.util.List;
@@ -325,6 +326,83 @@ class HybridKnowledgeRetrieverTest {
         assertEquals(
                 "HYBRID_ES_RRF_RERANK_V1",
                 retriever.mode());
+    }
+
+    @Test
+    void gatewayRewriteFailureShouldFallBackWithItsCodeAndShareOneCorrelationId() {
+        List<String> correlationIds = new ArrayList<>();
+        KnowledgeQueryRewriter rewriter =
+                new KnowledgeQueryRewriter() {
+                    @Override
+                    public KnowledgeQueryRewriteResult rewrite(String query) {
+                        throw new AssertionError("the retriever must pass its call context");
+                    }
+
+                    @Override
+                    public KnowledgeQueryRewriteResult rewrite(
+                            String query, KnowledgeModelCallContext context) {
+                        correlationIds.add(context.correlationId());
+                        context.record(
+                                new KnowledgeModelCall(
+                                        "QUERY_REWRITE", "gw-1", null, null, "RATE_LIMITED"));
+                        throw new ModelCallFailedException(
+                                "RATE_LIMITED", true, "gw-1", "rate limited");
+                    }
+                };
+        KnowledgeAnswerabilityJudge judge =
+                new KnowledgeAnswerabilityJudge() {
+                    @Override
+                    public KnowledgeAnswerabilityResult judge(
+                            String query, List<KnowledgeSearchHit> candidates) {
+                        throw new AssertionError("the retriever must pass its call context");
+                    }
+
+                    @Override
+                    public KnowledgeAnswerabilityResult judge(
+                            String query,
+                            List<KnowledgeSearchHit> candidates,
+                            KnowledgeModelCallContext context) {
+                        correlationIds.add(context.correlationId());
+                        context.record(
+                                new KnowledgeModelCall(
+                                        "ANSWERABILITY", "gw-2", "DASHSCOPE", "qwen-plus", null));
+                        return new KnowledgeAnswerabilityResult(
+                                List.of(candidates.get(0)),
+                                new KnowledgeAnswerabilityDiagnostics(
+                                        "TEST_JUDGE", 1, 1, "KNOWLEDGE", List.of()));
+                    }
+                };
+
+        KnowledgeRetrievalResult result =
+                new HybridKnowledgeRetriever(
+                                embeddingProvider(),
+                                backend(
+                                        List.of(),
+                                        List.of(hit("doc-offline", "chunk-offline", "Offline", 0.9d))),
+                                ALL_READABLE,
+                                4,
+                                60,
+                                true,
+                                0.60d,
+                                rewriter,
+                                null,
+                                8,
+                                judge,
+                                8)
+                        .searchDetailed("设备长期离线应该按什么顺序排查？", 5, STAFF);
+
+        assertEquals(1, result.hits().size());
+        assertEquals("FALLBACK_ORIGINAL", result.queryRewriteDiagnostics().decision());
+        assertEquals("RATE_LIMITED", result.queryRewriteDiagnostics().reasonCode());
+
+        assertEquals(2, correlationIds.size());
+        assertEquals(correlationIds.get(0), correlationIds.get(1));
+        KnowledgeModelCallDiagnostics calls = result.modelCallDiagnostics();
+        assertEquals(correlationIds.get(0), calls.correlationId());
+        assertEquals(
+                List.of("QUERY_REWRITE", "ANSWERABILITY"),
+                calls.calls().stream().map(KnowledgeModelCall::stage).toList());
+        assertEquals("qwen-plus", calls.calls().get(1).servedModel());
     }
 
     @Test

@@ -114,7 +114,8 @@ public class KnowledgeController {
                                     retrieval.queryRewriteDiagnostics(),
                                     retrieval.rerankDiagnostics(),
                                     retrieval.answerabilityDiagnostics(),
-                                    retrieval.accessDiagnostics());
+                                    retrieval.accessDiagnostics(),
+                                    retrieval.modelCallDiagnostics());
                         })
                 .subscribeOn(Schedulers.boundedElastic());
     }

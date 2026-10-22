@@ -1,5 +1,6 @@
 package com.agentforge.app.security;
 
+import com.agentforge.channel.wecom.WeComChannelSettings;
 import com.agentforge.core.AgentForgeConstants;
 import com.agentforge.core.security.AccessPrincipal;
 import com.agentforge.core.security.PrincipalDirectory;
@@ -44,8 +45,13 @@ public class TrustedIdentityWebFilter implements WebFilter {
         if (!path.startsWith(API_PATH_PREFIX) || path.equals(HEALTH_PATH)) {
             return chain.filter(exchange);
         }
+        String userId = exchange.getRequest().getHeaders().getFirst(USER_ID_HEADER);
+        // A WeCom group acts as a synthetic user; no person may sign in as it and read or write
+        // the group's session.
         Optional<AccessPrincipal> principal =
-                principals.resolve(exchange.getRequest().getHeaders().getFirst(USER_ID_HEADER));
+                WeComChannelSettings.isGroupUser(userId)
+                        ? Optional.empty()
+                        : principals.resolve(userId);
         if (principal.isEmpty()) {
             return unauthorized(exchange.getResponse());
         }

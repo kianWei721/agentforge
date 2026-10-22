@@ -5,6 +5,8 @@ import com.agentforge.infrastructure.config.KnowledgeEvaluationProperties;
 import com.agentforge.infrastructure.config.KnowledgeHybridProperties;
 import com.agentforge.infrastructure.config.KnowledgeQueryRewriteProperties;
 import com.agentforge.infrastructure.config.KnowledgeRerankProperties;
+import com.agentforge.infrastructure.config.ModelGatewayProperties;
+import com.agentforge.infrastructure.gateway.ModelGatewayClient;
 import com.agentforge.rag.EmbeddingProvider;
 import com.agentforge.rag.HybridKnowledgeRetriever;
 import com.agentforge.rag.KnowledgeAccessGuard;
@@ -95,15 +97,22 @@ public class KnowledgeRuntimeConfiguration {
             name = "enabled",
             havingValue = "true")
     public KnowledgeQueryRewriter knowledgeQueryRewriter(
-            KnowledgeQueryRewriteProperties properties) {
-        properties.validate();
+            KnowledgeQueryRewriteProperties properties,
+            ModelGatewayProperties gatewayProperties,
+            ObjectProvider<ModelGatewayClient> gatewayClientProvider) {
+        // With the gateway on, no call falls back to DashScope directly.
+        ModelGatewayClient gateway =
+                gatewayProperties.isEnabled() ? gatewayClientProvider.getObject() : null;
+        KnowledgeQueryRewriteProperties effective =
+                gateway == null ? properties : properties.viaGateway(gatewayProperties);
+        effective.validate();
         HttpClient client =
                 HttpClient.newBuilder()
-                        .connectTimeout(properties.getRequestTimeout())
+                        .connectTimeout(effective.getRequestTimeout())
                         .followRedirects(HttpClient.Redirect.NEVER)
                         .build();
         return new DashScopeKnowledgeQueryRewriter(
-                client, new ObjectMapper(), properties);
+                client, new ObjectMapper(), effective, gateway);
     }
 
     @Bean
@@ -128,15 +137,22 @@ public class KnowledgeRuntimeConfiguration {
             name = "enabled",
             havingValue = "true")
     public KnowledgeAnswerabilityJudge knowledgeAnswerabilityJudge(
-            KnowledgeAnswerabilityProperties properties) {
-        properties.validate();
+            KnowledgeAnswerabilityProperties properties,
+            ModelGatewayProperties gatewayProperties,
+            ObjectProvider<ModelGatewayClient> gatewayClientProvider) {
+        // With the gateway on, no call falls back to DashScope directly.
+        ModelGatewayClient gateway =
+                gatewayProperties.isEnabled() ? gatewayClientProvider.getObject() : null;
+        KnowledgeAnswerabilityProperties effective =
+                gateway == null ? properties : properties.viaGateway(gatewayProperties);
+        effective.validate();
         HttpClient client =
                 HttpClient.newBuilder()
-                        .connectTimeout(properties.getRequestTimeout())
+                        .connectTimeout(effective.getRequestTimeout())
                         .followRedirects(HttpClient.Redirect.NEVER)
                         .build();
         return new DashScopeKnowledgeAnswerabilityJudge(
-                client, new ObjectMapper(), properties);
+                client, new ObjectMapper(), effective, gateway);
     }
 
     @Bean

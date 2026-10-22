@@ -4,6 +4,7 @@ import com.agentforge.core.AgentForgeConstants;
 import com.agentforge.core.security.AccessPrincipal;
 import com.agentforge.runtime.AgentConversationRuntimeService;
 import com.agentforge.runtime.AgentRuntimeRequest;
+import com.agentforge.runtime.ChannelSessions;
 import com.agentforge.runtime.AgentStreamChunk;
 import jakarta.validation.Valid;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -26,6 +27,7 @@ public class LegacyAgentController {
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<AgentStreamChunk>> stream(
             @Valid @RequestBody ChatRequest request, AccessPrincipal principal) {
+        ChannelSessions.requireWriter(request.sessionId(), AgentRuntimeRequest.DEFAULT_SOURCE);
         AgentRuntimeRequest runtimeRequest =
                 new AgentRuntimeRequest(principal.userId(), request.sessionId(), request.message());
         return conversationRuntimeService

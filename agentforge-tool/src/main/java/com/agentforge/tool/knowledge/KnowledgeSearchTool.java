@@ -1,9 +1,12 @@
 package com.agentforge.tool.knowledge;
 
+import com.agentforge.core.model.ModelCallFailedException;
 import com.agentforge.core.security.AccessPrincipal;
 import com.agentforge.core.security.PrincipalDirectory;
 import com.agentforge.rag.KnowledgeAnswerabilityDecision;
 import com.agentforge.rag.KnowledgeAnswerabilityDiagnostics;
+import com.agentforge.rag.KnowledgeModelCall;
+import com.agentforge.rag.KnowledgeModelCallDiagnostics;
 import com.agentforge.rag.KnowledgeQueryRewriteDiagnostics;
 import com.agentforge.rag.KnowledgeRetrievalResult;
 import com.agentforge.rag.KnowledgeRetriever;
@@ -159,6 +162,22 @@ public class KnowledgeSearchTool implements AgentTool {
                 data.put("queryRewriteReasonCode", rewriteDiagnostics.reasonCode());
             }
 
+            KnowledgeModelCallDiagnostics modelCalls = retrieval.modelCallDiagnostics();
+            if (modelCalls != null && !modelCalls.calls().isEmpty()) {
+                data.put("modelCorrelationId", modelCalls.correlationId());
+                List<Map<String, Object>> calls = new ArrayList<>();
+                for (KnowledgeModelCall call : modelCalls.calls()) {
+                    Map<String, Object> item = new LinkedHashMap<>();
+                    item.put("stage", call.stage());
+                    item.put("gatewayRequestId", call.gatewayRequestId());
+                    item.put("servedProvider", call.servedProvider());
+                    item.put("servedModel", call.servedModel());
+                    item.put("errorCode", call.errorCode());
+                    calls.add(item);
+                }
+                data.put("modelCalls", calls);
+            }
+
             boolean noAnswer = resultHits.isEmpty();
             data.put("noAnswer", noAnswer);
             if (noAnswer) {
@@ -222,6 +241,22 @@ public class KnowledgeSearchTool implements AgentTool {
                     "knowledge searched",
                     data);
         } catch (RuntimeException exception) {
+            ModelCallFailedException modelFailure = ModelCallFailedException.find(exception);
+            if (modelFailure != null) {
+                // Retry only when the gateway says it is safe: an unknown upstream outcome may
+                // already have been billed, and a spent budget will not have refilled.
+                Map<String, Object> data = new LinkedHashMap<>();
+                if (modelFailure.gatewayRequestId() != null) {
+                    data.put("gatewayRequestId", modelFailure.gatewayRequestId());
+                }
+                return ToolResult.failure(
+                        "knowledge search unavailable: model call failed ("
+                                + modelFailure.errorCode()
+                                + ")",
+                        data,
+                        "MODEL_" + modelFailure.errorCode(),
+                        modelFailure.retryable());
+            }
             return ToolResult.failure(
                     "knowledge search unavailable",
                     "KNOWLEDGE_SEARCH_FAILED",

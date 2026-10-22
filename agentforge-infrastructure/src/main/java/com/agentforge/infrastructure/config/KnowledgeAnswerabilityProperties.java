@@ -62,6 +62,21 @@ public class KnowledgeAnswerabilityProperties {
         this.requestTimeout = requestTimeout;
     }
 
+    /**
+     * This configuration redirected to the model gateway: the gateway's URL and key, and its RAG
+     * route as the model. Nothing of the direct DashScope settings is used.
+     */
+    public KnowledgeAnswerabilityProperties viaGateway(ModelGatewayProperties gateway) {
+        KnowledgeAnswerabilityProperties copy = new KnowledgeAnswerabilityProperties();
+        copy.setEnabled(enabled);
+        copy.setBaseUrl(gateway.getBaseUrl());
+        copy.setApiKey(gateway.getApiKey());
+        copy.setModel(gateway.getRagRoute());
+        copy.setCandidateLimit(candidateLimit);
+        copy.setRequestTimeout(requestTimeout);
+        return copy;
+    }
+
     public boolean isConfigured() {
         return enabled
                 && StringUtils.hasText(baseUrl)

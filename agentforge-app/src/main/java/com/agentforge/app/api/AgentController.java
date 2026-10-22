@@ -3,6 +3,7 @@ package com.agentforge.app.api;
 import com.agentforge.core.AgentForgeConstants;
 import com.agentforge.core.security.AccessPrincipal;
 import com.agentforge.runtime.AgentConversationRuntimeService;
+import com.agentforge.runtime.ChannelSessions;
 import com.agentforge.runtime.AgentRuntimeRequest;
 import com.agentforge.runtime.AgentStreamChunk;
 import jakarta.validation.Valid;
@@ -28,6 +29,8 @@ public class AgentController {
             @PathVariable("agentId") String agentId,
             @Valid @RequestBody ChatRequest request,
             AccessPrincipal principal) {
+        // Early 400; the runtime enforces the same rule for every entry point.
+        ChannelSessions.requireWriter(request.sessionId(), AgentRuntimeRequest.DEFAULT_SOURCE);
         AgentRuntimeRequest runtimeRequest =
                 new AgentRuntimeRequest(principal.userId(), request.sessionId(), request.message());
         return conversationRuntimeService

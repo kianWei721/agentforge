@@ -2,7 +2,7 @@
 
 AgentForge is a Java-based experimental Agent runtime and governance project focused on production-oriented engineering: durable execution, tool governance, retrieval evaluation, safe promotion, rollback, and enterprise-system integration.
 
-> Status: V0.7 — Production Knowledge Platform. The project is under active development and is not presented as a drop-in production platform.
+> Status: V0.10 — WeCom channel with session isolation, on top of retrieval-layer access control (V0.8) and model calls through a standalone model gateway (V0.9). The project is under active development and is not presented as a drop-in production platform.
 
 ## Why AgentForge
 
@@ -47,6 +47,7 @@ agentforge-agent
 agentforge-tool
 agentforge-conversation
 agentforge-runtime
+agentforge-channel
 agentforge-rag
 agentforge-workflow
 agentforge-observability
@@ -118,6 +119,37 @@ Document visibility is `INTERNAL`, `PUBLIC`, or `CUSTOMER` + `customerId`. Agent
 from the runtime context; the tool schema has no identity field. See
 [docs/V0.8-retrieval-access-control.md](docs/V0.8-retrieval-access-control.md) for the threat model,
 trade-offs, tests, and known limits.
+
+## Model Gateway Client
+
+Optional. With `agentforge.model-gateway.enabled=true`, knowledge query rewrite and answerability
+calls go through the standalone [model-gateway](https://github.com/kianWei721/model-gateway), with no
+silent fallback to calling DashScope directly. `agentforge.model.provider=gateway` routes chat there too.
+
+```text
+one search -> correlation id kr-<uuid> -> rewrite + judge on route rag-json
+  -> standard OpenAI fields only, explicit max_tokens, X-Gateway-Deadline-Ms
+  -> retry decided by the gateway's error code, not the HTTP status
+  -> modelCallDiagnostics: gateway request id + the model that actually served each call
+```
+
+Agent runtime, embedding and rerank still call DashScope directly. See
+[docs/V0.9-model-gateway-client.md](docs/V0.9-model-gateway-client.md).
+
+## WeCom Channel
+
+Optional. A WeCom smart bot (HTTP callback at `/callbacks/wecom/bot`) answers through a dedicated
+agent, with sessions isolated per person and per group:
+
+```text
+signed + encrypted callback -> msgid dedup (unique key) -> server-derived session key
+  -> single chat runs as the mapped user; a group runs as its bound wecom-group:* user,
+     because everyone in the group reads the answer
+  -> same session strictly serial, different sessions in parallel -> pulled stream reply
+```
+
+Staff groups are refused by default, and the channel agent may only use allow-listed read-only
+tools. See [docs/V0.10-wecom-channel.md](docs/V0.10-wecom-channel.md).
 
 ## External IoT Integration
 

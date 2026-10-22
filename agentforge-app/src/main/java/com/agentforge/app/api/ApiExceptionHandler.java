@@ -2,12 +2,14 @@ package com.agentforge.app.api;
 
 import com.agentforge.agent.AgentNotFoundException;
 import com.agentforge.conversation.ConversationNotFoundException;
+import com.agentforge.core.model.ModelCallFailedException;
 import com.agentforge.core.security.AccessDeniedException;
 import com.agentforge.observability.execution.ExecutionNotFoundException;
 import com.agentforge.runtime.confirmation.ToolConfirmationAccessDeniedException;
 import com.agentforge.runtime.confirmation.ToolConfirmationInvalidStateException;
 import com.agentforge.runtime.confirmation.ToolConfirmationNotFoundException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -55,6 +57,21 @@ public class ApiExceptionHandler {
     @ResponseStatus(HttpStatus.CONFLICT)
     public ApiError handleConfirmationInvalidState(ToolConfirmationInvalidStateException exception) {
         return ApiError.of("TOOL_CONFIRMATION_INVALID_STATE", exception.getMessage());
+    }
+
+    /** 503 when the gateway says a retry is safe, 502 otherwise; the request id finds the ledger row. */
+    @ExceptionHandler(ModelCallFailedException.class)
+    public ResponseEntity<ApiError> handleModelCallFailed(ModelCallFailedException exception) {
+        ResponseEntity.BodyBuilder response =
+                ResponseEntity.status(
+                        exception.retryable()
+                                ? HttpStatus.SERVICE_UNAVAILABLE
+                                : HttpStatus.BAD_GATEWAY);
+        if (exception.gatewayRequestId() != null) {
+            response.header("X-Gateway-Request-Id", exception.gatewayRequestId());
+        }
+        return response.body(
+                ApiError.of("MODEL_" + exception.errorCode(), exception.getMessage()));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

@@ -36,6 +36,40 @@ agentforge:
       api-key: ${DASHSCOPE_API_KEY:}
       base-url: ${DASHSCOPE_BASE_URL:}
       model: ${DASHSCOPE_MODEL:qwen3.8-flash}
+  model-gateway:
+    # Off by default. When on, knowledge query rewrite and answerability go through the gateway
+    # with no direct DashScope fallback; AGENTFORGE_MODEL_PROVIDER=gateway routes chat as well.
+    # Embedding and rerank still call DashScope directly.
+    enabled: ${AGENTFORGE_MODEL_GATEWAY_ENABLED:false}
+    base-url: ${AGENTFORGE_MODEL_GATEWAY_BASE_URL:http://localhost:8090/v1}
+    api-key: ${AGENTFORGE_MODEL_GATEWAY_API_KEY:}
+    rag-route: ${AGENTFORGE_MODEL_GATEWAY_RAG_ROUTE:rag-json}
+    chat-route: ${AGENTFORGE_MODEL_GATEWAY_CHAT_ROUTE:standard}
+    connect-timeout: 3s
+    request-timeout: ${AGENTFORGE_MODEL_GATEWAY_REQUEST_TIMEOUT:30s}
+  channel:
+    wecom:
+      # WeCom smart bot over HTTP callbacks (POST/GET /callbacks/wecom/bot). Off by default.
+      enabled: ${AGENTFORGE_WECOM_ENABLED:false}
+      token: ${AGENTFORGE_WECOM_TOKEN:}
+      encoding-aes-key: ${AGENTFORGE_WECOM_ENCODING_AES_KEY:}
+      # Blank skips the receive id check after decryption.
+      receive-id: ${AGENTFORGE_WECOM_RECEIVE_ID:}
+      bot-id: ${AGENTFORGE_WECOM_BOT_ID:}
+      # A dedicated agent; it may only use these read-only, ACL-filtered tools.
+      agent-id: ${AGENTFORGE_WECOM_AGENT_ID:}
+      allowed-tools: search_knowledge
+      # wecomUserId=agentforgeUserId, comma separated
+      direct-users: ${AGENTFORGE_WECOM_DIRECT_USERS:}
+      # chatId=wecom-group:<name>; register that user under agentforge.security.principals
+      groups: ${AGENTFORGE_WECOM_GROUPS:}
+      allow-staff-groups: false
+      max-concurrent-turns: 4
+      max-pending-turns: 64
+      max-queued-per-session: 3
+      turn-timeout: 5m
+      stream-ttl: 10m
+      timestamp-tolerance: 5m
   knowledge:
     hybrid:
       enabled: ${AGENTFORGE_KNOWLEDGE_HYBRID_ENABLED:false}
