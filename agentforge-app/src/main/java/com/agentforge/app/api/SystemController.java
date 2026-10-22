@@ -11,6 +11,7 @@ import com.agentforge.infrastructure.config.KnowledgeEvaluationProperties;
 import com.agentforge.infrastructure.config.KnowledgeHybridProperties;
 import com.agentforge.infrastructure.config.KnowledgeQueryRewriteProperties;
 import com.agentforge.infrastructure.config.KnowledgeRerankProperties;
+import com.agentforge.infrastructure.config.ModelGatewayProperties;
 import com.agentforge.infrastructure.config.RetrievalBudgetProperties;
 import com.agentforge.infrastructure.config.ToolConfirmationProperties;
 import com.agentforge.infrastructure.config.ToolGovernanceProperties;
@@ -54,6 +55,7 @@ public class SystemController {
     private final KnowledgeAnswerabilityProperties knowledgeAnswerabilityProperties;
     private final KnowledgeEvaluationProperties knowledgeEvaluationProperties;
     private final RetrievalBudgetProperties retrievalBudgetProperties;
+    private final ModelGatewayProperties modelGatewayProperties;
 
     public SystemController(
             ModelGatewayCatalog modelGatewayCatalog,
@@ -75,7 +77,8 @@ public class SystemController {
             KnowledgeRerankProperties knowledgeRerankProperties,
             KnowledgeAnswerabilityProperties knowledgeAnswerabilityProperties,
             KnowledgeEvaluationProperties knowledgeEvaluationProperties,
-            RetrievalBudgetProperties retrievalBudgetProperties) {
+            RetrievalBudgetProperties retrievalBudgetProperties,
+            ModelGatewayProperties modelGatewayProperties) {
         this.modelGatewayCatalog = modelGatewayCatalog;
         this.agentProperties = agentProperties;
         this.agentService = agentService;
@@ -96,6 +99,7 @@ public class SystemController {
         this.knowledgeAnswerabilityProperties = knowledgeAnswerabilityProperties;
         this.knowledgeEvaluationProperties = knowledgeEvaluationProperties;
         this.retrievalBudgetProperties = retrievalBudgetProperties;
+        this.modelGatewayProperties = modelGatewayProperties;
     }
 
     @GetMapping("/health")
@@ -115,6 +119,13 @@ public class SystemController {
         result.put("redis", infrastructure.redisUp() ? "UP" : "DOWN");
         result.put("activeModelProvider", modelGatewayCatalog.activeProvider());
         result.put("registeredModelProviders", modelGatewayCatalog.registeredProviders());
+        // When enabled, the knowledge*Model values below are ignored: rewrite and answerability
+        // use the gateway's RAG route.
+        result.put("modelGatewayEnabled", modelGatewayProperties.isEnabled());
+        if (modelGatewayProperties.isEnabled()) {
+            result.put("modelGatewayRagRoute", modelGatewayProperties.getRagRoute());
+            result.put("modelGatewayChatRoute", modelGatewayProperties.getChatRoute());
+        }
         result.put("agentRuntimeEnabled", agentProperties.isEnabled());
         result.put("agentDefinitions", agentService.list().size());
         result.put("registeredTools", toolRegistry.descriptors().size());

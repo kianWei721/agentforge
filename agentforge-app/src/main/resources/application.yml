@@ -36,6 +36,17 @@ agentforge:
       api-key: ${DASHSCOPE_API_KEY:}
       base-url: ${DASHSCOPE_BASE_URL:}
       model: ${DASHSCOPE_MODEL:qwen3.8-flash}
+  model-gateway:
+    # Off by default. When on, knowledge query rewrite and answerability go through the gateway
+    # with no direct DashScope fallback; AGENTFORGE_MODEL_PROVIDER=gateway routes chat as well.
+    # Embedding and rerank still call DashScope directly.
+    enabled: ${AGENTFORGE_MODEL_GATEWAY_ENABLED:false}
+    base-url: ${AGENTFORGE_MODEL_GATEWAY_BASE_URL:http://localhost:8090/v1}
+    api-key: ${AGENTFORGE_MODEL_GATEWAY_API_KEY:}
+    rag-route: ${AGENTFORGE_MODEL_GATEWAY_RAG_ROUTE:rag-json}
+    chat-route: ${AGENTFORGE_MODEL_GATEWAY_CHAT_ROUTE:standard}
+    connect-timeout: 3s
+    request-timeout: ${AGENTFORGE_MODEL_GATEWAY_REQUEST_TIMEOUT:30s}
   knowledge:
     hybrid:
       enabled: ${AGENTFORGE_KNOWLEDGE_HYBRID_ENABLED:false}

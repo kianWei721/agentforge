@@ -1,15 +1,19 @@
 package com.agentforge.infrastructure.rag;
 
+import com.agentforge.core.model.ModelCallFailedException;
 import com.agentforge.infrastructure.config.KnowledgeAnswerabilityProperties;
+import com.agentforge.infrastructure.gateway.ModelGatewayClient;
 import com.agentforge.rag.KnowledgeAnswerabilityDecision;
 import com.agentforge.rag.KnowledgeAnswerabilityDiagnostics;
 import com.agentforge.rag.KnowledgeAnswerabilityJudge;
 import com.agentforge.rag.KnowledgeAnswerabilityResult;
+import com.agentforge.rag.KnowledgeModelCallContext;
 import com.agentforge.rag.KnowledgeSearchHit;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -51,18 +55,34 @@ public class DashScopeKnowledgeAnswerabilityJudge
             9. Output JSON only according to the provided schema.
             """;
 
+    static final String STAGE = "ANSWERABILITY";
+
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
     private final KnowledgeAnswerabilityProperties properties;
     private final URI endpoint;
+    private final ModelGatewayClient gateway;
 
     public DashScopeKnowledgeAnswerabilityJudge(
             HttpClient httpClient,
             ObjectMapper objectMapper,
             KnowledgeAnswerabilityProperties properties) {
+        this(httpClient, objectMapper, properties, null);
+    }
+
+    /**
+     * @param gateway when non-null, every call goes through the model gateway and {@code
+     *     properties.model} is a gateway route name
+     */
+    public DashScopeKnowledgeAnswerabilityJudge(
+            HttpClient httpClient,
+            ObjectMapper objectMapper,
+            KnowledgeAnswerabilityProperties properties,
+            ModelGatewayClient gateway) {
         this.httpClient = httpClient;
         this.objectMapper = objectMapper;
         this.properties = properties;
+        this.gateway = gateway;
         String baseUrl =
                 properties.getBaseUrl().trim().replaceAll("/+$", "");
         this.endpoint =
@@ -76,6 +96,14 @@ public class DashScopeKnowledgeAnswerabilityJudge
     public KnowledgeAnswerabilityResult judge(
             String query,
             List<KnowledgeSearchHit> candidates) {
+        return judge(query, candidates, null);
+    }
+
+    @Override
+    public KnowledgeAnswerabilityResult judge(
+            String query,
+            List<KnowledgeSearchHit> candidates,
+            KnowledgeModelCallContext context) {
         if (query == null || query.isBlank()) {
             throw new IllegalArgumentException(
                     "answerability query must not be blank");
@@ -97,7 +125,14 @@ public class DashScopeKnowledgeAnswerabilityJudge
             ObjectNode body = objectMapper.createObjectNode();
             body.put("model", properties.getModel());
             body.put("temperature", 0);
-            body.put("enable_thinking", false);
+            if (gateway == null) {
+                body.put("enable_thinking", false);
+            } else {
+                // The gateway takes standard fields only and adds enable_thinking itself for
+                // the models that need it. A truncated decision list fails closed, so leave
+                // room for one reason per candidate.
+                body.put("max_tokens", gatewayMaxTokens(candidates.size()));
+            }
 
             ArrayNode messages = body.putArray("messages");
             ObjectNode system = messages.addObject();
@@ -114,32 +149,15 @@ public class DashScopeKnowledgeAnswerabilityJudge
 
             addStructuredOutputSchema(body);
 
-            HttpRequest request =
-                    HttpRequest.newBuilder(endpoint)
-                            .timeout(properties.getRequestTimeout())
-                            .header(
-                                    "Authorization",
-                                    bearer(properties.getApiKey()))
-                            .header(
-                                    "Content-Type",
-                                    "application/json")
-                            .POST(
-                                    HttpRequest.BodyPublishers.ofString(
-                                            objectMapper.writeValueAsString(body),
-                                            StandardCharsets.UTF_8))
-                            .build();
-
-            HttpResponse<String> response =
-                    httpClient.send(
-                            request,
-                            HttpResponse.BodyHandlers.ofString(
-                                    StandardCharsets.UTF_8));
-            if (response.statusCode() < 200
-                    || response.statusCode() >= 300) {
-                throw providerFailure(response);
-            }
-
-            JsonNode root = objectMapper.readTree(response.body());
+            JsonNode root =
+                    gateway == null
+                            ? callDirect(body)
+                            : KnowledgeGatewayCalls.complete(
+                                    gateway,
+                                    STAGE,
+                                    body,
+                                    context,
+                                    properties.getRequestTimeout());
             JsonNode choices = root.path("choices");
             if (!choices.isArray() || choices.isEmpty()) {
                 throw new IllegalStateException(
@@ -255,6 +273,9 @@ public class DashScopeKnowledgeAnswerabilityJudge
             if (exception instanceof IllegalStateException stateException) {
                 throw stateException;
             }
+            if (exception instanceof ModelCallFailedException failure) {
+                throw failure;
+            }
             throw new IllegalStateException(
                     "answerability request failed",
                     exception);
@@ -264,6 +285,39 @@ public class DashScopeKnowledgeAnswerabilityJudge
     @Override
     public String mode() {
         return "QWEN3_8_FLASH_ANSWERABILITY_V1";
+    }
+
+    static int gatewayMaxTokens(int candidateCount) {
+        return 256 + 160 * candidateCount;
+    }
+
+    private JsonNode callDirect(ObjectNode body)
+            throws IOException, InterruptedException {
+        HttpRequest request =
+                HttpRequest.newBuilder(endpoint)
+                        .timeout(properties.getRequestTimeout())
+                        .header(
+                                "Authorization",
+                                bearer(properties.getApiKey()))
+                        .header(
+                                "Content-Type",
+                                "application/json")
+                        .POST(
+                                HttpRequest.BodyPublishers.ofString(
+                                        objectMapper.writeValueAsString(body),
+                                        StandardCharsets.UTF_8))
+                        .build();
+
+        HttpResponse<String> response =
+                httpClient.send(
+                        request,
+                        HttpResponse.BodyHandlers.ofString(
+                                StandardCharsets.UTF_8));
+        if (response.statusCode() < 200
+                || response.statusCode() >= 300) {
+            throw providerFailure(response);
+        }
+        return objectMapper.readTree(response.body());
     }
 
     private void addStructuredOutputSchema(ObjectNode body) {

@@ -1,5 +1,6 @@
 package com.agentforge.rag;
 
+import com.agentforge.core.model.ModelCallFailedException;
 import com.agentforge.core.security.AccessPrincipal;
 import java.util.List;
 
@@ -156,7 +157,8 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
         }
 
         String originalQuery = query.trim();
-        KnowledgeQueryRewriteResult rewrite = rewriteQuery(originalQuery);
+        KnowledgeModelCallContext modelCalls = KnowledgeModelCallContext.newSearch();
+        KnowledgeQueryRewriteResult rewrite = rewriteQuery(originalQuery, modelCalls);
         String retrievalQuery = rewrite.retrievalQuery();
 
         int candidateLimit = Math.min(100, Math.max(20, topK * candidateMultiplier));
@@ -218,7 +220,8 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
                 KnowledgeAnswerabilityResult answerability =
                         answerabilityJudge.judge(
                                 originalQuery,
-                                judgeCandidates);
+                                judgeCandidates,
+                                modelCalls);
                 List<KnowledgeSearchHit> hits =
                         answerability.hits().stream()
                                 .limit(topK)
@@ -228,7 +231,8 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
                         rerankDiagnostics,
                         answerability.diagnostics(),
                         rewrite.diagnostics(),
-                        accessDiagnostics);
+                        accessDiagnostics,
+                        modelCalls.diagnostics());
             }
 
             List<KnowledgeSearchHit> hits =
@@ -238,7 +242,8 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
                     rerankDiagnostics,
                     null,
                     rewrite.diagnostics(),
-                    accessDiagnostics);
+                    accessDiagnostics,
+                    modelCalls.diagnostics());
         }
 
         List<KnowledgeSearchHit> hits =
@@ -251,7 +256,8 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
                 null,
                 null,
                 rewrite.diagnostics(),
-                accessDiagnostics);
+                accessDiagnostics,
+                modelCalls.diagnostics());
     }
 
     @Override
@@ -284,7 +290,8 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
                 : "HYBRID_ES_RRF_V1";
     }
 
-    private KnowledgeQueryRewriteResult rewriteQuery(String originalQuery) {
+    private KnowledgeQueryRewriteResult rewriteQuery(
+            String originalQuery, KnowledgeModelCallContext modelCalls) {
         if (queryRewriter == null) {
             return KnowledgeQueryRewriteResult.original(
                     originalQuery,
@@ -293,7 +300,7 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
                     "UNCHANGED");
         }
         try {
-            KnowledgeQueryRewriteResult result = queryRewriter.rewrite(originalQuery);
+            KnowledgeQueryRewriteResult result = queryRewriter.rewrite(originalQuery, modelCalls);
             if (result == null
                     || result.retrievalQuery() == null
                     || result.retrievalQuery().isBlank()) {
@@ -301,11 +308,12 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
             }
             return result;
         } catch (RuntimeException exception) {
+            ModelCallFailedException gatewayFailure = ModelCallFailedException.find(exception);
             return KnowledgeQueryRewriteResult.original(
                     originalQuery,
                     queryRewriter.mode(),
                     "FALLBACK_ORIGINAL",
-                    "PROVIDER_ERROR");
+                    gatewayFailure == null ? "PROVIDER_ERROR" : gatewayFailure.errorCode());
         }
     }
 

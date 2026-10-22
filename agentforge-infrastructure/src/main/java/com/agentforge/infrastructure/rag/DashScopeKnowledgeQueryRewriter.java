@@ -1,6 +1,9 @@
 package com.agentforge.infrastructure.rag;
 
+import com.agentforge.core.model.ModelCallFailedException;
 import com.agentforge.infrastructure.config.KnowledgeQueryRewriteProperties;
+import com.agentforge.infrastructure.gateway.ModelGatewayClient;
+import com.agentforge.rag.KnowledgeModelCallContext;
 import com.agentforge.rag.KnowledgeQueryRewriteDiagnostics;
 import com.agentforge.rag.KnowledgeQueryRewriteResult;
 import com.agentforge.rag.KnowledgeQueryRewriter;
@@ -8,6 +11,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -47,18 +51,35 @@ public class DashScopeKnowledgeQueryRewriter implements KnowledgeQueryRewriter {
             7. Return JSON only according to the provided schema.
             """;
 
+    static final String STAGE = "QUERY_REWRITE";
+    static final int GATEWAY_MAX_TOKENS = 512;
+
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
     private final KnowledgeQueryRewriteProperties properties;
     private final URI endpoint;
+    private final ModelGatewayClient gateway;
 
     public DashScopeKnowledgeQueryRewriter(
             HttpClient httpClient,
             ObjectMapper objectMapper,
             KnowledgeQueryRewriteProperties properties) {
+        this(httpClient, objectMapper, properties, null);
+    }
+
+    /**
+     * @param gateway when non-null, every call goes through the model gateway and {@code
+     *     properties.model} is a gateway route name
+     */
+    public DashScopeKnowledgeQueryRewriter(
+            HttpClient httpClient,
+            ObjectMapper objectMapper,
+            KnowledgeQueryRewriteProperties properties,
+            ModelGatewayClient gateway) {
         this.httpClient = httpClient;
         this.objectMapper = objectMapper;
         this.properties = properties;
+        this.gateway = gateway;
         String baseUrl = properties.getBaseUrl().trim().replaceAll("/+$", "");
         this.endpoint =
                 URI.create(
@@ -69,6 +90,12 @@ public class DashScopeKnowledgeQueryRewriter implements KnowledgeQueryRewriter {
 
     @Override
     public KnowledgeQueryRewriteResult rewrite(String query) {
+        return rewrite(query, null);
+    }
+
+    @Override
+    public KnowledgeQueryRewriteResult rewrite(
+            String query, KnowledgeModelCallContext context) {
         if (query == null || query.isBlank()) {
             throw new IllegalArgumentException("query rewrite input must not be blank");
         }
@@ -82,7 +109,13 @@ public class DashScopeKnowledgeQueryRewriter implements KnowledgeQueryRewriter {
             ObjectNode body = objectMapper.createObjectNode();
             body.put("model", properties.getModel());
             body.put("temperature", 0);
-            body.put("enable_thinking", false);
+            if (gateway == null) {
+                body.put("enable_thinking", false);
+            } else {
+                // The gateway takes standard fields only and adds enable_thinking itself for
+                // the models that need it.
+                body.put("max_tokens", GATEWAY_MAX_TOKENS);
+            }
 
             ArrayNode messages = body.putArray("messages");
             ObjectNode system = messages.addObject();
@@ -95,26 +128,11 @@ public class DashScopeKnowledgeQueryRewriter implements KnowledgeQueryRewriter {
 
             addStructuredOutputSchema(body);
 
-            HttpRequest request =
-                    HttpRequest.newBuilder(endpoint)
-                            .timeout(properties.getRequestTimeout())
-                            .header("Authorization", bearer(properties.getApiKey()))
-                            .header("Content-Type", "application/json")
-                            .POST(
-                                    HttpRequest.BodyPublishers.ofString(
-                                            objectMapper.writeValueAsString(body),
-                                            StandardCharsets.UTF_8))
-                            .build();
-
-            HttpResponse<String> response =
-                    httpClient.send(
-                            request,
-                            HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw providerFailure(response);
-            }
-
-            JsonNode root = objectMapper.readTree(response.body());
+            JsonNode root =
+                    gateway == null
+                            ? callDirect(body)
+                            : KnowledgeGatewayCalls.complete(
+                                    gateway, STAGE, body, context, properties.getRequestTimeout());
             JsonNode choices = root.path("choices");
             if (!choices.isArray() || choices.isEmpty()) {
                 throw new IllegalStateException("query rewrite provider returned no choices");
@@ -158,6 +176,9 @@ public class DashScopeKnowledgeQueryRewriter implements KnowledgeQueryRewriter {
             if (exception instanceof IllegalStateException stateException) {
                 throw stateException;
             }
+            if (exception instanceof ModelCallFailedException failure) {
+                throw failure;
+            }
             throw new IllegalStateException("query rewrite request failed", exception);
         }
     }
@@ -165,6 +186,28 @@ public class DashScopeKnowledgeQueryRewriter implements KnowledgeQueryRewriter {
     @Override
     public String mode() {
         return "QWEN3_8_FLASH_QUERY_REWRITE_V1";
+    }
+
+    private JsonNode callDirect(ObjectNode body) throws IOException, InterruptedException {
+        HttpRequest request =
+                HttpRequest.newBuilder(endpoint)
+                        .timeout(properties.getRequestTimeout())
+                        .header("Authorization", bearer(properties.getApiKey()))
+                        .header("Content-Type", "application/json")
+                        .POST(
+                                HttpRequest.BodyPublishers.ofString(
+                                        objectMapper.writeValueAsString(body),
+                                        StandardCharsets.UTF_8))
+                        .build();
+
+        HttpResponse<String> response =
+                httpClient.send(
+                        request,
+                        HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            throw providerFailure(response);
+        }
+        return objectMapper.readTree(response.body());
     }
 
     private void addStructuredOutputSchema(ObjectNode body) {

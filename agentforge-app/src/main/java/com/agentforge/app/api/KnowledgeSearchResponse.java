@@ -2,6 +2,7 @@ package com.agentforge.app.api;
 
 import com.agentforge.rag.KnowledgeAccessDiagnostics;
 import com.agentforge.rag.KnowledgeAnswerabilityDiagnostics;
+import com.agentforge.rag.KnowledgeModelCallDiagnostics;
 import com.agentforge.rag.KnowledgeQueryRewriteDiagnostics;
 import com.agentforge.rag.KnowledgeRerankDiagnostics;
 import com.agentforge.rag.KnowledgeSearchHit;
@@ -16,4 +17,5 @@ public record KnowledgeSearchResponse(
         KnowledgeQueryRewriteDiagnostics queryRewriteDiagnostics,
         KnowledgeRerankDiagnostics rerankDiagnostics,
         KnowledgeAnswerabilityDiagnostics answerabilityDiagnostics,
-        KnowledgeAccessDiagnostics accessDiagnostics) {}
+        KnowledgeAccessDiagnostics accessDiagnostics,
+        KnowledgeModelCallDiagnostics modelCallDiagnostics) {}

@@ -119,6 +119,22 @@ from the runtime context; the tool schema has no identity field. See
 [docs/V0.8-retrieval-access-control.md](docs/V0.8-retrieval-access-control.md) for the threat model,
 trade-offs, tests, and known limits.
 
+## Model Gateway Client
+
+Optional. With `agentforge.model-gateway.enabled=true`, knowledge query rewrite and answerability
+calls go through the standalone [model-gateway](https://github.com/kianWei721/model-gateway), with no
+silent fallback to calling DashScope directly. `agentforge.model.provider=gateway` routes chat there too.
+
+```text
+one search -> correlation id kr-<uuid> -> rewrite + judge on route rag-json
+  -> standard OpenAI fields only, explicit max_tokens, X-Gateway-Deadline-Ms
+  -> retry decided by the gateway's error code, not the HTTP status
+  -> modelCallDiagnostics: gateway request id + the model that actually served each call
+```
+
+Agent runtime, embedding and rerank still call DashScope directly. See
+[docs/V0.9-model-gateway-client.md](docs/V0.9-model-gateway-client.md).
+
 ## External IoT Integration
 
 The HTTP adapter is intentionally configurable. Public defaults use synthetic endpoints:
