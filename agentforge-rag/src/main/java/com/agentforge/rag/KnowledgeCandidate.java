@@ -7,4 +7,12 @@ public record KnowledgeCandidate(
         String title,
         KnowledgeSourceType sourceType,
         String sourceRef,
-        String content) {}
+        String content,
+        KnowledgeAccessScope access) {
+
+    public KnowledgeCandidate {
+        if (access == null) {
+            throw new IllegalArgumentException("access is required");
+        }
+    }
+}

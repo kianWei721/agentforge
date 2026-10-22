@@ -1,6 +1,8 @@
 package com.agentforge.app.api;
 
 import com.agentforge.core.AgentForgeConstants;
+import com.agentforge.core.security.AccessDeniedException;
+import com.agentforge.core.security.AccessPrincipal;
 import com.agentforge.rag.KnowledgeEvaluationReport;
 import com.agentforge.rag.KnowledgeEvaluator;
 import java.util.Optional;
@@ -21,7 +23,8 @@ public class KnowledgeEvaluationController {
     }
 
     @PostMapping("/run")
-    public Mono<KnowledgeEvaluationReport> run() {
+    public Mono<KnowledgeEvaluationReport> run(AccessPrincipal principal) {
+        AccessDeniedException.requireStaff(principal, "running knowledge evaluation");
         KnowledgeEvaluator service =
                 evaluator.orElseThrow(
                         () ->

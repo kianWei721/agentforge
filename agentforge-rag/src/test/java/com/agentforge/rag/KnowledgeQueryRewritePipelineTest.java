@@ -2,8 +2,11 @@ package com.agentforge.rag;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.agentforge.core.security.AccessPrincipal;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 class KnowledgeQueryRewritePipelineTest {
@@ -61,13 +64,15 @@ class KnowledgeQueryRewritePipelineTest {
                     public void refresh() {}
 
                     @Override
-                    public List<KnowledgeBackendHit> searchLexical(String query, int limit) {
+                    public List<KnowledgeBackendHit> searchLexical(
+                            String query, int limit, AccessPrincipal principal) {
                         lexicalQuery.set(query);
                         return List.of(hit);
                     }
 
                     @Override
-                    public List<KnowledgeBackendHit> searchVector(float[] queryVector, int limit) {
+                    public List<KnowledgeBackendHit> searchVector(
+                            float[] queryVector, int limit, AccessPrincipal principal) {
                         return List.of(hit);
                     }
 
@@ -136,6 +141,15 @@ class KnowledgeQueryRewritePipelineTest {
                 new HybridKnowledgeRetriever(
                         embeddingProvider,
                         backend,
+                        new KnowledgeAccessGuard(
+                                ids ->
+                                        ids.stream()
+                                                .collect(
+                                                        Collectors.toMap(
+                                                                Function.identity(),
+                                                                ignored ->
+                                                                        KnowledgeAccessScope
+                                                                                .internal()))),
                         4,
                         60,
                         true,
@@ -146,7 +160,7 @@ class KnowledgeQueryRewritePipelineTest {
                         judge,
                         8);
 
-        KnowledgeRetrievalResult result = retriever.searchDetailed(original, 5);
+        KnowledgeRetrievalResult result = retriever.searchDetailed(original, 5, AccessPrincipal.staff("staff-1"));
 
         assertEquals(rewritten, embedded.get());
         assertEquals(rewritten, lexicalQuery.get());
@@ -206,13 +220,15 @@ class KnowledgeQueryRewritePipelineTest {
                     public void refresh() {}
 
                     @Override
-                    public List<KnowledgeBackendHit> searchLexical(String query, int limit) {
+                    public List<KnowledgeBackendHit> searchLexical(
+                            String query, int limit, AccessPrincipal principal) {
                         lexicalQuery.set(query);
                         return List.of(hit);
                     }
 
                     @Override
-                    public List<KnowledgeBackendHit> searchVector(float[] queryVector, int limit) {
+                    public List<KnowledgeBackendHit> searchVector(
+                            float[] queryVector, int limit, AccessPrincipal principal) {
                         return List.of(hit);
                     }
 
@@ -239,6 +255,15 @@ class KnowledgeQueryRewritePipelineTest {
                 new HybridKnowledgeRetriever(
                         embeddingProvider,
                         backend,
+                        new KnowledgeAccessGuard(
+                                ids ->
+                                        ids.stream()
+                                                .collect(
+                                                        Collectors.toMap(
+                                                                Function.identity(),
+                                                                ignored ->
+                                                                        KnowledgeAccessScope
+                                                                                .internal()))),
                         4,
                         60,
                         false,
@@ -249,7 +274,7 @@ class KnowledgeQueryRewritePipelineTest {
                         null,
                         8);
 
-        KnowledgeRetrievalResult result = retriever.searchDetailed(original, 5);
+        KnowledgeRetrievalResult result = retriever.searchDetailed(original, 5, AccessPrincipal.staff("staff-1"));
 
         assertEquals(original, lexicalQuery.get());
         assertEquals(1, result.hits().size());

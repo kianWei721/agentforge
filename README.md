@@ -102,6 +102,23 @@ RRF k           = 5
 
 The repository may still retain historical source defaults until the separate source-baseline codification change is merged. Historical evaluation references to `REWRITE + k=60` describe the legacy control, not the target production configuration.
 
+## Retrieval Access Control
+
+The same knowledge base serves staff and customers with different boundaries. The boundary is
+enforced in retrieval and data access, never by prompt wording:
+
+```text
+trusted identity header -> server-side PrincipalDirectory
+  -> backend pre-filter (ES knn.filter / bool.filter, SQL WHERE before LIMIT)
+  -> guard re-checks MySQL (enabled + ACL) before RRF, so rerank / judge LLMs never see unreadable chunks
+  -> documents, traces and sessions apply the same policy or owner checks
+```
+
+Document visibility is `INTERNAL`, `PUBLIC`, or `CUSTOMER` + `customerId`. Agent tools resolve identity
+from the runtime context; the tool schema has no identity field. See
+[docs/V0.8-retrieval-access-control.md](docs/V0.8-retrieval-access-control.md) for the threat model,
+trade-offs, tests, and known limits.
+
 ## External IoT Integration
 
 The HTTP adapter is intentionally configurable. Public defaults use synthetic endpoints:

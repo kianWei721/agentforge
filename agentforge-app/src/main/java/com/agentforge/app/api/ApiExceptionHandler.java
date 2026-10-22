@@ -2,6 +2,7 @@ package com.agentforge.app.api;
 
 import com.agentforge.agent.AgentNotFoundException;
 import com.agentforge.conversation.ConversationNotFoundException;
+import com.agentforge.core.security.AccessDeniedException;
 import com.agentforge.observability.execution.ExecutionNotFoundException;
 import com.agentforge.runtime.confirmation.ToolConfirmationAccessDeniedException;
 import com.agentforge.runtime.confirmation.ToolConfirmationInvalidStateException;
@@ -13,6 +14,12 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+
+    @ExceptionHandler(AccessDeniedException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ApiError handleAccessDenied(AccessDeniedException exception) {
+        return ApiError.of("ACCESS_DENIED", exception.getMessage());
+    }
 
     @ExceptionHandler(AgentNotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)

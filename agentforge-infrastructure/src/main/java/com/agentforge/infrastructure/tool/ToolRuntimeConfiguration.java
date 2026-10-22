@@ -1,5 +1,6 @@
 package com.agentforge.infrastructure.tool;
 
+import com.agentforge.core.security.PrincipalDirectory;
 import com.agentforge.infrastructure.config.IoTDeviceStatusProperties;
 import com.agentforge.infrastructure.config.IoTLureLampControlProperties;
 import com.agentforge.rag.KnowledgeRetriever;
@@ -126,8 +127,9 @@ public class ToolRuntimeConfiguration {
     }
 
     @Bean
-    public AgentTool knowledgeSearchTool(KnowledgeRetriever retriever) {
-        return new KnowledgeSearchTool(retriever);
+    public AgentTool knowledgeSearchTool(
+            KnowledgeRetriever retriever, PrincipalDirectory principals) {
+        return new KnowledgeSearchTool(retriever, principals);
     }
 
     @Bean

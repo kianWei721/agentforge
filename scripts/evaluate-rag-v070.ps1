@@ -1,7 +1,9 @@
 param(
     [string]$BaseUrl = "http://localhost:8080",
     [ValidateRange(60, 3600)]
-    [int]$RequestTimeoutSeconds = 1200
+    [int]$RequestTimeoutSeconds = 1200,
+    # Stands in for the trusted gateway; evaluation is staff-only.
+    [string]$UserId = "dev-staff"
 )
 
 $ErrorActionPreference = "Stop"
@@ -13,6 +15,7 @@ function Invoke-Utf8JsonPost {
     param([Parameter(Mandatory = $true)][string]$Uri)
     $client = New-Object System.Net.Http.HttpClient
     $client.Timeout = [TimeSpan]::FromSeconds($RequestTimeoutSeconds)
+    $client.DefaultRequestHeaders.Add("X-AgentForge-User-Id", $UserId)
     try {
         $content = New-Object System.Net.Http.StringContent("{}", [System.Text.Encoding]::UTF8, "application/json")
         try {

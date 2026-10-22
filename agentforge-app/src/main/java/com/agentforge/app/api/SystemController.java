@@ -156,7 +156,7 @@ public class SystemController {
         result.put("toolConfirmationTtl", toolConfirmationProperties.getTtl().toString());
         result.put("knowledgeGroundingEnabled", true);
         result.put("knowledgeRetrieverMode", knowledgeRetriever.mode());
-        result.put("knowledgeDocuments", knowledgeIngestionService.list().size());
+        result.put("knowledgeDocuments", knowledgeIngestionService.count());
         result.put("knowledgeHybridEnabled", knowledgeHybridProperties.isEnabled());
         result.put("knowledgeHybridConfigured", knowledgeHybridProperties.isConfigured());
         result.put(

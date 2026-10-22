@@ -2,8 +2,11 @@ package com.agentforge.rag;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.agentforge.core.security.AccessPrincipal;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
@@ -58,12 +61,14 @@ class KnowledgeIndexServiceTest {
                     }
 
                     @Override
-                    public List<KnowledgeBackendHit> searchLexical(String query, int limit) {
+                    public List<KnowledgeBackendHit> searchLexical(
+                            String query, int limit, AccessPrincipal principal) {
                         return List.of();
                     }
 
                     @Override
-                    public List<KnowledgeBackendHit> searchVector(float[] queryVector, int limit) {
+                    public List<KnowledgeBackendHit> searchVector(
+                            float[] queryVector, int limit, AccessPrincipal principal) {
                         return List.of();
                     }
 
@@ -78,6 +83,9 @@ class KnowledgeIndexServiceTest {
                         .rebuild();
 
         assertEquals(2, indexed.size());
+        // Every indexed chunk carries its document's ACL so the backend can pre-filter on it.
+        assertEquals(
+                KnowledgeAccessScope.customer("cust-doc-1"), indexed.get(0).candidate().access());
         assertEquals(2, report.indexedChunks());
         assertEquals("test-embedding", report.embeddingModel());
         assertEquals(3, report.embeddingDimensions());
@@ -122,12 +130,14 @@ class KnowledgeIndexServiceTest {
                     public void refresh() {}
 
                     @Override
-                    public List<KnowledgeBackendHit> searchLexical(String query, int limit) {
+                    public List<KnowledgeBackendHit> searchLexical(
+                            String query, int limit, AccessPrincipal principal) {
                         return List.of();
                     }
 
                     @Override
-                    public List<KnowledgeBackendHit> searchVector(float[] queryVector, int limit) {
+                    public List<KnowledgeBackendHit> searchVector(
+                            float[] queryVector, int limit, AccessPrincipal principal) {
                         return List.of();
                     }
 
@@ -178,6 +188,18 @@ class KnowledgeIndexServiceTest {
             }
 
             @Override
+            public List<KnowledgeCandidate> findAccessibleCandidates(
+                    int maxCandidates, AccessPrincipal principal) {
+                throw new AssertionError("indexing must not read through a principal");
+            }
+
+            @Override
+            public Map<String, KnowledgeAccessScope> findReadableScopes(
+                    Collection<String> documentIds) {
+                return Map.of();
+            }
+
+            @Override
             public void deleteById(String id) {}
         };
     }
@@ -191,6 +213,7 @@ class KnowledgeIndexServiceTest {
                 "Title " + documentId,
                 KnowledgeSourceType.TEST,
                 "test://" + documentId,
-                "Knowledge content " + documentId);
+                "Knowledge content " + documentId,
+                KnowledgeAccessScope.customer("cust-" + documentId));
     }
 }

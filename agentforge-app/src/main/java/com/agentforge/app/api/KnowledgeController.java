@@ -1,7 +1,8 @@
 package com.agentforge.app.api;
 
 import com.agentforge.core.AgentForgeConstants;
-import com.agentforge.rag.KnowledgeDocument;
+import com.agentforge.core.security.AccessDeniedException;
+import com.agentforge.core.security.AccessPrincipal;
 import com.agentforge.rag.KnowledgeIndexReport;
 import com.agentforge.rag.KnowledgeIndexService;
 import com.agentforge.rag.KnowledgeIngestionService;
@@ -35,7 +36,8 @@ public class KnowledgeController {
     @PostMapping("/documents")
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<KnowledgeDocumentDetailView> create(
-            @Valid @RequestBody KnowledgeDocumentCreateRequest request) {
+            @Valid @RequestBody KnowledgeDocumentCreateRequest request,
+            AccessPrincipal principal) {
         return Mono.fromCallable(
                         () ->
                                 KnowledgeDocumentDetailView.from(
@@ -43,37 +45,43 @@ public class KnowledgeController {
                                                 request.title(),
                                                 request.sourceType(),
                                                 request.sourceRef(),
-                                                request.content())))
+                                                request.access(),
+                                                request.content(),
+                                                principal)))
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
     @GetMapping("/documents")
-    public Mono<List<KnowledgeDocumentView>> list() {
+    public Mono<List<KnowledgeDocumentView>> list(AccessPrincipal principal) {
         return Mono.fromCallable(
                         () ->
-                                ingestionService.list().stream()
+                                ingestionService.list(principal).stream()
                                         .map(KnowledgeDocumentView::from)
                                         .toList())
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
     @GetMapping("/documents/{documentId}")
-    public Mono<KnowledgeDocumentDetailView> get(@PathVariable String documentId) {
+    public Mono<KnowledgeDocumentDetailView> get(
+            @PathVariable String documentId, AccessPrincipal principal) {
         return Mono.fromCallable(
-                        () -> KnowledgeDocumentDetailView.from(ingestionService.get(documentId)))
+                        () ->
+                                KnowledgeDocumentDetailView.from(
+                                        ingestionService.get(documentId, principal)))
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
     @DeleteMapping("/documents/{documentId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public Mono<Void> delete(@PathVariable String documentId) {
-        return Mono.fromRunnable(() -> ingestionService.delete(documentId))
+    public Mono<Void> delete(@PathVariable String documentId, AccessPrincipal principal) {
+        return Mono.fromRunnable(() -> ingestionService.delete(documentId, principal))
                 .subscribeOn(Schedulers.boundedElastic())
                 .then();
     }
 
     @PostMapping("/index/rebuild")
-    public Mono<KnowledgeIndexReport> rebuildIndex() {
+    public Mono<KnowledgeIndexReport> rebuildIndex(AccessPrincipal principal) {
+        AccessDeniedException.requireStaff(principal, "rebuilding the knowledge index");
         KnowledgeIndexService service =
                 indexService.orElseThrow(
                         () ->
@@ -86,13 +94,15 @@ public class KnowledgeController {
 
     @PostMapping("/search")
     public Mono<KnowledgeSearchResponse> search(
-            @Valid @RequestBody KnowledgeSearchRequest request) {
+            @Valid @RequestBody KnowledgeSearchRequest request,
+            AccessPrincipal principal) {
         return Mono.fromCallable(
                         () -> {
                             var retrieval =
                                     retriever.searchDetailed(
                                             request.query(),
-                                            request.resolvedTopK());
+                                            request.resolvedTopK(),
+                                            principal);
                             var hits = retrieval.hits();
                             boolean noAnswer = hits.isEmpty();
                             return new KnowledgeSearchResponse(
@@ -103,7 +113,8 @@ public class KnowledgeController {
                                     hits,
                                     retrieval.queryRewriteDiagnostics(),
                                     retrieval.rerankDiagnostics(),
-                                    retrieval.answerabilityDiagnostics());
+                                    retrieval.answerabilityDiagnostics(),
+                                    retrieval.accessDiagnostics());
                         })
                 .subscribeOn(Schedulers.boundedElastic());
     }

@@ -1,13 +1,14 @@
 package com.agentforge.app.api;
 
 import com.agentforge.core.AgentForgeConstants;
+import com.agentforge.core.security.AccessPrincipal;
 import com.agentforge.runtime.confirmation.ToolConfirmationService;
-import jakarta.validation.Valid;
 import java.util.concurrent.Callable;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+/** The service already checks that a confirmation belongs to the acting user. */
 @RestController
 @RequestMapping(AgentForgeConstants.API_PREFIX + "/tool-confirmations")
 public class ToolConfirmationController {
@@ -21,33 +22,34 @@ public class ToolConfirmationController {
     @GetMapping("/{confirmationId}")
     public Mono<ToolConfirmationView> get(
             @PathVariable("confirmationId") String confirmationId,
-            @RequestParam("userId") String userId) {
+            AccessPrincipal principal) {
         return blocking(
                 () ->
                         ToolConfirmationView.from(
-                                confirmationService.getForUser(confirmationId, userId)));
+                                confirmationService.getForUser(
+                                        confirmationId, principal.userId())));
     }
 
     @PostMapping("/{confirmationId}/approve")
     public Mono<ToolConfirmationView> approve(
             @PathVariable("confirmationId") String confirmationId,
-            @Valid @RequestBody ToolConfirmationActionRequest request) {
+            AccessPrincipal principal) {
         return blocking(
                 () ->
                         ToolConfirmationView.from(
                                 confirmationService.approve(
-                                        confirmationId, request.userId())));
+                                        confirmationId, principal.userId())));
     }
 
     @PostMapping("/{confirmationId}/reject")
     public Mono<ToolConfirmationView> reject(
             @PathVariable("confirmationId") String confirmationId,
-            @Valid @RequestBody ToolConfirmationActionRequest request) {
+            AccessPrincipal principal) {
         return blocking(
                 () ->
                         ToolConfirmationView.from(
                                 confirmationService.reject(
-                                        confirmationId, request.userId())));
+                                        confirmationId, principal.userId())));
     }
 
     private static <T> Mono<T> blocking(Callable<T> callable) {

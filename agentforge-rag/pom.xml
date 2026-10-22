@@ -11,6 +11,11 @@
     <artifactId>agentforge-rag</artifactId>
     <dependencies>
         <dependency>
+            <groupId>com.agentforge</groupId>
+            <artifactId>agentforge-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>

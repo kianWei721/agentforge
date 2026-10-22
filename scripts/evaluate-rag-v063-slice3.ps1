@@ -1,6 +1,8 @@
 param(
     [string]$BaseUrl = "http://localhost:8080",
-    [string]$ExpectedTitle = "V0.6 Offline Troubleshooting Acceptance"
+    [string]$ExpectedTitle = "V0.6 Offline Troubleshooting Acceptance",
+    # Stands in for the trusted gateway; must be registered in AGENTFORGE_STAFF_USER_IDS.
+    [string]$UserId = "dev-staff"
 )
 
 $ErrorActionPreference = "Stop"
@@ -19,6 +21,7 @@ function Invoke-Utf8JsonPost {
     )
 
     $client = New-Object System.Net.Http.HttpClient
+    $client.DefaultRequestHeaders.Add("X-AgentForge-User-Id", $UserId)
     try {
         $content = New-Object System.Net.Http.StringContent(
             $JsonBody,

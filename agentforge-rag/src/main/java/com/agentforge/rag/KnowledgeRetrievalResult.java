@@ -6,7 +6,8 @@ public record KnowledgeRetrievalResult(
         List<KnowledgeSearchHit> hits,
         KnowledgeRerankDiagnostics rerankDiagnostics,
         KnowledgeAnswerabilityDiagnostics answerabilityDiagnostics,
-        KnowledgeQueryRewriteDiagnostics queryRewriteDiagnostics) {
+        KnowledgeQueryRewriteDiagnostics queryRewriteDiagnostics,
+        KnowledgeAccessDiagnostics accessDiagnostics) {
 
     public KnowledgeRetrievalResult {
         hits = hits == null ? List.of() : List.copyOf(hits);
@@ -15,17 +16,25 @@ public record KnowledgeRetrievalResult(
     public KnowledgeRetrievalResult(
             List<KnowledgeSearchHit> hits,
             KnowledgeRerankDiagnostics rerankDiagnostics,
+            KnowledgeAnswerabilityDiagnostics answerabilityDiagnostics,
+            KnowledgeQueryRewriteDiagnostics queryRewriteDiagnostics) {
+        this(hits, rerankDiagnostics, answerabilityDiagnostics, queryRewriteDiagnostics, null);
+    }
+
+    public KnowledgeRetrievalResult(
+            List<KnowledgeSearchHit> hits,
+            KnowledgeRerankDiagnostics rerankDiagnostics,
             KnowledgeAnswerabilityDiagnostics answerabilityDiagnostics) {
-        this(hits, rerankDiagnostics, answerabilityDiagnostics, null);
+        this(hits, rerankDiagnostics, answerabilityDiagnostics, null, null);
     }
 
     public KnowledgeRetrievalResult(
             List<KnowledgeSearchHit> hits,
             KnowledgeRerankDiagnostics rerankDiagnostics) {
-        this(hits, rerankDiagnostics, null, null);
+        this(hits, rerankDiagnostics, null, null, null);
     }
 
     public static KnowledgeRetrievalResult of(List<KnowledgeSearchHit> hits) {
-        return new KnowledgeRetrievalResult(hits, null, null, null);
+        return new KnowledgeRetrievalResult(hits, null, null, null, null);
     }
 }

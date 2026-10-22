@@ -2,4 +2,5 @@ package com.agentforge.app.api;
 
 import jakarta.validation.constraints.NotBlank;
 
-public record ChatRequest(String userId, String sessionId, @NotBlank(message = "message must not be blank") String message) {}
+/** The caller's user id is not part of the body; it comes from the trusted identity header. */
+public record ChatRequest(String sessionId, @NotBlank(message = "message must not be blank") String message) {}
