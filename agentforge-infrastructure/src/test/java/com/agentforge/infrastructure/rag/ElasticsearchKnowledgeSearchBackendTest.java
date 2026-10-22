@@ -2,10 +2,13 @@ package com.agentforge.infrastructure.rag;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.agentforge.core.security.AccessPrincipal;
 import com.agentforge.infrastructure.config.KnowledgeHybridProperties;
+import com.agentforge.rag.KnowledgeAccessScope;
 import com.agentforge.rag.KnowledgeCandidate;
 import com.agentforge.rag.KnowledgeIndexedChunk;
 import com.agentforge.rag.KnowledgeSourceType;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
@@ -17,6 +20,10 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.Test;
 
 class ElasticsearchKnowledgeSearchBackendTest {
+
+    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final AccessPrincipal STAFF = AccessPrincipal.staff("staff-1");
+    private static final AccessPrincipal CUSTOMER_A = AccessPrincipal.customer("user-a", "cust-a");
 
     @Test
     void shouldUseIndexedKnnOnElasticsearch8() throws Exception {
@@ -59,7 +66,96 @@ class ElasticsearchKnowledgeSearchBackendTest {
         assertEquals("", refresh.body());
     }
 
+    @Test
+    void customerFilterShouldRideInsideKnnAndBoolFilter() throws Exception {
+        List<RequestCapture> requests = runScenario("8.19.0", CUSTOMER_A);
+
+        JsonNode vector = searchBody(requests, "knn");
+        assertCustomerAFilter(vector.path("knn").path("filter"));
+        // A post_filter would be applied after k neighbours were chosen and starve the caller.
+        assertTrue(vector.path("post_filter").isMissingNode());
+
+        JsonNode lexical = searchBody(requests, "multi_match");
+        assertTrue(lexical.path("query").path("bool").path("must").get(0).has("multi_match"));
+        assertCustomerAFilter(lexical.path("query").path("bool").path("filter").get(0));
+    }
+
+    @Test
+    void customerFilterShouldReplaceMatchAllOnElasticsearch7() throws Exception {
+        List<RequestCapture> requests = runScenario("7.17.24", CUSTOMER_A);
+
+        JsonNode vector = searchBody(requests, "script_score");
+        JsonNode inner = vector.path("query").path("script_score").path("query");
+        assertTrue(inner.path("match_all").isMissingNode());
+        assertCustomerAFilter(inner.path("bool").path("filter").get(0));
+    }
+
+    @Test
+    void staffFilterShouldListEveryVisibilityExplicitly() throws Exception {
+        List<RequestCapture> requests = runScenario("8.19.0", STAFF);
+
+        JsonNode should = searchBody(requests, "knn").path("knn").path("filter").path("bool").path("should");
+        assertEquals(1, should.size());
+        assertEquals(
+                "[\"INTERNAL\",\"PUBLIC\",\"CUSTOMER\"]",
+                should.get(0).path("terms").path("visibility").toString());
+    }
+
+    @Test
+    void indexShouldCarryAccessFieldsForPreFiltering() throws Exception {
+        List<RequestCapture> requests = runScenario("8.19.0", STAFF);
+
+        JsonNode mapping =
+                JSON.readTree(
+                                requests.stream()
+                                        .filter(request -> "PUT".equals(request.method()))
+                                        .findFirst()
+                                        .orElseThrow()
+                                        .body())
+                        .path("mappings")
+                        .path("properties");
+        assertEquals("keyword", mapping.path("visibility").path("type").asText());
+        assertEquals("keyword", mapping.path("customerId").path("type").asText());
+
+        String bulk =
+                requests.stream()
+                        .filter(request -> "/_bulk".equals(request.path()))
+                        .findFirst()
+                        .orElseThrow()
+                        .body();
+        JsonNode source = JSON.readTree(bulk.split("\n")[1]);
+        assertEquals("CUSTOMER", source.path("visibility").asText());
+        assertEquals("cust-a", source.path("customerId").asText());
+    }
+
+    private static void assertCustomerAFilter(JsonNode filter) {
+        JsonNode bool = filter.path("bool");
+        assertEquals(1, bool.path("minimum_should_match").asInt());
+        JsonNode should = bool.path("should");
+        assertEquals(2, should.size());
+        assertEquals("[\"PUBLIC\"]", should.get(0).path("terms").path("visibility").toString());
+        JsonNode own = should.get(1).path("bool").path("filter");
+        assertEquals("CUSTOMER", own.get(0).path("term").path("visibility").asText());
+        assertEquals("cust-a", own.get(1).path("term").path("customerId").asText());
+    }
+
+    private static JsonNode searchBody(List<RequestCapture> requests, String marker)
+            throws Exception {
+        return JSON.readTree(
+                requests.stream()
+                        .filter(request -> request.path().endsWith("/_search"))
+                        .filter(request -> request.body().contains("\"" + marker + "\""))
+                        .findFirst()
+                        .orElseThrow()
+                        .body());
+    }
+
     private static List<RequestCapture> runScenario(String version) throws Exception {
+        return runScenario(version, STAFF);
+    }
+
+    private static List<RequestCapture> runScenario(String version, AccessPrincipal principal)
+            throws Exception {
         List<RequestCapture> requests = new CopyOnWriteArrayList<>();
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext(
@@ -133,15 +229,16 @@ class ElasticsearchKnowledgeSearchBackendTest {
                             "Offline troubleshooting",
                             KnowledgeSourceType.TEST,
                             "acceptance://offline",
-                            "Check power and SIM.");
+                            "Check power and SIM.",
+                            KnowledgeAccessScope.customer("cust-a"));
             backend.indexBatch(
                     List.of(
                             new KnowledgeIndexedChunk(
                                     candidate, new float[] {0.1f, 0.2f, 0.3f})));
             backend.refresh();
 
-            var lexical = backend.searchLexical("offline", 5);
-            var vector = backend.searchVector(new float[] {0.3f, 0.2f, 0.1f}, 5);
+            var lexical = backend.searchLexical("offline", 5, principal);
+            var vector = backend.searchVector(new float[] {0.3f, 0.2f, 0.1f}, 5, principal);
 
             assertEquals(1, lexical.size());
             assertEquals("doc-1", lexical.get(0).documentId());

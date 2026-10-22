@@ -1,5 +1,7 @@
 package com.agentforge.tool.knowledge;
 
+import com.agentforge.core.security.AccessPrincipal;
+import com.agentforge.core.security.PrincipalDirectory;
 import com.agentforge.rag.KnowledgeAnswerabilityDecision;
 import com.agentforge.rag.KnowledgeAnswerabilityDiagnostics;
 import com.agentforge.rag.KnowledgeQueryRewriteDiagnostics;
@@ -14,6 +16,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 public class KnowledgeSearchTool implements AgentTool {
 
@@ -22,9 +25,11 @@ public class KnowledgeSearchTool implements AgentTool {
     private static final int MAX_TOP_K = 8;
 
     private final KnowledgeRetriever retriever;
+    private final PrincipalDirectory principals;
 
-    public KnowledgeSearchTool(KnowledgeRetriever retriever) {
+    public KnowledgeSearchTool(KnowledgeRetriever retriever, PrincipalDirectory principals) {
         this.retriever = retriever;
+        this.principals = principals;
     }
 
     @Override
@@ -87,9 +92,19 @@ public class KnowledgeSearchTool implements AgentTool {
                     false);
         }
 
+        // Identity comes from the runtime context, never from model arguments: the schema has no
+        // identity fields and rejects additional properties.
+        Optional<AccessPrincipal> principal = principals.resolve(context.userId());
+        if (principal.isEmpty()) {
+            return ToolResult.failure(
+                    "knowledge access denied: caller is not a registered principal",
+                    "ACCESS_DENIED",
+                    false);
+        }
+
         try {
             KnowledgeRetrievalResult retrieval =
-                    retriever.searchDetailed(query, topK);
+                    retriever.searchDetailed(query, topK, principal.get());
             List<KnowledgeSearchHit> hits = retrieval.hits();
 
             List<Map<String, Object>> resultHits =

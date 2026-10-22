@@ -2,10 +2,141 @@ package com.agentforge.rag;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.agentforge.core.security.AccessPrincipal;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 class HybridKnowledgeRetrieverTest {
+
+    private static final AccessPrincipal STAFF = AccessPrincipal.staff("staff-1");
+    private static final KnowledgeAccessGuard ALL_READABLE =
+            new KnowledgeAccessGuard(
+                    ids ->
+                            ids.stream()
+                                    .distinct()
+                                    .collect(
+                                            Collectors.toMap(
+                                                    Function.identity(),
+                                                    ignored -> KnowledgeAccessScope.internal())));
+
+    @Test
+    void guardShouldDropUnreadableAndStaleHitsBeforeRerank() {
+        // Simulates an index whose filter is wrong or stale: it returns other customers', internal
+        // and already-deleted chunks to customer A.
+        KnowledgeBackendHit own = hit("doc-a", "chunk-a", "A 的申报说明", 5d);
+        KnowledgeBackendHit published = hit("doc-public", "chunk-public", "政策解读", 4d);
+        KnowledgeBackendHit otherCustomer = hit("doc-b", "chunk-b", "B 的申报说明", 6d);
+        KnowledgeBackendHit internal = hit("doc-internal", "chunk-internal", "内部 SOP", 7d);
+        KnowledgeBackendHit deleted = hit("doc-deleted", "chunk-deleted", "已删除", 8d);
+        Map<String, KnowledgeAccessScope> table =
+                Map.of(
+                        "doc-a", KnowledgeAccessScope.customer("cust-a"),
+                        "doc-public", KnowledgeAccessScope.publicAudience(),
+                        "doc-b", KnowledgeAccessScope.customer("cust-b"),
+                        "doc-internal", KnowledgeAccessScope.internal());
+        KnowledgeAccessGuard guard =
+                new KnowledgeAccessGuard(
+                        ids ->
+                                ids.stream()
+                                        .filter(table::containsKey)
+                                        .collect(Collectors.toMap(Function.identity(), table::get)));
+
+        List<String> rerankInput = new ArrayList<>();
+        KnowledgeReranker reranker =
+                (query, candidates, topK) -> {
+                    candidates.forEach(candidate -> rerankInput.add(candidate.documentId()));
+                    return new KnowledgeRerankResult(candidates, false, null);
+                };
+
+        KnowledgeRetriever retriever =
+                new HybridKnowledgeRetriever(
+                        embeddingProvider(),
+                        backend(
+                                List.of(otherCustomer, internal, deleted, own),
+                                List.of(published, otherCustomer)),
+                        guard,
+                        4,
+                        60,
+                        true,
+                        0.60d,
+                        reranker,
+                        8);
+
+        KnowledgeRetrievalResult result =
+                retriever.searchDetailed(
+                        "申报说明",
+                        5,
+                        AccessPrincipal.customer("user-a", "cust-a"));
+
+        assertEquals(
+                List.of("doc-a", "doc-public"),
+                result.hits().stream().map(KnowledgeSearchHit::documentId).sorted().toList());
+        assertEquals(
+                List.of("doc-a", "doc-public"),
+                rerankInput.stream().sorted().toList());
+        assertEquals("CUSTOMER", result.accessDiagnostics().principalType());
+        assertEquals(4, result.accessDiagnostics().guardDroppedHits());
+    }
+
+    @Test
+    void shouldPushPrincipalDownToBothChannels() {
+        List<AccessPrincipal> seen = new ArrayList<>();
+        KnowledgeSearchBackend backend =
+                new KnowledgeSearchBackend() {
+                    @Override
+                    public void recreateIndex(int dimensions) {}
+
+                    @Override
+                    public void indexBatch(List<KnowledgeIndexedChunk> chunks) {}
+
+                    @Override
+                    public void refresh() {}
+
+                    @Override
+                    public List<KnowledgeBackendHit> searchLexical(
+                            String query, int limit, AccessPrincipal principal) {
+                        seen.add(principal);
+                        return List.of();
+                    }
+
+                    @Override
+                    public List<KnowledgeBackendHit> searchVector(
+                            float[] queryVector, int limit, AccessPrincipal principal) {
+                        seen.add(principal);
+                        return List.of();
+                    }
+
+                    @Override
+                    public String indexName() {
+                        return "test";
+                    }
+                };
+        AccessPrincipal customer = AccessPrincipal.customer("user-a", "cust-a");
+
+        new HybridKnowledgeRetriever(embeddingProvider(), backend, ALL_READABLE, 4, 60, true, 0.6d)
+                .search("申报", 5, customer);
+
+        assertEquals(List.of(customer, customer), seen);
+    }
+
+    @Test
+    void shouldRefuseToSearchWithoutPrincipal() {
+        KnowledgeRetriever retriever =
+                new HybridKnowledgeRetriever(
+                        embeddingProvider(),
+                        backend(List.of(), List.of()),
+                        ALL_READABLE,
+                        4,
+                        60,
+                        true,
+                        0.60d);
+
+        assertThrows(IllegalArgumentException.class, () -> retriever.search("申报", 5, null));
+    }
 
     @Test
     void shouldFuseLexicalAndVectorRanksWithStableCitation() {
@@ -34,6 +165,7 @@ class HybridKnowledgeRetrieverTest {
                         backend(
                                 List.of(shared, lexicalOnly),
                                 List.of(shared, vectorOnly)),
+                        ALL_READABLE,
                         4,
                         60,
                         true,
@@ -42,7 +174,8 @@ class HybridKnowledgeRetrieverTest {
         List<KnowledgeSearchHit> hits =
                 retriever.search(
                         "设备离线怎么排查",
-                        3);
+                        3,
+                        STAFF);
 
         assertEquals(3, hits.size());
         assertEquals(
@@ -77,6 +210,7 @@ class HybridKnowledgeRetrieverTest {
                         backend(
                                 List.of(),
                                 List.of(vectorOnly)),
+                        ALL_READABLE,
                         4,
                         60,
                         true,
@@ -85,7 +219,8 @@ class HybridKnowledgeRetrieverTest {
         List<KnowledgeSearchHit> hits =
                 retriever.search(
                         "设备长期离线应该按什么顺序排查？",
-                        5);
+                        5,
+                        STAFF);
 
         assertEquals(1, hits.size());
         assertEquals(
@@ -114,6 +249,7 @@ class HybridKnowledgeRetrieverTest {
                         backend(
                                 List.of(),
                                 List.of(unrelated)),
+                        ALL_READABLE,
                         4,
                         60,
                         true,
@@ -122,7 +258,8 @@ class HybridKnowledgeRetrieverTest {
         assertTrue(
                 retriever.search(
                                 "shadowStatus CONFLICT 的字段语义是什么？",
-                                5)
+                                5,
+                                STAFF)
                         .isEmpty());
     }
 
@@ -166,6 +303,7 @@ class HybridKnowledgeRetrieverTest {
                         backend(
                                 List.of(),
                                 List.of(crossLanguage)),
+                        ALL_READABLE,
                         4,
                         60,
                         true,
@@ -176,7 +314,8 @@ class HybridKnowledgeRetrieverTest {
         List<KnowledgeSearchHit> hits =
                 retriever.search(
                         "设备长期离线应该按什么顺序排查？",
-                        5);
+                        5,
+                        STAFF);
 
         assertEquals(1, hits.size());
         assertEquals(
@@ -235,6 +374,7 @@ class HybridKnowledgeRetrieverTest {
                         backend(
                                 List.of(),
                                 List.of(crossLanguage)),
+                        ALL_READABLE,
                         4,
                         60,
                         true,
@@ -247,7 +387,8 @@ class HybridKnowledgeRetrieverTest {
         KnowledgeRetrievalResult result =
                 retriever.searchDetailed(
                         "设备长期离线应该按什么顺序排查？",
-                        5);
+                        5,
+                        STAFF);
 
         assertEquals(1, result.hits().size());
         assertEquals(
@@ -308,6 +449,7 @@ class HybridKnowledgeRetrieverTest {
                         backend(
                                 List.of(),
                                 List.of(unrelated)),
+                        ALL_READABLE,
                         4,
                         60,
                         true,
@@ -320,7 +462,8 @@ class HybridKnowledgeRetrieverTest {
         KnowledgeRetrievalResult result =
                 retriever.searchDetailed(
                         "SignalStrength=0 在这个设备里具体代表什么？",
-                        5);
+                        5,
+                        STAFF);
 
         assertTrue(result.hits().isEmpty());
         assertEquals(
@@ -348,6 +491,7 @@ class HybridKnowledgeRetrieverTest {
                         backend(
                                 List.of(exact),
                                 List.of(sameVector)),
+                        ALL_READABLE,
                         4,
                         60,
                         true,
@@ -356,7 +500,8 @@ class HybridKnowledgeRetrieverTest {
         List<KnowledgeSearchHit> hits =
                 retriever.search(
                         "shadowStatus CONFLICT",
-                        5);
+                        5,
+                        STAFF);
 
         assertEquals(1, hits.size());
         assertEquals(
@@ -382,6 +527,7 @@ class HybridKnowledgeRetrieverTest {
                         backend(
                                 List.of(),
                                 List.of(unrelated)),
+                        ALL_READABLE,
                         4,
                         60,
                         false,
@@ -391,7 +537,8 @@ class HybridKnowledgeRetrieverTest {
                 1,
                 retriever.search(
                                 "unrelated query",
-                                5)
+                                5,
+                                STAFF)
                         .size());
         assertEquals(
                 "HYBRID_ES_RRF_V1",
@@ -440,14 +587,16 @@ class HybridKnowledgeRetrieverTest {
             @Override
             public List<KnowledgeBackendHit> searchLexical(
                     String query,
-                    int limit) {
+                    int limit,
+                    AccessPrincipal principal) {
                 return lexical;
             }
 
             @Override
             public List<KnowledgeBackendHit> searchVector(
                     float[] queryVector,
-                    int limit) {
+                    int limit,
+                    AccessPrincipal principal) {
                 return vector;
             }
 

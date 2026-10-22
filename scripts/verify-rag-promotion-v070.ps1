@@ -4,7 +4,9 @@ param(
     [string]$PositiveQuery = "For a device that has been offline for a prolonged period, what troubleshooting order should I follow?",
     [string]$NoAnswerQuery = "What is the exact reconnect backoff ceiling in seconds?",
     [switch]$SkipKnowledgeSearch,
-    [switch]$AllowEvaluationEnabled
+    [switch]$AllowEvaluationEnabled,
+    # Stands in for the trusted gateway; must be registered in AGENTFORGE_STAFF_USER_IDS.
+    [string]$UserId = "dev-staff"
 )
 
 $ErrorActionPreference = "Stop"
@@ -16,7 +18,7 @@ function Invoke-JsonPost {
         [Parameter(Mandatory = $true)]$Body
     )
     $json = $Body | ConvertTo-Json -Depth 8
-    return Invoke-RestMethod -Method Post -Uri $Uri -ContentType "application/json; charset=utf-8" -Body ([Text.Encoding]::UTF8.GetBytes($json))
+    return Invoke-RestMethod -Method Post -Uri $Uri -Headers @{ "X-AgentForge-User-Id" = $UserId } -ContentType "application/json; charset=utf-8" -Body ([Text.Encoding]::UTF8.GetBytes($json))
 }
 
 $health = Invoke-RestMethod -Method Get -Uri ($base + "/api/v1/system/health")

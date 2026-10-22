@@ -126,6 +126,13 @@ agentforge:
     key-prefix: ${AGENTFORGE_SESSION_CACHE_PREFIX:agentforge:session:}
     ttl: ${AGENTFORGE_SESSION_CACHE_TTL:24h}
     restore-max-messages: ${AGENTFORGE_CONTEXT_RESTORE_MAX_MESSAGES:40}
+  security:
+    # The trusted gateway authenticates the caller and injects X-AgentForge-User-Id. These lists
+    # decide what that user is; unknown users get 401. No defaults on purpose.
+    principals:
+      staff-user-ids: ${AGENTFORGE_STAFF_USER_IDS:}
+      # userId=customerId, comma separated
+      customer-users: ${AGENTFORGE_CUSTOMER_USERS:}
   agent:
     enabled: ${AGENTFORGE_AGENT_ENABLED:false}
     name: agentforge-assistant

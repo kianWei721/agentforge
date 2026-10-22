@@ -5,6 +5,8 @@ import com.agentforge.agent.AgentDefinition;
 import com.agentforge.agent.AgentDefinitionService;
 import com.agentforge.agent.AgentUpdateCommand;
 import com.agentforge.core.AgentForgeConstants;
+import com.agentforge.core.security.AccessDeniedException;
+import com.agentforge.core.security.AccessPrincipal;
 import com.agentforge.runtime.AgentRuntimeManager;
 import com.agentforge.tool.ToolRegistry;
 import jakarta.validation.Valid;
@@ -44,7 +46,9 @@ public class AgentManagementController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public Mono<AgentDefinition> create(@Valid @RequestBody AgentCreateRequest request) {
+    public Mono<AgentDefinition> create(
+            @Valid @RequestBody AgentCreateRequest request, AccessPrincipal principal) {
+        AccessDeniedException.requireStaff(principal, "creating agents");
         return blocking(
                 () -> {
                     validateTools(request.toolNames());
@@ -63,7 +67,9 @@ public class AgentManagementController {
     @PutMapping("/{agentId}")
     public Mono<AgentDefinition> update(
             @PathVariable("agentId") String agentId,
-            @Valid @RequestBody AgentUpdateRequest request) {
+            @Valid @RequestBody AgentUpdateRequest request,
+            AccessPrincipal principal) {
+        AccessDeniedException.requireStaff(principal, "updating agents");
         return blocking(
                 () -> {
                     validateTools(request.toolNames());
@@ -85,7 +91,9 @@ public class AgentManagementController {
 
     @DeleteMapping("/{agentId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public Mono<Void> delete(@PathVariable("agentId") String agentId) {
+    public Mono<Void> delete(
+            @PathVariable("agentId") String agentId, AccessPrincipal principal) {
+        AccessDeniedException.requireStaff(principal, "deleting agents");
         return blocking(
                         () -> {
                             agentService.delete(agentId);

@@ -7,6 +7,7 @@ import com.agentforge.infrastructure.config.KnowledgeQueryRewriteProperties;
 import com.agentforge.infrastructure.config.KnowledgeRerankProperties;
 import com.agentforge.rag.EmbeddingProvider;
 import com.agentforge.rag.HybridKnowledgeRetriever;
+import com.agentforge.rag.KnowledgeAccessGuard;
 import com.agentforge.rag.KnowledgeAnswerabilityJudge;
 import com.agentforge.rag.KnowledgeChunker;
 import com.agentforge.rag.KnowledgeEvaluator;
@@ -146,6 +147,7 @@ public class KnowledgeRuntimeConfiguration {
     public KnowledgeRetriever hybridKnowledgeRetriever(
             EmbeddingProvider embeddingProvider,
             KnowledgeSearchBackend backend,
+            KnowledgeRepository repository,
             KnowledgeHybridProperties properties,
             KnowledgeQueryRewriteProperties queryRewriteProperties,
             KnowledgeRerankProperties rerankProperties,
@@ -156,6 +158,7 @@ public class KnowledgeRuntimeConfiguration {
         return new HybridKnowledgeRetriever(
                 embeddingProvider,
                 backend,
+                new KnowledgeAccessGuard(repository),
                 properties.getCandidateMultiplier(),
                 properties.getRrfK(),
                 properties.isRelevanceGateEnabled(),

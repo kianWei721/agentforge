@@ -7,6 +7,7 @@ public record KnowledgeDocument(
         String title,
         KnowledgeSourceType sourceType,
         String sourceRef,
+        KnowledgeAccessScope access,
         String content,
         boolean enabled,
         Instant createdAt,

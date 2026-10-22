@@ -18,6 +18,7 @@ import org.springframework.context.annotation.Configuration;
     KnowledgeRerankProperties.class,
     KnowledgeAnswerabilityProperties.class,
     KnowledgeEvaluationProperties.class,
-    RetrievalBudgetProperties.class
+    RetrievalBudgetProperties.class,
+    PrincipalDirectoryProperties.class
 })
 public class AgentForgeInfrastructureConfiguration {}

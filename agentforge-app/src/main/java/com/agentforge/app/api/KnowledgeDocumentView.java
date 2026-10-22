@@ -2,6 +2,7 @@ package com.agentforge.app.api;
 
 import com.agentforge.rag.KnowledgeDocument;
 import com.agentforge.rag.KnowledgeSourceType;
+import com.agentforge.rag.KnowledgeVisibility;
 import java.time.Instant;
 
 public record KnowledgeDocumentView(
@@ -9,6 +10,8 @@ public record KnowledgeDocumentView(
         String title,
         KnowledgeSourceType sourceType,
         String sourceRef,
+        KnowledgeVisibility visibility,
+        String customerId,
         boolean enabled,
         int contentLength,
         Instant createdAt,
@@ -20,6 +23,8 @@ public record KnowledgeDocumentView(
                 document.title(),
                 document.sourceType(),
                 document.sourceRef(),
+                document.access().visibility(),
+                document.access().customerId(),
                 document.enabled(),
                 document.content() == null ? 0 : document.content().length(),
                 document.createdAt(),

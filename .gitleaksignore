@@ -1,0 +1,4 @@
+# Test fixtures on branch claude/project-architecture-review-f3b361 (commit d336b9d), not real secrets.
+d336b9ded1c42af2695e41416e56f18e688ee91b:agentforge-app/src/test/java/com/agentforge/app/security/SecurityPropertiesTest.java:generic-api-key:11
+d336b9ded1c42af2695e41416e56f18e688ee91b:agentforge-app/src/test/java/com/agentforge/app/security/ApiAuthenticationContractTest.java:generic-api-key:51
+d336b9ded1c42af2695e41416e56f18e688ee91b:agentforge-app/src/test/java/com/agentforge/app/security/ApiAuthenticationContractTest.java:generic-api-key:55

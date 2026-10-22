@@ -1,10 +1,13 @@
 package com.agentforge.infrastructure.rag;
 
+import com.agentforge.core.security.AccessPrincipal;
 import com.agentforge.infrastructure.config.KnowledgeHybridProperties;
+import com.agentforge.rag.KnowledgeAccessPolicy;
 import com.agentforge.rag.KnowledgeBackendHit;
 import com.agentforge.rag.KnowledgeIndexedChunk;
 import com.agentforge.rag.KnowledgeSearchBackend;
 import com.agentforge.rag.KnowledgeSourceType;
+import com.agentforge.rag.KnowledgeVisibility;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -59,6 +62,8 @@ public class ElasticsearchKnowledgeSearchBackend implements KnowledgeSearchBacke
         propertiesNode.putObject("title").put("type", "text");
         propertiesNode.putObject("sourceType").put("type", "keyword");
         propertiesNode.putObject("sourceRef").put("type", "keyword");
+        propertiesNode.putObject("visibility").put("type", "keyword");
+        propertiesNode.putObject("customerId").put("type", "keyword");
         propertiesNode.putObject("content").put("type", "text");
         ObjectNode vector = propertiesNode.putObject("embedding");
         vector.put("type", "dense_vector");
@@ -95,6 +100,10 @@ public class ElasticsearchKnowledgeSearchBackend implements KnowledgeSearchBacke
                 source.put("title", candidate.title());
                 source.put("sourceType", candidate.sourceType().name());
                 source.put("sourceRef", candidate.sourceRef());
+                source.put("visibility", candidate.access().visibility().name());
+                if (candidate.access().customerId() != null) {
+                    source.put("customerId", candidate.access().customerId());
+                }
                 source.put("content", candidate.content());
                 ArrayNode embedding = source.putArray("embedding");
                 for (float value : indexedChunk.embedding()) {
@@ -127,21 +136,25 @@ public class ElasticsearchKnowledgeSearchBackend implements KnowledgeSearchBacke
     }
 
     @Override
-    public List<KnowledgeBackendHit> searchLexical(String query, int limit) {
+    public List<KnowledgeBackendHit> searchLexical(
+            String query, int limit, AccessPrincipal principal) {
         ObjectNode root = searchSource(limit);
-        ObjectNode multiMatch = root.putObject("query").putObject("multi_match");
+        ObjectNode bool = root.putObject("query").putObject("bool");
+        ObjectNode multiMatch = bool.putArray("must").addObject().putObject("multi_match");
         multiMatch.put("query", query);
         ArrayNode fields = multiMatch.putArray("fields");
         fields.add("title^2");
         fields.add("content");
+        bool.putArray("filter").add(accessFilter(principal));
         return search(root);
     }
 
     @Override
-    public List<KnowledgeBackendHit> searchVector(float[] queryVector, int limit) {
+    public List<KnowledgeBackendHit> searchVector(
+            float[] queryVector, int limit, AccessPrincipal principal) {
         return elasticsearchMajorVersion() >= 8
-                ? searchApproximateKnn(queryVector, limit)
-                : searchExactCosineScriptScore(queryVector, limit);
+                ? searchApproximateKnn(queryVector, limit, principal)
+                : searchExactCosineScriptScore(queryVector, limit, principal);
     }
 
     @Override
@@ -165,7 +178,8 @@ public class ElasticsearchKnowledgeSearchBackend implements KnowledgeSearchBacke
         return Math.max(-1.0d, Math.min(1.0d, cosine));
     }
 
-    private List<KnowledgeBackendHit> searchApproximateKnn(float[] queryVector, int limit) {
+    private List<KnowledgeBackendHit> searchApproximateKnn(
+            float[] queryVector, int limit, AccessPrincipal principal) {
         ObjectNode root = searchSource(limit);
         ObjectNode knn = root.putObject("knn");
         knn.put("field", "embedding");
@@ -175,14 +189,21 @@ public class ElasticsearchKnowledgeSearchBackend implements KnowledgeSearchBacke
         }
         knn.put("k", limit);
         knn.put("num_candidates", Math.min(10000, Math.max(50, limit * 5)));
+        // knn.filter is applied during the ANN search, so k counts readable chunks. A top-level
+        // post_filter would run after k neighbours were chosen and could leave the caller empty.
+        knn.set("filter", accessFilter(principal));
         return search(root);
     }
 
     private List<KnowledgeBackendHit> searchExactCosineScriptScore(
-            float[] queryVector, int limit) {
+            float[] queryVector, int limit, AccessPrincipal principal) {
         ObjectNode root = searchSource(limit);
         ObjectNode scriptScore = root.putObject("query").putObject("script_score");
-        scriptScore.putObject("query").putObject("match_all");
+        scriptScore
+                .putObject("query")
+                .putObject("bool")
+                .putArray("filter")
+                .add(accessFilter(principal));
         ObjectNode script = scriptScore.putObject("script");
         script.put("source", "cosineSimilarity(params.query_vector, 'embedding') + 1.0");
         ArrayNode vector =
@@ -226,6 +247,34 @@ public class ElasticsearchKnowledgeSearchBackend implements KnowledgeSearchBacke
             }
             return elasticsearchMajorVersion;
         }
+    }
+
+    /**
+     * Elasticsearch translation of {@link KnowledgeAccessPolicy#permits}.
+     *
+     * <p>Staff get an explicit terms clause over every visibility rather than no filter, so chunks
+     * indexed before ACL fields existed match nobody until the index is rebuilt.
+     */
+    private ObjectNode accessFilter(AccessPrincipal principal) {
+        ObjectNode filter = objectMapper.createObjectNode();
+        ObjectNode bool = filter.putObject("bool");
+        ArrayNode should = bool.putArray("should");
+        ArrayNode visibilities =
+                should.addObject().putObject("terms").putArray("visibility");
+        KnowledgeAccessPolicy.unrestrictedVisibilities(principal)
+                .forEach(visibility -> visibilities.add(visibility.name()));
+        KnowledgeAccessPolicy.customerScope(principal)
+                .ifPresent(
+                        customerId -> {
+                            ArrayNode own =
+                                    should.addObject().putObject("bool").putArray("filter");
+                            own.addObject()
+                                    .putObject("term")
+                                    .put("visibility", KnowledgeVisibility.CUSTOMER.name());
+                            own.addObject().putObject("term").put("customerId", customerId);
+                        });
+        bool.put("minimum_should_match", 1);
+        return filter;
     }
 
     private ObjectNode searchSource(int limit) {

@@ -1,11 +1,14 @@
 package com.agentforge.infrastructure.rag;
 
+import com.agentforge.core.security.AccessPrincipal;
 import com.agentforge.infrastructure.config.KnowledgeAnswerabilityProperties;
 import com.agentforge.infrastructure.config.KnowledgeEvaluationProperties;
 import com.agentforge.infrastructure.config.KnowledgeHybridProperties;
 import com.agentforge.infrastructure.config.KnowledgeRerankProperties;
 import com.agentforge.rag.EmbeddingProvider;
 import com.agentforge.rag.HybridKnowledgeRetriever;
+import com.agentforge.rag.KnowledgeAccessGuard;
+import com.agentforge.rag.KnowledgeAccessScope;
 import com.agentforge.rag.KnowledgeAnswerabilityJudge;
 import com.agentforge.rag.KnowledgeBackendHit;
 import com.agentforge.rag.KnowledgeCandidate;
@@ -39,6 +42,7 @@ import java.io.InputStream;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -53,6 +57,10 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
     private static final int EVALUATION_REWRITE_MAX_ATTEMPTS = 2;
     private static final long EVALUATION_REWRITE_RETRY_DELAY_MS = 500L;
     private static final int REGRESSION_RECHECK_TRIALS = 3;
+    // The isolated gold corpus is indexed as INTERNAL and searched as staff, so ACL filtering
+    // never changes recall metrics. Leakage is covered by dedicated access tests instead.
+    private static final AccessPrincipal EVALUATION_PRINCIPAL =
+            AccessPrincipal.staff("agentforge-evaluation");
 
     private final EmbeddingProvider embeddingProvider;
     private final KnowledgeSearchBackend backend;
@@ -236,7 +244,8 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
                                                 document.title(),
                                                 document.sourceType(),
                                                 document.sourceRef(),
-                                                document.content()))
+                                                document.content(),
+                                                KnowledgeAccessScope.internal()))
                         .toList();
 
         List<KnowledgeIndexedChunk> indexed = new ArrayList<>(candidates.size());
@@ -447,8 +456,8 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
                     "evaluation query embedding must return exactly one vector");
         }
         return new CandidateChannels(
-                backend.searchLexical(query, candidateWindow),
-                backend.searchVector(vectors.get(0), candidateWindow));
+                backend.searchLexical(query, candidateWindow, EVALUATION_PRINCIPAL),
+                backend.searchVector(vectors.get(0), candidateWindow, EVALUATION_PRINCIPAL));
     }
 
     private Map<String, KnowledgeQueryRewriteResult> prepareRewritePlan() {
@@ -1046,6 +1055,7 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
         return new HybridKnowledgeRetriever(
                 embeddingProvider,
                 backend,
+                new KnowledgeAccessGuard(this::evaluationScopes),
                 hybridProperties.getCandidateMultiplier(),
                 rrfK,
                 hybridProperties.isRelevanceGateEnabled(),
@@ -1055,6 +1065,19 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
                 rerankProperties.getCandidateLimit(),
                 answerabilityJudge,
                 answerabilityProperties.getCandidateLimit());
+    }
+
+    /** The isolated index holds only the gold corpus, which never lives in the document table. */
+    private Map<String, KnowledgeAccessScope> evaluationScopes(Collection<String> documentIds) {
+        Set<String> corpus = new HashSet<>();
+        dataset.documents().forEach(document -> corpus.add(document.id()));
+        Map<String, KnowledgeAccessScope> scopes = new LinkedHashMap<>();
+        for (String documentId : documentIds) {
+            if (corpus.contains(documentId)) {
+                scopes.put(documentId, KnowledgeAccessScope.internal());
+            }
+        }
+        return scopes;
     }
 
     private static KnowledgeEvaluationVariantReport summarizeVariant(
@@ -1114,7 +1137,8 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
         List<KnowledgeSearchHit> hits =
                 retriever.searchDetailed(
                                 testCase.query(),
-                                evaluationProperties.getTopK())
+                                evaluationProperties.getTopK(),
+                                EVALUATION_PRINCIPAL)
                         .hits();
 
         List<String> actualDocumentIds =
@@ -1321,17 +1345,19 @@ public class ElasticsearchGoldDatasetKnowledgeEvaluator implements KnowledgeEval
         @Override
         public List<KnowledgeBackendHit> searchLexical(
                 String query,
-                int limit) {
+                int limit,
+                AccessPrincipal principal) {
             return searchWithRetry(
-                    () -> delegate.searchLexical(query, limit));
+                    () -> delegate.searchLexical(query, limit, principal));
         }
 
         @Override
         public List<KnowledgeBackendHit> searchVector(
                 float[] queryVector,
-                int limit) {
+                int limit,
+                AccessPrincipal principal) {
             return searchWithRetry(
-                    () -> delegate.searchVector(queryVector, limit));
+                    () -> delegate.searchVector(queryVector, limit, principal));
         }
 
         @Override

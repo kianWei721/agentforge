@@ -1,5 +1,6 @@
 package com.agentforge.rag;
 
+import com.agentforge.core.security.AccessPrincipal;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -19,7 +20,8 @@ public class LexicalKnowledgeRetriever implements KnowledgeRetriever {
     }
 
     @Override
-    public List<KnowledgeSearchHit> search(String query, int topK) {
+    public List<KnowledgeSearchHit> search(String query, int topK, AccessPrincipal principal) {
+        KnowledgeAccessPolicy.requirePrincipal(principal);
         if (query == null || query.isBlank()) {
             return List.of();
         }
@@ -34,7 +36,12 @@ public class LexicalKnowledgeRetriever implements KnowledgeRetriever {
         }
 
         List<ScoredCandidate> scored = new ArrayList<>();
-        for (KnowledgeCandidate candidate : repository.findEnabledCandidates(MAX_CANDIDATES)) {
+        for (KnowledgeCandidate candidate :
+                repository.findAccessibleCandidates(MAX_CANDIDATES, principal)) {
+            // The repository filters in SQL; re-checking the row's own ACL catches a wrong predicate.
+            if (!KnowledgeAccessPolicy.permits(principal, candidate.access())) {
+                continue;
+            }
             String normalizedContent = normalize(candidate.content());
             Set<String> contentTokens = tokens(normalizedContent);
             double score = cosineLikeOverlap(queryTokens, contentTokens);

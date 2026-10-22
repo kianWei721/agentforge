@@ -1,11 +1,13 @@
 package com.agentforge.rag;
 
+import com.agentforge.core.security.AccessPrincipal;
 import java.util.List;
 
 public class HybridKnowledgeRetriever implements KnowledgeRetriever {
 
     private final EmbeddingProvider embeddingProvider;
     private final KnowledgeSearchBackend backend;
+    private final KnowledgeAccessGuard accessGuard;
     private final int candidateMultiplier;
     private final int rrfK;
     private final boolean relevanceGateEnabled;
@@ -19,6 +21,7 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
     public HybridKnowledgeRetriever(
             EmbeddingProvider embeddingProvider,
             KnowledgeSearchBackend backend,
+            KnowledgeAccessGuard accessGuard,
             int candidateMultiplier,
             int rrfK,
             boolean relevanceGateEnabled,
@@ -26,6 +29,7 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
         this(
                 embeddingProvider,
                 backend,
+                accessGuard,
                 candidateMultiplier,
                 rrfK,
                 relevanceGateEnabled,
@@ -40,6 +44,7 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
     public HybridKnowledgeRetriever(
             EmbeddingProvider embeddingProvider,
             KnowledgeSearchBackend backend,
+            KnowledgeAccessGuard accessGuard,
             int candidateMultiplier,
             int rrfK,
             boolean relevanceGateEnabled,
@@ -49,6 +54,7 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
         this(
                 embeddingProvider,
                 backend,
+                accessGuard,
                 candidateMultiplier,
                 rrfK,
                 relevanceGateEnabled,
@@ -63,6 +69,7 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
     public HybridKnowledgeRetriever(
             EmbeddingProvider embeddingProvider,
             KnowledgeSearchBackend backend,
+            KnowledgeAccessGuard accessGuard,
             int candidateMultiplier,
             int rrfK,
             boolean relevanceGateEnabled,
@@ -74,6 +81,7 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
         this(
                 embeddingProvider,
                 backend,
+                accessGuard,
                 candidateMultiplier,
                 rrfK,
                 relevanceGateEnabled,
@@ -88,6 +96,7 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
     public HybridKnowledgeRetriever(
             EmbeddingProvider embeddingProvider,
             KnowledgeSearchBackend backend,
+            KnowledgeAccessGuard accessGuard,
             int candidateMultiplier,
             int rrfK,
             boolean relevanceGateEnabled,
@@ -97,6 +106,9 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
             int rerankCandidateLimit,
             KnowledgeAnswerabilityJudge answerabilityJudge,
             int answerabilityCandidateLimit) {
+        if (accessGuard == null) {
+            throw new IllegalArgumentException("accessGuard is required");
+        }
         if (candidateMultiplier < 1) {
             throw new IllegalArgumentException("candidateMultiplier must be positive");
         }
@@ -115,6 +127,7 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
         }
         this.embeddingProvider = embeddingProvider;
         this.backend = backend;
+        this.accessGuard = accessGuard;
         this.candidateMultiplier = candidateMultiplier;
         this.rrfK = rrfK;
         this.relevanceGateEnabled = relevanceGateEnabled;
@@ -127,12 +140,14 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
     }
 
     @Override
-    public List<KnowledgeSearchHit> search(String query, int topK) {
-        return searchDetailed(query, topK).hits();
+    public List<KnowledgeSearchHit> search(String query, int topK, AccessPrincipal principal) {
+        return searchDetailed(query, topK, principal).hits();
     }
 
     @Override
-    public KnowledgeRetrievalResult searchDetailed(String query, int topK) {
+    public KnowledgeRetrievalResult searchDetailed(
+            String query, int topK, AccessPrincipal principal) {
+        KnowledgeAccessPolicy.requirePrincipal(principal);
         if (query == null || query.isBlank()) {
             return KnowledgeRetrievalResult.of(List.of());
         }
@@ -151,15 +166,19 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
                     "query embedding response must contain exactly one vector");
         }
 
-        List<KnowledgeBackendHit> lexical =
-                backend.searchLexical(retrievalQuery, candidateLimit);
-        List<KnowledgeBackendHit> vector =
-                backend.searchVector(vectors.get(0), candidateLimit);
+        KnowledgeAccessGuard.Result readable =
+                accessGuard.retainReadable(
+                        principal,
+                        backend.searchLexical(retrievalQuery, candidateLimit, principal),
+                        backend.searchVector(vectors.get(0), candidateLimit, principal));
+        KnowledgeAccessDiagnostics accessDiagnostics =
+                new KnowledgeAccessDiagnostics(
+                        principal.type().name(), readable.droppedHits());
 
         List<KnowledgeSearchHit> ranked =
                 RrfFusion.fuse(
-                        lexical,
-                        vector,
+                        readable.lexical(),
+                        readable.vector(),
                         rrfK,
                         backend::normalizeVectorScore);
 
@@ -208,7 +227,8 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
                         hits,
                         rerankDiagnostics,
                         answerability.diagnostics(),
-                        rewrite.diagnostics());
+                        rewrite.diagnostics(),
+                        accessDiagnostics);
             }
 
             List<KnowledgeSearchHit> hits =
@@ -217,7 +237,8 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
                     hits,
                     rerankDiagnostics,
                     null,
-                    rewrite.diagnostics());
+                    rewrite.diagnostics(),
+                    accessDiagnostics);
         }
 
         List<KnowledgeSearchHit> hits =
@@ -229,7 +250,8 @@ public class HybridKnowledgeRetriever implements KnowledgeRetriever {
                 hits,
                 null,
                 null,
-                rewrite.diagnostics());
+                rewrite.diagnostics(),
+                accessDiagnostics);
     }
 
     @Override
