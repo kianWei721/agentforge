@@ -30,9 +30,12 @@ public class WeComChannelProperties {
     private List<String> groups = new ArrayList<>();
     private boolean allowStaffGroups;
     private int maxConcurrentTurns = 4;
-    private int maxPendingTurns = 64;
+    /** A memory bound only; admission by deadline decides what is accepted. */
+    private int maxPendingTurns = 1000;
     private int maxQueuedPerSession = 3;
     private Duration turnTimeout = Duration.ofMinutes(5);
+    /** Assumed turn duration until real ones are measured; admission estimates waits from it. */
+    private Duration expectedTurnDuration = Duration.ofSeconds(15);
     private Duration streamTtl = Duration.ofMinutes(10);
     private Duration timestampTolerance = Duration.ofMinutes(5);
 
@@ -148,6 +151,14 @@ public class WeComChannelProperties {
         this.turnTimeout = turnTimeout;
     }
 
+    public Duration getExpectedTurnDuration() {
+        return expectedTurnDuration;
+    }
+
+    public void setExpectedTurnDuration(Duration expectedTurnDuration) {
+        this.expectedTurnDuration = expectedTurnDuration;
+    }
+
     public Duration getStreamTtl() {
         return streamTtl;
     }
@@ -180,13 +191,23 @@ public class WeComChannelProperties {
         if (maxConcurrentTurns < 1 || maxPendingTurns < 1 || maxQueuedPerSession < 0) {
             throw new IllegalStateException("WeCom channel turn limits must be positive.");
         }
+        // Within the reply window, which leaves a margin before WeCom stops pulling: a turn timing
+        // out after it would teach admission a duration no turn can be admitted under.
         if (turnTimeout == null
                 || turnTimeout.isNegative()
                 || turnTimeout.isZero()
-                || turnTimeout.compareTo(WECOM_STREAM_WINDOW) >= 0) {
+                || turnTimeout.compareTo(WeComChannelSettings.DEFAULT_REPLY_WINDOW) > 0) {
             throw new IllegalStateException(
-                    "WeCom channel turn-timeout must be positive and shorter than WeCom's"
-                            + " 6-minute stream window.");
+                    "WeCom channel turn-timeout must be positive and within the reply window ("
+                            + WeComChannelSettings.DEFAULT_REPLY_WINDOW
+                            + ", WeCom's 6-minute stream window less a margin).");
+        }
+        if (expectedTurnDuration == null
+                || expectedTurnDuration.isNegative()
+                || expectedTurnDuration.isZero()
+                || expectedTurnDuration.compareTo(turnTimeout) > 0) {
+            throw new IllegalStateException(
+                    "WeCom channel expected-turn-duration must be positive and within turn-timeout.");
         }
         // A reply must stay readable for as long as WeCom may still pull it.
         if (streamTtl == null || streamTtl.compareTo(WECOM_STREAM_WINDOW) < 0) {
