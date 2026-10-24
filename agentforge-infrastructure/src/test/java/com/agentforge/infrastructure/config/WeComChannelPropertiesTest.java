@@ -48,8 +48,16 @@ class WeComChannelPropertiesTest {
     void turnsMustEndBeforeWeComStopsPulling() {
         WeComChannelProperties properties = valid();
         properties.setTurnTimeout(Duration.ofMinutes(6));
-
         assertThrows(IllegalStateException.class, properties::validate);
+
+        // Past the reply window but short of 6 minutes: no turn could be admitted under it.
+        properties.setTurnTimeout(Duration.ofMinutes(5).plusSeconds(50));
+        properties.setExpectedTurnDuration(Duration.ofMinutes(5).plusSeconds(45));
+        assertThrows(IllegalStateException.class, properties::validate);
+
+        properties.setTurnTimeout(Duration.ofMinutes(5).plusSeconds(40));
+        properties.setExpectedTurnDuration(Duration.ofSeconds(15));
+        properties.validate();
     }
 
     @Test

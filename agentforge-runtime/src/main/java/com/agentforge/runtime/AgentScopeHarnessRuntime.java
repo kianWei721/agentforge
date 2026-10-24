@@ -23,6 +23,7 @@ import io.agentscope.core.permission.PermissionRule;
 import io.agentscope.core.state.AgentStateStore;
 import io.agentscope.core.tool.Toolkit;
 import io.agentscope.harness.agent.HarnessAgent;
+import io.agentscope.harness.agent.memory.compaction.CompactionConfig;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -132,7 +133,34 @@ public final class AgentScopeHarnessRuntime implements AgentRuntime, AutoCloseab
             ToolExecutionPolicy toolExecutionPolicy,
             ToolConfirmationService toolConfirmationService,
             RetrievalBudgetOptions retrievalBudgetOptions) {
+        this(
+                agentId,
+                name,
+                systemPrompt,
+                model,
+                businessTools,
+                stateStore,
+                toolGovernanceOptions,
+                toolExecutionPolicy,
+                toolConfirmationService,
+                retrievalBudgetOptions,
+                HarnessMemoryOptions.defaults());
+    }
+
+    public AgentScopeHarnessRuntime(
+            String agentId,
+            String name,
+            String systemPrompt,
+            Model model,
+            List<AgentTool> businessTools,
+            AgentStateStore stateStore,
+            ToolGovernanceOptions toolGovernanceOptions,
+            ToolExecutionPolicy toolExecutionPolicy,
+            ToolConfirmationService toolConfirmationService,
+            RetrievalBudgetOptions retrievalBudgetOptions,
+            HarnessMemoryOptions memoryOptions) {
         Objects.requireNonNull(model, "model must not be null");
+        Objects.requireNonNull(memoryOptions, "memoryOptions must not be null");
         Objects.requireNonNull(stateStore, "stateStore must not be null");
         this.toolGovernanceOptions =
                 toolGovernanceOptions == null
@@ -189,6 +217,24 @@ public final class AgentScopeHarnessRuntime implements AgentRuntime, AutoCloseab
                         .disableWorkspaceContext()
                         .disableSubagents()
                         .disableToolsConfig()
+                        // Customer conversations never go to local disk: no session files, no
+                        // flush or offload before compaction, no spilled tool results.
+                        .workspace(memoryOptions.workspace())
+                        .disableSessionPersistence()
+                        .disableToolResultEviction()
+                        .compaction(
+                                CompactionConfig.builder()
+                                        // The prompt asks for the summary length; this enforces it.
+                                        .model(
+                                                new SummaryLengthLimitedModel(
+                                                        model, memoryOptions.summaryMaxChars()))
+                                        .triggerMessages(memoryOptions.compactionTriggerMessages())
+                                        .triggerTokens(memoryOptions.compactionTriggerTokens())
+                                        .keepMessages(memoryOptions.compactionKeepMessages())
+                                        .summaryPrompt(memoryOptions.summaryPrompt())
+                                        .flushBeforeCompact(false)
+                                        .offloadBeforeCompact(false)
+                                        .build())
                         .build();
     }
 

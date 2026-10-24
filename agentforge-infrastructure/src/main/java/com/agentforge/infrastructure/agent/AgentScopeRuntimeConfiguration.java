@@ -3,6 +3,7 @@ package com.agentforge.infrastructure.agent;
 import com.agentforge.agent.AgentDefinition;
 import com.agentforge.agent.AgentDefinitionRepository;
 import com.agentforge.conversation.ConversationService;
+import com.agentforge.infrastructure.config.AgentRuntimeProperties;
 import com.agentforge.infrastructure.config.RetrievalBudgetProperties;
 import com.agentforge.infrastructure.config.ToolGovernanceProperties;
 import com.agentforge.infrastructure.config.ToolPolicyProperties;
@@ -14,6 +15,7 @@ import com.agentforge.runtime.AgentRuntimeFactory;
 import com.agentforge.runtime.AgentRuntimeManager;
 import com.agentforge.runtime.AgentScopeHarnessRuntime;
 import com.agentforge.runtime.BaselineToolExecutionPolicy;
+import com.agentforge.runtime.HarnessMemoryOptions;
 import com.agentforge.runtime.RetrievalBudgetOptions;
 import com.agentforge.runtime.SessionContextRestoreService;
 import com.agentforge.runtime.ToolGovernanceOptions;
@@ -38,7 +40,9 @@ public class AgentScopeRuntimeConfiguration {
             ToolGovernanceProperties governanceProperties,
             ToolPolicyProperties policyProperties,
             RetrievalBudgetProperties retrievalBudgetProperties,
-            ToolConfirmationService confirmationService) {
+            ToolConfirmationService confirmationService,
+            AgentRuntimeProperties agentProperties) {
+        HarnessMemoryOptions memoryOptions = agentProperties.getMemory().toOptions();
         governanceProperties.validate();
         retrievalBudgetProperties.validate();
         ToolGovernanceOptions governanceOptions =
@@ -76,7 +80,8 @@ public class AgentScopeRuntimeConfiguration {
                         governanceOptions,
                         executionPolicy,
                         confirmationService,
-                        retrievalBudgetOptions);
+                        retrievalBudgetOptions,
+                        memoryOptions);
             }
         };
     }
@@ -85,8 +90,13 @@ public class AgentScopeRuntimeConfiguration {
     public AgentRuntimeManager agentRuntimeManager(
             AgentDefinitionRepository agentRepository,
             ToolRegistry toolRegistry,
-            AgentRuntimeFactory runtimeFactory) {
-        return new AgentRuntimeManager(agentRepository, toolRegistry, runtimeFactory);
+            AgentRuntimeFactory runtimeFactory,
+            AgentRuntimeProperties agentProperties) {
+        return new AgentRuntimeManager(
+                agentRepository,
+                toolRegistry,
+                runtimeFactory,
+                agentProperties.getRuntimeGenerationTurns());
     }
 
     @Bean

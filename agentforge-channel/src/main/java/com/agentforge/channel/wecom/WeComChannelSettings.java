@@ -24,11 +24,33 @@ public record WeComChannelSettings(
         Map<String, String> directUsers,
         Map<String, String> groupUsers,
         boolean allowStaffGroups,
-        Duration turnTimeout) {
+        Duration turnTimeout,
+        Duration replyWindow) {
 
     public static final String GROUP_USER_PREFIX = "wecom-group:";
 
+    /**
+     * WeCom stops pulling a stream reply 6 minutes after the user's message. Every turn must end
+     * inside that, with some room left for WeCom's last refresh to see the end.
+     */
+    public static final Duration DEFAULT_REPLY_WINDOW = Duration.ofMinutes(6).minusSeconds(20);
+
+    public WeComChannelSettings(
+            String botId,
+            String agentId,
+            Set<String> allowedTools,
+            Map<String, String> directUsers,
+            Map<String, String> groupUsers,
+            boolean allowStaffGroups,
+            Duration turnTimeout) {
+        this(botId, agentId, allowedTools, directUsers, groupUsers, allowStaffGroups, turnTimeout,
+                DEFAULT_REPLY_WINDOW);
+    }
+
     public WeComChannelSettings {
+        if (replyWindow == null || replyWindow.isZero() || replyWindow.isNegative()) {
+            throw new IllegalArgumentException("replyWindow must be positive");
+        }
         requireText(botId, "botId");
         requireText(agentId, "agentId");
         allowedTools = Set.copyOf(allowedTools);

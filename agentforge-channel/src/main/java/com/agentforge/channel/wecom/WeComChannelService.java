@@ -3,6 +3,7 @@ package com.agentforge.channel.wecom;
 import com.agentforge.agent.AgentDefinition;
 import com.agentforge.agent.AgentDefinitionRepository;
 import com.agentforge.channel.AgentTurnRunner;
+import com.agentforge.channel.ChannelMetrics;
 import com.agentforge.channel.ChannelInbound;
 import com.agentforge.channel.ChannelInboundRepository;
 import com.agentforge.channel.ChannelInboundStatus;
@@ -43,11 +44,7 @@ public final class WeComChannelService {
     static final String FAILED_EXPIRED_IN_QUEUE = "排队太久，这个问题没来得及回答，请重新提问。";
     static final String FAILED_OTHER = "处理出错了，请稍后再试。";
 
-    /**
-     * WeCom stops pulling a stream reply 6 minutes after the user's message. Every turn must end
-     * inside that, with some room left for WeCom's last refresh to see the end.
-     */
-    static final Duration REPLY_WINDOW = Duration.ofMinutes(6).minusSeconds(20);
+    static final Duration REPLY_WINDOW = WeComChannelSettings.DEFAULT_REPLY_WINDOW;
 
     private static final System.Logger LOG = System.getLogger(WeComChannelService.class.getName());
 
@@ -59,6 +56,7 @@ public final class WeComChannelService {
     private final SessionTurnGate gate;
     private final StreamBuffers streams;
     private final Clock clock;
+    private final ChannelMetrics metrics;
 
     public WeComChannelService(
             WeComChannelSettings settings,
@@ -69,6 +67,20 @@ public final class WeComChannelService {
             SessionTurnGate gate,
             StreamBuffers streams,
             Clock clock) {
+        this(settings, inbound, principals, agents, runner, gate, streams, clock, ChannelMetrics.NONE);
+    }
+
+    public WeComChannelService(
+            WeComChannelSettings settings,
+            ChannelInboundRepository inbound,
+            PrincipalDirectory principals,
+            AgentDefinitionRepository agents,
+            AgentTurnRunner runner,
+            SessionTurnGate gate,
+            StreamBuffers streams,
+            Clock clock,
+            ChannelMetrics metrics) {
+        this.metrics = metrics;
         this.settings = settings;
         this.inbound = inbound;
         this.principals = principals;
@@ -113,15 +125,22 @@ public final class WeComChannelService {
                     .orElseGet(() -> new WeComStreamReply(streamId, "", false));
         }
         if (route.refused()) {
+            metrics.admission(route.refusalCode());
             streams.openFinished(streamId, route.refusal());
             return snapshot(streamId);
         }
 
         streams.open(streamId);
         Instant acceptedAt = record.createdAt();
+        // Admitted only if it can finish before WeCom stops pulling; otherwise refused right now.
+        Duration timeLeft =
+                Duration.between(clock.instant(), acceptedAt.plus(settings.replyWindow()));
         SessionTurnGate.Admission admission =
                 gate.submit(
-                        route.sessionKey(), () -> runTurn(record.id(), route, streamId, acceptedAt));
+                        route.sessionKey(),
+                        timeLeft,
+                        () -> runTurn(record.id(), route, streamId, acceptedAt));
+        metrics.admission(admission.name());
         if (admission != SessionTurnGate.Admission.ACCEPTED) {
             streams.fail(
                     streamId,
@@ -198,17 +217,19 @@ public final class WeComChannelService {
         return Optional.empty();
     }
 
-    private void runTurn(String inboundId, Route route, String streamId, Instant acceptedAt) {
+    /** @return whether the agent ran to an answer or to the time limit, see {@link SessionTurnGate.Turn} */
+    private boolean runTurn(String inboundId, Route route, String streamId, Instant acceptedAt) {
         // WeCom's clock started when the user sent the message, not when this turn got a worker.
-        Duration remaining = Duration.between(clock.instant(), acceptedAt.plus(REPLY_WINDOW));
+        Duration remaining =
+                Duration.between(clock.instant(), acceptedAt.plus(settings.replyWindow()));
         if (remaining.isNegative() || remaining.isZero()) {
             endTurn(inboundId, streamId, null, "EXPIRED_IN_QUEUE", FAILED_EXPIRED_IN_QUEUE);
-            return;
+            return false;
         }
         Optional<String> agentRefusal = agentRefusal();
         if (agentRefusal.isPresent()) {
             endTurn(inboundId, streamId, null, agentRefusal.get(), REFUSE_AGENT);
-            return;
+            return false;
         }
         Duration limit =
                 settings.turnTimeout().compareTo(remaining) < 0 ? settings.turnTimeout() : remaining;
@@ -250,9 +271,11 @@ public final class WeComChannelService {
                 LOG.log(System.Logger.Level.WARNING, "WeCom turn " + inboundId + " failed", cause);
             }
             endTurn(inboundId, streamId, executionId.get(), code, notice);
-            return;
+            // A model failure may come back at once; only a turn that used its time is a measure.
+            return "TURN_TIMEOUT".equals(code);
         }
         // Record first: once WeCom shows the answer as finished, the audit row says so too.
+        metrics.turnOutcome(ChannelInboundStatus.DONE.name());
         try {
             inbound.complete(
                     inboundId, ChannelInboundStatus.DONE, executionId.get(), null, clock.instant());
@@ -261,11 +284,13 @@ public final class WeComChannelService {
         } finally {
             streams.finish(streamId);
         }
+        return true;
     }
 
     /** Records the failure, then ends the stream with a notice, keeping what was already shown. */
     private void endTurn(
             String inboundId, String streamId, String executionId, String code, String notice) {
+        metrics.turnOutcome(code);
         try {
             inbound.complete(inboundId, ChannelInboundStatus.FAILED, executionId, code, clock.instant());
         } catch (RuntimeException exception) {

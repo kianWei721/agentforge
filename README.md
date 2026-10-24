@@ -2,7 +2,7 @@
 
 AgentForge is a Java-based experimental Agent runtime and governance project focused on production-oriented engineering: durable execution, tool governance, retrieval evaluation, safe promotion, rollback, and enterprise-system integration.
 
-> Status: V0.10 — WeCom channel with session isolation, on top of retrieval-layer access control (V0.8) and model calls through a standalone model gateway (V0.9). The project is under active development and is not presented as a drop-in production platform.
+> Status: V0.11 — WeCom channel with session isolation, verified at ten thousand groups, on top of retrieval-layer access control (V0.8) and model calls through a standalone model gateway (V0.9). The project is under active development and is not presented as a drop-in production platform.
 
 ## Why AgentForge
 
@@ -150,6 +150,13 @@ signed + encrypted callback -> msgid dedup (unique key) -> server-derived sessio
 
 Staff groups are refused by default, and the channel agent may only use allow-listed read-only
 tools. See [docs/V0.10-wecom-channel.md](docs/V0.10-wecom-channel.md).
+
+At ten thousand groups: 50,000 simulated turns with no answer containing another group's history;
+compaction bounded and nothing written to local disk; a message estimated (from measured turn
+durations, with a margin) to finish after WeCom stops pulling is refused when it arrives, and a
+group's follow-ups run right after its own turns; the agent runtime is replaced every 5000
+turns so its per-session caches stay bounded. See
+[docs/V0.11-wecom-scale-hardening.md](docs/V0.11-wecom-scale-hardening.md).
 
 ## External IoT Integration
 

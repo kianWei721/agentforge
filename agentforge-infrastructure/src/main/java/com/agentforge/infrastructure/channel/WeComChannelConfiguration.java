@@ -2,6 +2,7 @@ package com.agentforge.infrastructure.channel;
 
 import com.agentforge.agent.AgentDefinitionRepository;
 import com.agentforge.channel.ChannelInboundRepository;
+import com.agentforge.channel.ChannelMetrics;
 import com.agentforge.channel.wecom.SessionTurnGate;
 import com.agentforge.channel.wecom.StreamBuffers;
 import com.agentforge.channel.wecom.WeComChannelService;
@@ -15,6 +16,7 @@ import java.time.Clock;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -52,13 +54,15 @@ public class WeComChannelConfiguration {
             PrincipalDirectory principals,
             AgentDefinitionRepository agents,
             AgentConversationRuntimeService conversationRuntime,
-            ExecutorService weComTurnExecutor) {
+            ExecutorService weComTurnExecutor,
+            ObjectProvider<ChannelMetrics> metricsProvider) {
         properties.validate();
         // The channel runs agents; it must not be a way around the agent runtime switch.
         if (!agentProperties.isEnabled()) {
             throw new IllegalStateException(
                     "agentforge.channel.wecom.enabled=true requires agentforge.agent.enabled=true.");
         }
+        ChannelMetrics metrics = metricsProvider.getIfAvailable(() -> ChannelMetrics.NONE);
         return new WeComChannelService(
                 properties.toSettings(),
                 inboundRepository,
@@ -67,10 +71,14 @@ public class WeComChannelConfiguration {
                 conversationRuntime::stream,
                 new SessionTurnGate(
                         weComTurnExecutor,
+                        properties.getMaxConcurrentTurns(),
                         properties.getMaxPendingTurns(),
-                        properties.getMaxQueuedPerSession()),
+                        properties.getMaxQueuedPerSession(),
+                        properties.getExpectedTurnDuration(),
+                        metrics),
                 new StreamBuffers(properties.getStreamTtl(), Clock.systemUTC()),
-                Clock.systemUTC());
+                Clock.systemUTC(),
+                metrics);
     }
 
     @Bean

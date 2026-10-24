@@ -65,8 +65,12 @@ agentforge:
       groups: ${AGENTFORGE_WECOM_GROUPS:}
       allow-staff-groups: false
       max-concurrent-turns: 4
-      max-pending-turns: 64
+      # Memory bound only: admission by deadline decides what is accepted.
+      max-pending-turns: 1000
       max-queued-per-session: 3
+      # Starting guess for how long one turn takes; real durations replace it as they come in.
+      # Admission refuses a message at once when it would only finish after WeCom stops pulling.
+      expected-turn-duration: 15s
       turn-timeout: 5m
       stream-ttl: 10m
       timestamp-tolerance: 5m
@@ -176,9 +180,21 @@ agentforge:
       当工具明确返回 AUTHENTICATION_FAILED、FORBIDDEN、BAD_REQUEST 等不可重试错误时，
       不要使用完全相同的参数重复调用同一工具。
       当前 V0.5 仅开放 AgentForge 显式注册的业务工具，不开放文件、Shell、动态技能和子 Agent 工具。
+    # The agent runtime keeps per-session caches it never evicts; a new generation replaces it
+    # after this many turns (state is reloaded from the store each turn, so nothing is lost).
+    runtime-generation-turns: ${AGENTFORGE_AGENT_RUNTIME_GENERATION_TURNS:5000}
+    memory:
+      # AgentScope's root directory; conversation content is never written here.
+      workspace: ${AGENTFORGE_AGENT_WORKSPACE:}
+      # Compact a long session at whichever comes first; keep the most recent messages verbatim.
+      compaction-trigger-messages: 50
+      compaction-trigger-tokens: 12000
+      compaction-keep-messages: 20
+      summary-max-chars: 800
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        # /actuator is not behind the identity filter: add metrics only where it is not public.
+        include: ${AGENTFORGE_ACTUATOR_EXPOSURE:health,info}
