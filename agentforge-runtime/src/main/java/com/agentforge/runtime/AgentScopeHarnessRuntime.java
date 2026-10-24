@@ -224,6 +224,10 @@ public final class AgentScopeHarnessRuntime implements AgentRuntime, AutoCloseab
                         .disableToolResultEviction()
                         .compaction(
                                 CompactionConfig.builder()
+                                        // The prompt asks for the summary length; this enforces it.
+                                        .model(
+                                                new SummaryLengthLimitedModel(
+                                                        model, memoryOptions.summaryMaxChars()))
                                         .triggerMessages(memoryOptions.compactionTriggerMessages())
                                         .triggerTokens(memoryOptions.compactionTriggerTokens())
                                         .keepMessages(memoryOptions.compactionKeepMessages())

@@ -233,6 +233,32 @@ class SessionTurnGateTest {
     }
 
     @Test
+    void anotherSessionsFollowUpsDoNotHideAFreeWorker() throws Exception {
+        CountDownLatch release = new CountDownLatch(1);
+        CountDownLatch started = new CountDownLatch(1);
+        try {
+            SessionTurnGate gate =
+                    new SessionTurnGate(pool, 4, 64, 10, Duration.ofSeconds(10), ChannelMetrics.NONE);
+            gate.submit("a", Duration.ofSeconds(60), () -> {
+                started.countDown();
+                await(release);
+            });
+            assertTrue(started.await(5, TimeUnit.SECONDS));
+            for (int i = 0; i < 3; i++) {
+                gate.submit("a", () -> {});
+            }
+
+            // a holds one worker and its three follow-ups will run there: three are free. With
+            // a 10 s estimate against 1 s left, only a free worker admits b.
+            assertEquals(
+                    SessionTurnGate.Admission.ACCEPTED,
+                    gate.submit("b", Duration.ofSeconds(1), () -> {}));
+        } finally {
+            release.countDown();
+        }
+    }
+
+    @Test
     void turnsThatEndedEarlyDoNotMoveTheEstimate() throws Exception {
         SessionTurnGate gate =
                 new SessionTurnGate(pool, 4, 64, 10, Duration.ofMillis(100), ChannelMetrics.NONE);

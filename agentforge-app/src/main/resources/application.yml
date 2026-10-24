@@ -196,4 +196,5 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        # /actuator is not behind the identity filter: add metrics only where it is not public.
+        include: ${AGENTFORGE_ACTUATOR_EXPOSURE:health,info}

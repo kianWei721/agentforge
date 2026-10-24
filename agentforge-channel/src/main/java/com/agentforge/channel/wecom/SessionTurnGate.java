@@ -63,6 +63,12 @@ public final class SessionTurnGate {
     /** Turns admitted but not yet started, across all sessions. */
     private int pending;
 
+    /**
+     * Sessions handed to the executor whose first turn has not started: the only waiting turns
+     * that need a worker of their own. A session's follow-ups run on the worker it already holds.
+     */
+    private int scheduledHeads;
+
     /** Start times of the turns running now, keyed by turn. */
     private final Map<Object, Long> runningSince = new HashMap<>();
 
@@ -130,6 +136,7 @@ public final class SessionTurnGate {
                 return Admission.ACCEPTED;
             }
             sessions.put(sessionKey, new SessionState());
+            scheduledHeads++;
         }
         try {
             executor.execute(() -> drain(sessionKey, queued));
@@ -137,6 +144,7 @@ public final class SessionTurnGate {
             synchronized (this) {
                 sessions.remove(sessionKey);
                 pending--;
+                scheduledHeads--;
             }
             return Admission.OVERLOADED;
         }
@@ -158,7 +166,7 @@ public final class SessionTurnGate {
         if (timeLeft.isNegative() || timeLeft.isZero()) {
             return true;
         }
-        if (session == null && runningSince.size() + pending < workers) {
+        if (session == null && runningSince.size() + scheduledHeads < workers) {
             return false;
         }
         double turnsAhead;
@@ -218,6 +226,10 @@ public final class SessionTurnGate {
                 // Left by an Error: the rest of the session goes to another worker.
                 Queued rest = next(sessionKey);
                 if (rest != null) {
+                    synchronized (this) {
+                        sessions.get(sessionKey).started = false;
+                        scheduledHeads++;
+                    }
                     executor.execute(() -> drain(sessionKey, rest));
                 }
             }
@@ -230,7 +242,11 @@ public final class SessionTurnGate {
         synchronized (this) {
             pending--;
             runningSince.put(id, started);
-            sessions.get(sessionKey).started = true;
+            SessionState session = sessions.get(sessionKey);
+            if (!session.started) {
+                session.started = true;
+                scheduledHeads--;
+            }
         }
         boolean measured = false;
         try {

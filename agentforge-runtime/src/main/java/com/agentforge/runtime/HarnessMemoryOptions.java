@@ -14,7 +14,7 @@ import java.nio.file.Path;
  * @param compactionTriggerMessages compact once the context holds this many messages
  * @param compactionTriggerTokens or once it holds roughly this many tokens, whichever comes first
  * @param compactionKeepMessages recent messages kept verbatim after a compaction
- * @param summaryMaxChars length the summary is asked to stay within
+ * @param summaryMaxChars length the summary is asked to stay within, and cut at if it does not
  */
 public record HarnessMemoryOptions(
         Path workspace,
