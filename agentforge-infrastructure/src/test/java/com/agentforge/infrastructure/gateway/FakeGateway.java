@@ -27,6 +27,8 @@ public final class FakeGateway implements AutoCloseable {
     private volatile String body = completion("{}");
     private volatile Map<String, String> headers = Map.of();
     private volatile long delayMillis;
+    /** Replies used once each, in order, before the standing reply. */
+    private final java.util.Queue<Object[]> script = new java.util.concurrent.ConcurrentLinkedQueue<>();
 
     private FakeGateway() throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -49,10 +51,13 @@ public final class FakeGateway implements AutoCloseable {
                             return;
                         }
                     }
-                    byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+                    Object[] next = script.poll();
+                    int replyStatus = next == null ? status : (int) next[0];
+                    String replyBody = next == null ? body : (String) next[1];
+                    byte[] bytes = replyBody.getBytes(StandardCharsets.UTF_8);
                     exchange.getResponseHeaders().set("Content-Type", "application/json");
                     headers.forEach(exchange.getResponseHeaders()::set);
-                    exchange.sendResponseHeaders(status, bytes.length);
+                    exchange.sendResponseHeaders(replyStatus, bytes.length);
                     exchange.getResponseBody().write(bytes);
                     exchange.close();
                 });
@@ -67,6 +72,12 @@ public final class FakeGateway implements AutoCloseable {
         this.status = status;
         this.body = body;
         this.headers = headers;
+        return this;
+    }
+
+    /** Answers the next call with this, once; later calls get the next scripted or standing reply. */
+    public FakeGateway then(int status, String body) {
+        script.add(new Object[] {status, body});
         return this;
     }
 

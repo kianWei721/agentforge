@@ -39,7 +39,8 @@ agentforge:
   model-gateway:
     # Off by default. When on, knowledge query rewrite and answerability go through the gateway
     # with no direct DashScope fallback; AGENTFORGE_MODEL_PROVIDER=gateway routes chat as well.
-    # Embedding and rerank still call DashScope directly.
+    # An agent goes through the gateway when its definition says model-provider=gateway and names
+    # the route as its model (e.g. "agent"). Embedding and rerank still call DashScope directly.
     enabled: ${AGENTFORGE_MODEL_GATEWAY_ENABLED:false}
     base-url: ${AGENTFORGE_MODEL_GATEWAY_BASE_URL:http://localhost:8090/v1}
     api-key: ${AGENTFORGE_MODEL_GATEWAY_API_KEY:}
@@ -47,6 +48,8 @@ agentforge:
     chat-route: ${AGENTFORGE_MODEL_GATEWAY_CHAT_ROUTE:standard}
     connect-timeout: 3s
     request-timeout: ${AGENTFORGE_MODEL_GATEWAY_REQUEST_TIMEOUT:30s}
+    agent-max-tokens: ${AGENTFORGE_MODEL_GATEWAY_AGENT_MAX_TOKENS:2048}
+    agent-request-timeout: ${AGENTFORGE_MODEL_GATEWAY_AGENT_REQUEST_TIMEOUT:40s}
   channel:
     wecom:
       # WeCom smart bot over HTTP callbacks (POST/GET /callbacks/wecom/bot). Off by default.
