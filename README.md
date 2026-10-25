@@ -2,7 +2,7 @@
 
 AgentForge is a Java-based experimental Agent runtime and governance project focused on production-oriented engineering: durable execution, tool governance, retrieval evaluation, safe promotion, rollback, and enterprise-system integration.
 
-> Status: V0.11 — WeCom channel with session isolation, verified at ten thousand groups, on top of retrieval-layer access control (V0.8) and model calls through a standalone model gateway (V0.9). The project is under active development and is not presented as a drop-in production platform.
+> Status: V0.12 — WeCom channel with session isolation verified at ten thousand groups and intent routing (answer, hand off to a person, refuse), on top of retrieval-layer access control (V0.8) and model calls through a standalone model gateway (V0.9). The project is under active development and is not presented as a drop-in production platform.
 
 ## Why AgentForge
 
@@ -157,6 +157,13 @@ durations, with a margin) to finish after WeCom stops pulling is refused when it
 group's follow-ups run right after its own turns; the agent runtime is replaced every 5000
 turns so its per-session caches stay bounded. See
 [docs/V0.11-wecom-scale-hardening.md](docs/V0.11-wecom-scale-hardening.md).
+
+Optional intent routing sends each message to one of three places: the channel agent answers it,
+a person is needed (fixed reply, recorded as HANDOFF), or it is out of scope (fixed reply).
+Phrases decide on arrival; a classifier through the model gateway decides the rest, and anything
+unclear or failed goes to the agent. Each decision is recorded with its source, confidence and
+gateway request id. On a labelled set through the real gateway: 93.7% on the test split. See
+[docs/V0.12-intent-routing.md](docs/V0.12-intent-routing.md).
 
 ## External IoT Integration
 

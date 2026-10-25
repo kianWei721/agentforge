@@ -7,6 +7,13 @@ import com.agentforge.agent.AgentDefinitionRepository;
 import com.agentforge.channel.ChannelInbound;
 import com.agentforge.channel.ChannelInboundRepository;
 import com.agentforge.channel.ChannelInboundStatus;
+import com.agentforge.channel.ChannelIntent;
+import com.agentforge.channel.ChannelMetrics;
+import com.agentforge.channel.intent.IntentClassifier;
+import com.agentforge.channel.intent.IntentClassifier.Classification;
+import com.agentforge.channel.intent.IntentRouter;
+import com.agentforge.channel.intent.IntentRouterTest;
+import com.agentforge.channel.intent.IntentRoutingSettings;
 import com.agentforge.core.model.ModelCallFailedException;
 import com.agentforge.core.security.AccessPrincipal;
 import com.agentforge.runtime.AgentRuntimeRequest;
@@ -44,6 +51,15 @@ class WeComChannelServiceTest {
                     GROUP_USER, AccessPrincipal.customer(GROUP_USER, "cust-a"),
                     STAFF_GROUP_USER, AccessPrincipal.staff(STAFF_GROUP_USER));
     private List<String> agentTools = List.of("search_knowledge");
+    private final List<String> intentsCounted = new ArrayList<>();
+    private final ChannelMetrics metrics =
+            new ChannelMetrics() {
+                @Override
+                public void intent(String intent, String source) {
+                    intentsCounted.add(intent + "/" + source);
+                }
+            };
+    private SessionTurnGate gate;
     private Function<AgentRuntimeRequest, Flux<AgentStreamChunk>> answer =
             request ->
                     Flux.just(
@@ -300,6 +316,173 @@ class WeComChannelServiceTest {
         assertRejected("m3", "SESSION_BUSY");
     }
 
+    @Test
+    void aHandoffPhraseIsAnsweredOnArrivalWithoutAWorkerOrAnAgent() {
+        WeComChannelService service = service(runnable -> fail("no turn for a handoff"), router(false, null));
+
+        WeComStreamReply reply = service.handle(group("m1", "wrkCustA", "zhangsan", "@助手 我要转人工"));
+
+        assertEquals("已登记", reply.content());
+        assertTrue(reply.finished());
+        assertTrue(runs.isEmpty());
+        ChannelInbound row = inbound.rows.get("m1");
+        assertEquals(ChannelInboundStatus.HANDOFF, row.status());
+        assertNull(row.agentId());
+        assertEquals(GROUP_USER, row.userId(), "the handoff list shows which group asked");
+        assertEquals(new ChannelIntent("handoff", "RULE", null, null), row.intent());
+    }
+
+    @Test
+    void anOutOfScopePhraseIsRefusedOnArrival() {
+        WeComStreamReply reply =
+                service(runnable -> fail("no turn"), router(false, null))
+                        .handle(direct("m1", "zhangsan", "please write code"));
+
+        assertEquals("不在范围内", reply.content());
+        assertTrue(runs.isEmpty());
+        assertRejected("m1", "INTENT_REFUSED");
+        assertEquals("out_of_scope", inbound.rows.get("m1").intent().intent());
+    }
+
+    @Test
+    void withoutTheModelStageEverythingElseIsAnswered() {
+        service(Runnable::run, router(false, null)).handle(direct("m1", "zhangsan", "发票怎么开"));
+
+        assertEquals(1, runs.size());
+        assertEquals(ChannelInboundStatus.DONE, inbound.rows.get("m1").status());
+        assertEquals(new ChannelIntent("answer", "DEFAULT", null, null), inbound.rows.get("m1").intent());
+    }
+
+    @Test
+    void theClassifierCanHandAMessageToAPersonWithoutRunningTheAgent() {
+        List<String> correlationIds = new ArrayList<>();
+        WeComChannelService service =
+                service(
+                        Runnable::run,
+                        router(
+                                true,
+                                (text, intents, correlationId, timeout) -> {
+                                    correlationIds.add(correlationId);
+                                    return new Classification("handoff", 0.95, "gw-9");
+                                }));
+
+        WeComStreamReply reply = service.handle(group("m1", "wrkCustA", "zhangsan", "@助手 什么破东西我要退款"));
+
+        assertEquals("已登记", reply.content());
+        assertTrue(reply.finished());
+        assertTrue(runs.isEmpty());
+        ChannelInbound row = inbound.rows.get("m1");
+        assertEquals(ChannelInboundStatus.HANDOFF, row.status());
+        assertEquals(new ChannelIntent("handoff", "MODEL", 0.95, "gw-9"), row.intent());
+        assertEquals(List.of("wecom-" + row.id()), correlationIds, "the gateway ledger finds the message");
+    }
+
+    @Test
+    void aFailingClassifierStillAnswers() {
+        service(
+                        Runnable::run,
+                        router(
+                                true,
+                                (text, intents, correlationId, timeout) -> {
+                                    throw new ModelCallFailedException("GATEWAY_UNREACHABLE", true, null, "down");
+                                }))
+                .handle(direct("m1", "zhangsan", "发票怎么开"));
+
+        assertEquals(1, runs.size());
+        ChannelInbound row = inbound.rows.get("m1");
+        assertEquals(ChannelInboundStatus.DONE, row.status());
+        assertEquals(new ChannelIntent("answer", "FALLBACK_MODEL_ERROR", null, null), row.intent());
+    }
+
+    @Test
+    void theToolAllowListIsStillCheckedAfterClassification() {
+        service(
+                        Runnable::run,
+                        router(
+                                true,
+                                (text, intents, correlationId, timeout) -> {
+                                    // The agent is edited while the message is being classified.
+                                    agentTools = List.of("search_knowledge", "query_device_status");
+                                    return new Classification("answer", 0.9, "gw-1");
+                                }))
+                .handle(direct("m1", "zhangsan", "发票怎么开"));
+
+        assertTrue(runs.isEmpty());
+        assertEquals(ChannelInboundStatus.FAILED, inbound.rows.get("m1").status());
+        assertEquals("AGENT_TOOLS_NOT_ALLOWED", inbound.rows.get("m1").errorCode());
+    }
+
+    @Test
+    void classificationTakesAtMostHalfOfWhatIsLeftOfTheWindow() {
+        Queue<Runnable> scheduled = new ArrayDeque<>();
+        List<Duration> timeouts = new ArrayList<>();
+        WeComChannelService service =
+                service(
+                        scheduled::add,
+                        router(
+                                true,
+                                (text, intents, correlationId, timeout) -> {
+                                    timeouts.add(timeout);
+                                    return new Classification("answer", 0.9, "gw-1");
+                                }));
+
+        service.handle(direct("m1", "zhangsan", "一"));
+        scheduled.poll().run();
+        service.handle(direct("m2", "zhangsan", "二"));
+        clock.advance(WeComChannelService.REPLY_WINDOW.minusSeconds(2));
+        scheduled.poll().run();
+
+        assertEquals(List.of(Duration.ofSeconds(3), Duration.ofSeconds(1)), timeouts);
+    }
+
+    @Test
+    void aRedeliveredMessageIsRoutedAndCountedOnce() {
+        List<String> classified = new ArrayList<>();
+        WeComChannelService rules = service(Runnable::run, router(false, null));
+        rules.handle(group("m1", "wrkCustA", "zhangsan", "@助手 转人工"));
+        rules.handle(group("m1", "wrkCustA", "zhangsan", "@助手 转人工"));
+        WeComChannelService model =
+                service(
+                        Runnable::run,
+                        router(
+                                true,
+                                (text, intents, correlationId, timeout) -> {
+                                    classified.add(correlationId);
+                                    return new Classification("handoff", 0.9, "gw-1");
+                                }));
+        model.handle(direct("m2", "zhangsan", "什么破服务"));
+        model.handle(direct("m2", "zhangsan", "什么破服务"));
+
+        assertEquals(List.of("handoff/RULE", "handoff/MODEL"), intentsCounted);
+        assertEquals(1, classified.size(), "a redelivery is not classified again");
+        assertEquals(new ChannelIntent("handoff", "MODEL", 0.9, "gw-1"), inbound.rows.get("m2").intent());
+    }
+
+    @Test
+    void aFixedReplyFromTheClassifierDoesNotTeachTheTurnEstimate() {
+        List<String> next = new ArrayList<>(List.of("handoff", "answer"));
+        WeComChannelService service =
+                service(
+                        Runnable::run,
+                        router(
+                                true,
+                                (text, intents, correlationId, timeout) ->
+                                        new Classification(next.remove(0), 0.9, "gw-1")));
+
+        service.handle(direct("m1", "zhangsan", "什么破服务"));
+        assertEquals(Duration.ZERO, gate.averageTurn(), "a hand-off took no agent time");
+
+        service.handle(direct("m2", "zhangsan", "发票怎么开"));
+        assertTrue(gate.averageTurn().compareTo(Duration.ZERO) > 0, "an answered turn does count");
+    }
+
+    private IntentRouter router(boolean modelStage, IntentClassifier classifier) {
+        return new IntentRouter(
+                new IntentRoutingSettings(
+                        modelStage, "answer", Duration.ofSeconds(3), 0.7, 500, IntentRouterTest.INTENTS),
+                classifier);
+    }
+
     private void assertRejected(String msgId, String code) {
         ChannelInbound row = inbound.rows.get(msgId);
         assertEquals(ChannelInboundStatus.REJECTED, row.status());
@@ -310,8 +493,20 @@ class WeComChannelServiceTest {
         return service(executor, allowStaffGroups, Duration.ofSeconds(5));
     }
 
+    private WeComChannelService service(java.util.concurrent.Executor executor, IntentRouter router) {
+        return service(executor, false, Duration.ofSeconds(5), router);
+    }
+
     private WeComChannelService service(
             java.util.concurrent.Executor executor, boolean allowStaffGroups, Duration turnTimeout) {
+        return service(executor, allowStaffGroups, turnTimeout, IntentRouter.DISABLED);
+    }
+
+    private WeComChannelService service(
+            java.util.concurrent.Executor executor,
+            boolean allowStaffGroups,
+            Duration turnTimeout,
+            IntentRouter router) {
         WeComChannelSettings settings =
                 new WeComChannelSettings(
                         BOT,
@@ -328,9 +523,11 @@ class WeComChannelServiceTest {
                 userId -> Optional.ofNullable(userId == null ? null : principals.get(userId)),
                 new AgentsFake(),
                 runner::stream,
-                new SessionTurnGate(executor, 64, 1),
+                gate = new SessionTurnGate(executor, 64, 1),
                 new StreamBuffers(Duration.ofMinutes(10), clock),
-                clock);
+                clock,
+                metrics,
+                router);
     }
 
     private static WeComInbound direct(String msgId, String from, String text) {
@@ -402,7 +599,20 @@ class WeComChannelServiceTest {
                                             row.chatId(), row.senderUserId(), row.agentId(), row.userId(),
                                             row.sessionKey(),
                                             executionId == null ? row.executionId() : executionId,
-                                            status, errorCode, row.createdAt(), updatedAt)
+                                            status, errorCode, row.createdAt(), updatedAt, row.intent())
+                                    : row);
+        }
+
+        @Override
+        public void recordIntent(String id, ChannelIntent intent) {
+            rows.replaceAll(
+                    (msgId, row) ->
+                            row.id().equals(id)
+                                    ? new ChannelInbound(
+                                            row.id(), row.channel(), row.botId(), row.msgId(), row.chatType(),
+                                            row.chatId(), row.senderUserId(), row.agentId(), row.userId(),
+                                            row.sessionKey(), row.executionId(), row.status(), row.errorCode(),
+                                            row.createdAt(), row.updatedAt(), intent)
                                     : row);
         }
 

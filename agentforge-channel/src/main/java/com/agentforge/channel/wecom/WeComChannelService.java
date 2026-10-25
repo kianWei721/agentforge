@@ -7,6 +7,10 @@ import com.agentforge.channel.ChannelMetrics;
 import com.agentforge.channel.ChannelInbound;
 import com.agentforge.channel.ChannelInboundRepository;
 import com.agentforge.channel.ChannelInboundStatus;
+import com.agentforge.channel.ChannelIntent;
+import com.agentforge.channel.intent.IntentDecision;
+import com.agentforge.channel.intent.IntentRouter;
+import com.agentforge.channel.intent.IntentTarget;
 import com.agentforge.core.model.ModelCallFailedException;
 import com.agentforge.core.security.AccessPrincipal;
 import com.agentforge.core.security.PrincipalDirectory;
@@ -57,6 +61,7 @@ public final class WeComChannelService {
     private final StreamBuffers streams;
     private final Clock clock;
     private final ChannelMetrics metrics;
+    private final IntentRouter intents;
 
     public WeComChannelService(
             WeComChannelSettings settings,
@@ -80,7 +85,23 @@ public final class WeComChannelService {
             StreamBuffers streams,
             Clock clock,
             ChannelMetrics metrics) {
+        this(settings, inbound, principals, agents, runner, gate, streams, clock, metrics,
+                IntentRouter.DISABLED);
+    }
+
+    public WeComChannelService(
+            WeComChannelSettings settings,
+            ChannelInboundRepository inbound,
+            PrincipalDirectory principals,
+            AgentDefinitionRepository agents,
+            AgentTurnRunner runner,
+            SessionTurnGate gate,
+            StreamBuffers streams,
+            Clock clock,
+            ChannelMetrics metrics,
+            IntentRouter intents) {
         this.metrics = metrics;
+        this.intents = intents;
         this.settings = settings;
         this.inbound = inbound;
         this.principals = principals;
@@ -108,14 +129,15 @@ public final class WeComChannelService {
                         message.chatType().name(),
                         message.chatId(),
                         message.fromUserId(),
-                        route.refused() ? null : settings.agentId(),
+                        route.stopped() ? null : settings.agentId(),
                         route.userId(),
                         route.sessionKey(),
                         null,
-                        route.refused() ? ChannelInboundStatus.REJECTED : ChannelInboundStatus.RECEIVED,
+                        route.stopped() ? route.status() : ChannelInboundStatus.RECEIVED,
                         route.refusalCode(),
                         clock.instant(),
-                        clock.instant());
+                        clock.instant(),
+                        route.intent() == null ? null : ChannelIntent.of(route.intent()));
         if (!inbound.insertIfAbsent(record)) {
             // WeCom redelivered a message we already took: answer from the same stream. The
             // original callback may not have opened it yet (it lost the race to a slow insert), so
@@ -124,8 +146,12 @@ public final class WeComChannelService {
             return streams.snapshot(streamId)
                     .orElseGet(() -> new WeComStreamReply(streamId, "", false));
         }
-        if (route.refused()) {
-            metrics.admission(route.refusalCode());
+        if (route.intent() != null) {
+            metrics.intent(route.intent().intent(), route.intent().source().name());
+        }
+        if (route.stopped()) {
+            metrics.admission(
+                    route.refusalCode() == null ? route.status().name() : route.refusalCode());
             streams.openFinished(streamId, route.refusal());
             return snapshot(streamId);
         }
@@ -184,7 +210,7 @@ public final class WeComChannelService {
             if (userId == null || principals.resolve(userId).isEmpty()) {
                 return Route.refuse("UNKNOWN_USER", REFUSE_USER);
             }
-            return Route.accept(
+            return routed(
                     userId, WeComSessionKeys.direct(settings.botId(), message.fromUserId()), text);
         }
 
@@ -197,8 +223,24 @@ public final class WeComChannelService {
         if (principal.get().isStaff() && !settings.allowStaffGroups()) {
             return Route.refuse("STAFF_GROUP_DISABLED", REFUSE_GROUP);
         }
-        return Route.accept(
+        return routed(
                 groupUserId, WeComSessionKeys.group(settings.botId(), message.chatId()), text);
+    }
+
+    /**
+     * The rule stage of intent routing, on the callback thread: a configured phrase that hands the
+     * message to a person or refuses it decides here, without a worker and without a model.
+     */
+    private Route routed(String userId, String sessionKey, String text) {
+        Optional<IntentDecision> decided = intents.onArrival(text);
+        if (decided.isPresent() && decided.get().target() != IntentTarget.ANSWER) {
+            return Route.stop(userId, sessionKey, text, decided.get(), reply(decided.get()));
+        }
+        return Route.accept(userId, sessionKey, text, decided.orElse(null));
+    }
+
+    private String reply(IntentDecision decision) {
+        return intents.intent(decision.intent()).reply();
     }
 
     /**
@@ -225,6 +267,20 @@ public final class WeComChannelService {
         if (remaining.isNegative() || remaining.isZero()) {
             endTurn(inboundId, streamId, null, "EXPIRED_IN_QUEUE", FAILED_EXPIRED_IN_QUEUE);
             return false;
+        }
+        if (route.intent() == null && intents.modelStage()) {
+            IntentDecision decision = classify(inboundId, route, remaining);
+            if (decision.target() != IntentTarget.ANSWER) {
+                // A fixed reply took no agent time: not a measure of how long turns take.
+                endByIntent(inboundId, streamId, decision);
+                return false;
+            }
+            // The classifier used part of the window; the answer gets what is left.
+            remaining = Duration.between(clock.instant(), acceptedAt.plus(settings.replyWindow()));
+            if (remaining.isNegative() || remaining.isZero()) {
+                endTurn(inboundId, streamId, null, "EXPIRED_IN_QUEUE", FAILED_EXPIRED_IN_QUEUE);
+                return false;
+            }
         }
         Optional<String> agentRefusal = agentRefusal();
         if (agentRefusal.isPresent()) {
@@ -287,6 +343,44 @@ public final class WeComChannelService {
         return true;
     }
 
+    /**
+     * The model stage of intent routing, on the worker. It may take at most half of what is left of
+     * the reply window, so a slow classifier never leaves the answer without time. Never throws:
+     * the router turns every failure into the default intent.
+     */
+    private IntentDecision classify(String inboundId, Route route, Duration remaining) {
+        Duration half = remaining.dividedBy(2);
+        Duration timeout = half.compareTo(intents.timeout()) < 0 ? half : intents.timeout();
+        // The same id finds this call in the gateway's ledger.
+        IntentDecision decision = intents.classify(route.text(), "wecom-" + inboundId, timeout);
+        metrics.intent(decision.intent(), decision.source().name());
+        try {
+            inbound.recordIntent(inboundId, ChannelIntent.of(decision));
+        } catch (RuntimeException exception) {
+            LOG.log(System.Logger.Level.WARNING, "WeCom turn " + inboundId + " intent not recorded", exception);
+        }
+        return decision;
+    }
+
+    /** Hands the message to a person or refuses it, with the intent's reply. */
+    private void endByIntent(String inboundId, String streamId, IntentDecision decision) {
+        boolean handoff = decision.target() == IntentTarget.HANDOFF;
+        String code = handoff ? null : "INTENT_REFUSED";
+        metrics.turnOutcome(handoff ? ChannelInboundStatus.HANDOFF.name() : code);
+        try {
+            inbound.complete(
+                    inboundId,
+                    handoff ? ChannelInboundStatus.HANDOFF : ChannelInboundStatus.REJECTED,
+                    null,
+                    code,
+                    clock.instant());
+        } catch (RuntimeException exception) {
+            LOG.log(System.Logger.Level.WARNING, "WeCom turn " + inboundId + " not recorded", exception);
+        } finally {
+            streams.fail(streamId, reply(decision));
+        }
+    }
+
     /** Records the failure, then ends the stream with a notice, keeping what was already shown. */
     private void endTurn(
             String inboundId, String streamId, String executionId, String code, String notice) {
@@ -324,19 +418,44 @@ public final class WeComChannelService {
         return text;
     }
 
+    /**
+     * @param status set when the message ends here, without a turn: REJECTED or HANDOFF
+     * @param refusal what the user sees when it ends here
+     * @param intent decided on arrival; null when routing is off or the classifier is to decide
+     */
     private record Route(
-            String userId, String sessionKey, String text, String refusalCode, String refusal) {
+            String userId,
+            String sessionKey,
+            String text,
+            ChannelInboundStatus status,
+            String refusalCode,
+            String refusal,
+            IntentDecision intent) {
 
-        static Route accept(String userId, String sessionKey, String text) {
-            return new Route(userId, sessionKey, text, null, null);
+        static Route accept(String userId, String sessionKey, String text, IntentDecision intent) {
+            return new Route(userId, sessionKey, text, null, null, null, intent);
         }
 
         static Route refuse(String code, String refusal) {
-            return new Route(null, null, null, code, refusal);
+            return new Route(null, null, null, ChannelInboundStatus.REJECTED, code, refusal, null);
         }
 
-        boolean refused() {
-            return refusalCode != null;
+        /** Handed to a person or refused by its intent; who asked is still recorded. */
+        static Route stop(
+                String userId, String sessionKey, String text, IntentDecision intent, String reply) {
+            boolean handoff = intent.target() == IntentTarget.HANDOFF;
+            return new Route(
+                    userId,
+                    sessionKey,
+                    text,
+                    handoff ? ChannelInboundStatus.HANDOFF : ChannelInboundStatus.REJECTED,
+                    handoff ? null : "INTENT_REFUSED",
+                    reply,
+                    intent);
+        }
+
+        boolean stopped() {
+            return status != null;
         }
     }
 }
