@@ -266,7 +266,16 @@ public final class AgentScopeHarnessRuntime implements AgentRuntime, AutoCloseab
                                     }
                                 });
 
-        return events.concatWithValues(AgentStreamChunk.done(SOURCE));
+        Flux<AgentStreamChunk> turn = events.concatWithValues(AgentStreamChunk.done(SOURCE));
+        if (request.executionId() == null || request.executionId().isBlank()) {
+            return turn;
+        }
+        // Read by a model that reports its calls elsewhere, the model gateway's ledger.
+        return turn.contextWrite(
+                reactorContext ->
+                        reactorContext.put(
+                                ModelCallContext.CORRELATION_ID,
+                                ModelCallContext.correlationId(request.executionId())));
     }
 
     private AgentStreamChunk mapEvent(AgentEvent event, RuntimeContext context) {

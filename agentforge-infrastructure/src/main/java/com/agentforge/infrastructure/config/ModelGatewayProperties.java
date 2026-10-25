@@ -19,6 +19,10 @@ public class ModelGatewayProperties {
     private String chatRoute = "standard";
     private Duration connectTimeout = Duration.ofSeconds(3);
     private Duration requestTimeout = Duration.ofSeconds(30);
+    /** Agent model calls: the gateway reserves budget by max tokens, so it is always sent. */
+    private int agentMaxTokens = 2048;
+    /** One agent model call; the gateway itself stops at 45 s. */
+    private Duration agentRequestTimeout = Duration.ofSeconds(40);
 
     public boolean isEnabled() {
         return enabled;
@@ -76,6 +80,22 @@ public class ModelGatewayProperties {
         this.requestTimeout = requestTimeout;
     }
 
+    public int getAgentMaxTokens() {
+        return agentMaxTokens;
+    }
+
+    public void setAgentMaxTokens(int agentMaxTokens) {
+        this.agentMaxTokens = agentMaxTokens;
+    }
+
+    public Duration getAgentRequestTimeout() {
+        return agentRequestTimeout;
+    }
+
+    public void setAgentRequestTimeout(Duration agentRequestTimeout) {
+        this.agentRequestTimeout = agentRequestTimeout;
+    }
+
     public void validate() {
         if (!enabled) {
             return;
@@ -89,8 +109,11 @@ public class ModelGatewayProperties {
         if (!StringUtils.hasText(ragRoute) || !StringUtils.hasText(chatRoute)) {
             throw new IllegalStateException("Model gateway requires ragRoute and chatRoute.");
         }
-        if (!positive(connectTimeout) || !positive(requestTimeout)) {
+        if (!positive(connectTimeout) || !positive(requestTimeout) || !positive(agentRequestTimeout)) {
             throw new IllegalStateException("Model gateway timeouts must be positive.");
+        }
+        if (agentMaxTokens < 1) {
+            throw new IllegalStateException("Model gateway agent-max-tokens must be positive.");
         }
     }
 

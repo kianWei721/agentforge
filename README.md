@@ -2,7 +2,7 @@
 
 AgentForge is a Java-based experimental Agent runtime and governance project focused on production-oriented engineering: durable execution, tool governance, retrieval evaluation, safe promotion, rollback, and enterprise-system integration.
 
-> Status: V0.12 — WeCom channel with session isolation verified at ten thousand groups and intent routing (answer, hand off to a person, refuse), on top of retrieval-layer access control (V0.8) and model calls through a standalone model gateway (V0.9). The project is under active development and is not presented as a drop-in production platform.
+> Status: V0.13 — agent turns through the model gateway (per agent); WeCom channel with session isolation verified at ten thousand groups and intent routing (answer, hand off to a person, refuse), on top of retrieval-layer access control (V0.8) and model calls through a standalone model gateway (V0.9). The project is under active development and is not presented as a drop-in production platform.
 
 ## Why AgentForge
 
@@ -133,8 +133,13 @@ one search -> correlation id kr-<uuid> -> rewrite + judge on route rag-json
   -> modelCallDiagnostics: gateway request id + the model that actually served each call
 ```
 
-Agent runtime, embedding and rerank still call DashScope directly. See
-[docs/V0.9-model-gateway-client.md](docs/V0.9-model-gateway-client.md).
+An agent goes through the gateway too when its definition says `modelProvider=gateway` and names
+the route as its model (`agent`): tool calls, history and compaction, non-streamed, every call of
+a turn under one correlation id `ag-<executionId>`, and no fallback to calling the vendor. In a
+real smoke run, 11 of 11 agent turns passed through the gateway as they did direct. Embedding and
+rerank still call DashScope directly. See
+[docs/V0.9-model-gateway-client.md](docs/V0.9-model-gateway-client.md) and
+[docs/V0.13-agent-through-gateway.md](docs/V0.13-agent-through-gateway.md).
 
 ## WeCom Channel
 

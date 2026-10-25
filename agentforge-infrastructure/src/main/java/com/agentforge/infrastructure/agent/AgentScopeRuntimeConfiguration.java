@@ -4,10 +4,13 @@ import com.agentforge.agent.AgentDefinition;
 import com.agentforge.agent.AgentDefinitionRepository;
 import com.agentforge.conversation.ConversationService;
 import com.agentforge.infrastructure.config.AgentRuntimeProperties;
+import com.agentforge.infrastructure.config.ModelGatewayProperties;
 import com.agentforge.infrastructure.config.RetrievalBudgetProperties;
 import com.agentforge.infrastructure.config.ToolGovernanceProperties;
 import com.agentforge.infrastructure.config.ToolPolicyProperties;
+import com.agentforge.infrastructure.gateway.ModelGatewayClient;
 import com.agentforge.infrastructure.model.DashScopeModelFactory;
+import com.agentforge.infrastructure.model.GatewayChatModel;
 import com.agentforge.observability.execution.ExecutionService;
 import com.agentforge.runtime.AgentConversationRuntimeService;
 import com.agentforge.runtime.AgentRuntime;
@@ -24,9 +27,11 @@ import com.agentforge.runtime.ToolPolicyOptions;
 import com.agentforge.runtime.confirmation.ToolConfirmationService;
 import com.agentforge.tool.AgentTool;
 import com.agentforge.tool.ToolRegistry;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agentscope.core.model.Model;
 import io.agentscope.core.state.AgentStateStore;
 import java.util.List;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -41,7 +46,9 @@ public class AgentScopeRuntimeConfiguration {
             ToolPolicyProperties policyProperties,
             RetrievalBudgetProperties retrievalBudgetProperties,
             ToolConfirmationService confirmationService,
-            AgentRuntimeProperties agentProperties) {
+            AgentRuntimeProperties agentProperties,
+            ModelGatewayProperties gatewayProperties,
+            ObjectProvider<ModelGatewayClient> gatewayProvider) {
         HarnessMemoryOptions memoryOptions = agentProperties.getMemory().toOptions();
         governanceProperties.validate();
         retrievalBudgetProperties.validate();
@@ -63,13 +70,7 @@ public class AgentScopeRuntimeConfiguration {
         return new AgentRuntimeFactory() {
             @Override
             public AgentRuntime create(AgentDefinition definition, List<AgentTool> tools) {
-                if (!"dashscope".equalsIgnoreCase(definition.modelProvider())) {
-                    throw new IllegalArgumentException(
-                            "AgentScope runtime currently supports modelProvider=dashscope only. Requested: "
-                                    + definition.modelProvider());
-                }
-
-                Model model = modelFactory.createStreamingModel(definition.modelName());
+                Model model = model(definition, modelFactory, gatewayProperties, gatewayProvider);
                 return new AgentScopeHarnessRuntime(
                         definition.id(),
                         definition.name(),
@@ -84,6 +85,38 @@ public class AgentScopeRuntimeConfiguration {
                         memoryOptions);
             }
         };
+    }
+
+    /**
+     * dashscope calls DashScope directly; gateway calls the model gateway route named by the agent's
+     * model name. An agent set to the gateway while the gateway is off fails rather than quietly
+     * calling the vendor.
+     */
+    static Model model(
+            AgentDefinition definition,
+            DashScopeModelFactory modelFactory,
+            ModelGatewayProperties gatewayProperties,
+            ObjectProvider<ModelGatewayClient> gatewayProvider) {
+        String provider = definition.modelProvider() == null ? "" : definition.modelProvider().trim();
+        if ("dashscope".equalsIgnoreCase(provider)) {
+            return modelFactory.createStreamingModel(definition.modelName());
+        }
+        if ("gateway".equalsIgnoreCase(provider)) {
+            ModelGatewayClient gateway = gatewayProvider.getIfAvailable();
+            if (gateway == null) {
+                throw new IllegalStateException(
+                        "Agent '" + definition.id() + "' uses modelProvider=gateway, which requires"
+                                + " agentforge.model-gateway.enabled=true.");
+            }
+            return new GatewayChatModel(
+                    gateway,
+                    definition.modelName(),
+                    gatewayProperties.getAgentMaxTokens(),
+                    gatewayProperties.getAgentRequestTimeout(),
+                    new ObjectMapper());
+        }
+        throw new IllegalArgumentException(
+                "AgentScope runtime supports modelProvider=dashscope or gateway. Requested: " + provider);
     }
 
     @Bean(destroyMethod = "close")
