@@ -1,11 +1,15 @@
 package com.agentforge.infrastructure.config;
 
+import com.agentforge.channel.intent.IntentDefinition;
+import com.agentforge.channel.intent.IntentRoutingSettings;
+import com.agentforge.channel.intent.IntentTarget;
 import com.agentforge.channel.wecom.WeComChannelSettings;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.util.StringUtils;
@@ -38,6 +42,11 @@ public class WeComChannelProperties {
     private Duration expectedTurnDuration = Duration.ofSeconds(15);
     private Duration streamTtl = Duration.ofMinutes(10);
     private Duration timestampTolerance = Duration.ofMinutes(5);
+    private final Intent intent = new Intent();
+
+    public Intent getIntent() {
+        return intent;
+    }
 
     public boolean isEnabled() {
         return enabled;
@@ -218,6 +227,9 @@ public class WeComChannelProperties {
             throw new IllegalStateException("WeCom channel timestamp-tolerance must not be negative.");
         }
         toSettings();
+        if (intent.isEnabled()) {
+            intent.toSettings();
+        }
     }
 
     public WeComChannelSettings toSettings() {
@@ -233,6 +245,90 @@ public class WeComChannelProperties {
         } catch (IllegalArgumentException invalid) {
             throw new IllegalStateException(
                     "Invalid WeCom channel configuration: " + invalid.getMessage(), invalid);
+        }
+    }
+
+    /**
+     * Intent routing: phrases decide on arrival; with the model stage, a classifier through the
+     * model gateway decides the rest. Off by default.
+     */
+    public static class Intent {
+        private boolean enabled;
+        private boolean modelStage;
+        private String defaultIntent = "answer";
+        /** The gateway route the classifier calls; it must support structured JSON output. */
+        private String modelRoute = "rag-json";
+        private Duration timeout = Duration.ofSeconds(3);
+        private double minConfidence = 0.7;
+        private int maxInputChars = 500;
+        private List<Entry> intents = new ArrayList<>();
+
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
+        public boolean isModelStage() { return modelStage; }
+        public void setModelStage(boolean modelStage) { this.modelStage = modelStage; }
+        public String getDefaultIntent() { return defaultIntent; }
+        public void setDefaultIntent(String defaultIntent) { this.defaultIntent = defaultIntent; }
+        public String getModelRoute() { return modelRoute; }
+        public void setModelRoute(String modelRoute) { this.modelRoute = modelRoute; }
+        public Duration getTimeout() { return timeout; }
+        public void setTimeout(Duration timeout) { this.timeout = timeout; }
+        public double getMinConfidence() { return minConfidence; }
+        public void setMinConfidence(double minConfidence) { this.minConfidence = minConfidence; }
+        public int getMaxInputChars() { return maxInputChars; }
+        public void setMaxInputChars(int maxInputChars) { this.maxInputChars = maxInputChars; }
+        public List<Entry> getIntents() { return intents; }
+        public void setIntents(List<Entry> intents) { this.intents = intents; }
+
+        /** Fails startup on an inconsistent configuration. */
+        public IntentRoutingSettings toSettings() {
+            if (modelStage && !StringUtils.hasText(modelRoute)) {
+                throw new IllegalStateException("agentforge.channel.wecom.intent.model-route is required.");
+            }
+            try {
+                return new IntentRoutingSettings(
+                        modelStage,
+                        defaultIntent == null ? null : defaultIntent.trim(),
+                        timeout,
+                        minConfidence,
+                        maxInputChars,
+                        intents.stream().map(Entry::toDefinition).toList());
+            } catch (IllegalArgumentException invalid) {
+                throw new IllegalStateException(
+                        "Invalid agentforge.channel.wecom.intent: " + invalid.getMessage(), invalid);
+            }
+        }
+    }
+
+    /** One intent; target is answer, handoff or refuse. */
+    public static class Entry {
+        private String name;
+        private String description;
+        private List<String> keywords = new ArrayList<>();
+        private String target;
+        private String reply;
+
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+        public String getDescription() { return description; }
+        public void setDescription(String description) { this.description = description; }
+        public List<String> getKeywords() { return keywords; }
+        public void setKeywords(List<String> keywords) { this.keywords = keywords; }
+        public String getTarget() { return target; }
+        public void setTarget(String target) { this.target = target; }
+        public String getReply() { return reply; }
+        public void setReply(String reply) { this.reply = reply; }
+
+        IntentDefinition toDefinition() {
+            IntentTarget parsed;
+            try {
+                parsed = IntentTarget.valueOf(target == null ? "" : target.trim().toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException unknown) {
+                throw new IllegalArgumentException(
+                        "intent '" + name + "' target must be answer, handoff or refuse, got: " + target);
+            }
+            return new IntentDefinition(
+                    name == null ? null : name.trim(), description, keywords, parsed, reply);
         }
     }
 

@@ -3,6 +3,7 @@ package com.agentforge.infrastructure.channel;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.agentforge.channel.ChannelInbound;
+import com.agentforge.channel.ChannelIntent;
 import com.agentforge.channel.ChannelInboundStatus;
 import java.time.Instant;
 import org.h2.jdbcx.JdbcDataSource;
@@ -24,7 +25,7 @@ class JdbcChannelInboundRepositoryTest {
         dataSource.setUser("sa");
         JdbcTemplate jdbc = new JdbcTemplate(dataSource);
         jdbc.execute("DROP TABLE IF EXISTS af_channel_inbound");
-        // Same columns and unique key as V11; H2 compares strings case-sensitively, like the
+        // Same columns and unique key as V11 and V12; H2 compares strings case-sensitively, like the
         // utf8mb4_bin columns there.
         jdbc.execute(
                 """
@@ -44,6 +45,10 @@ class JdbcChannelInboundRepositoryTest {
                     error_code VARCHAR(64),
                     created_at TIMESTAMP(6) NOT NULL,
                     updated_at TIMESTAMP(6) NOT NULL,
+                    intent VARCHAR(32),
+                    intent_source VARCHAR(32),
+                    intent_confidence DECIMAL(4, 3),
+                    intent_request_id VARCHAR(64),
                     UNIQUE (channel, bot_id, msg_id)
                 )
                 """);
@@ -72,6 +77,33 @@ class JdbcChannelInboundRepositoryTest {
         assertEquals("exec-1", stored.executionId());
         assertEquals("TURN_TIMEOUT", stored.errorCode());
         assertEquals(NOW.plusSeconds(6), stored.updatedAt());
+    }
+
+    @Test
+    void anIntentIsStoredOnArrivalOrRecordedAfterClassification() {
+        ChannelInbound handoff =
+                new ChannelInbound(
+                        "id-1", "wecom", "bot-1", "msg-1", "GROUP", "chat-1", "zhangsan", null,
+                        "wecom-group:a", "wecom:abc", null, ChannelInboundStatus.HANDOFF, null, NOW, NOW,
+                        new ChannelIntent("handoff", "RULE", null, null));
+        repository.insertIfAbsent(handoff);
+        repository.insertIfAbsent(row("id-2", "msg-2"));
+
+        repository.recordIntent("id-2", new ChannelIntent("answer", "MODEL", 0.87654, "gw-1"));
+
+        ChannelInbound first = repository.find("wecom", "bot-1", "msg-1").orElseThrow();
+        assertEquals(ChannelInboundStatus.HANDOFF, first.status());
+        assertEquals(new ChannelIntent("handoff", "RULE", null, null), first.intent());
+        assertEquals(
+                new ChannelIntent("answer", "MODEL", 0.877, "gw-1"),
+                repository.find("wecom", "bot-1", "msg-2").orElseThrow().intent());
+    }
+
+    @Test
+    void aMessageRoutedWithoutIntentsHasNone() {
+        repository.insertIfAbsent(row("id-1", "msg-1"));
+
+        assertNull(repository.find("wecom", "bot-1", "msg-1").orElseThrow().intent());
     }
 
     private static ChannelInbound row(String id, String msgId) {

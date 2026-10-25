@@ -74,6 +74,32 @@ agentforge:
       turn-timeout: 5m
       stream-ttl: 10m
       timestamp-tolerance: 5m
+      # Intent routing (V0.12). Phrases decide on arrival; with model-stage, a classifier through
+      # the model gateway decides the rest. Whatever is unclear goes to the default intent, which
+      # the agent answers. Names are recorded in af_channel_inbound and in metrics: keep them stable.
+      intent:
+        enabled: ${AGENTFORGE_WECOM_INTENT_ENABLED:false}
+        model-stage: ${AGENTFORGE_WECOM_INTENT_MODEL_STAGE:false}
+        model-route: ${AGENTFORGE_WECOM_INTENT_MODEL_ROUTE:rag-json}
+        default-intent: answer
+        timeout: 3s
+        min-confidence: 0.7
+        max-input-chars: 500
+        intents:
+          - name: answer
+            description: 可以从知识库回答的业务咨询，例如政策、办事流程、需要准备的资料、产品和服务说明，以及对前面回答的追问
+            target: answer
+          - name: handoff
+            description: 必须由人处理的诉求，例如明确要求人工、投诉、表达强烈不满、要求退款或改动自己的账户和订单
+            target: handoff
+            # Matched as plain substrings, so keep them specific: a negation such as "不用转人工" also matches.
+            keywords: [转人工, 人工客服, 找人工, 投诉]
+            # Nobody is notified: the reply must not claim a person is on the way.
+            reply: 已登记，请直接联系群里的客服同事。
+          - name: out_of_scope
+            description: 与业务无关的请求，例如闲聊、娱乐、写代码、写作业、翻译与业务无关的内容
+            target: refuse
+            reply: 这个问题不在我能回答的范围内，可以问我业务相关的问题。
   knowledge:
     hybrid:
       enabled: ${AGENTFORGE_KNOWLEDGE_HYBRID_ENABLED:false}

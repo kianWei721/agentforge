@@ -83,6 +83,43 @@ class WeComChannelPropertiesTest {
         assertThrows(IllegalStateException.class, badKey::validate);
     }
 
+    @Test
+    void intentRoutingIsCheckedAtStartup() {
+        WeComChannelProperties valid = valid();
+        valid.getIntent().setEnabled(true);
+        valid.getIntent().setIntents(
+                List.of(
+                        entry("answer", "answer"),
+                        entry("handoff", "handoff")));
+        valid.validate();
+
+        WeComChannelProperties unknownTarget = valid();
+        unknownTarget.getIntent().setEnabled(true);
+        unknownTarget.getIntent().setIntents(
+                List.of(entry("answer", "agent:other")));
+        assertThrows(IllegalStateException.class, unknownTarget::validate);
+
+        WeComChannelProperties handoffByDefault = valid();
+        handoffByDefault.getIntent().setEnabled(true);
+        handoffByDefault.getIntent().setDefaultIntent("handoff");
+        handoffByDefault.getIntent().setIntents(valid.getIntent().getIntents());
+        assertThrows(IllegalStateException.class, handoffByDefault::validate);
+
+        // Off, the intents are not read.
+        WeComChannelProperties off = valid();
+        off.getIntent().setIntents(List.of());
+        off.validate();
+    }
+
+    private static WeComChannelProperties.Entry entry(String name, String target) {
+        WeComChannelProperties.Entry entry = new WeComChannelProperties.Entry();
+        entry.setName(name);
+        entry.setDescription(name);
+        entry.setTarget(target);
+        entry.setReply("answer".equals(target) ? null : "已登记，请直接联系群里的客服同事。");
+        return entry;
+    }
+
     private static WeComChannelProperties valid() {
         WeComChannelProperties properties = new WeComChannelProperties();
         properties.setEnabled(true);

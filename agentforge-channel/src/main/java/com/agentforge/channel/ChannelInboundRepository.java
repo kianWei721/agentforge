@@ -15,5 +15,8 @@ public interface ChannelInboundRepository {
             String errorCode,
             Instant updatedAt);
 
+    /** Records the intent the classifier decided, once the turn has run it. */
+    void recordIntent(String id, ChannelIntent intent);
+
     Optional<ChannelInbound> find(String channel, String botId, String msgId);
 }

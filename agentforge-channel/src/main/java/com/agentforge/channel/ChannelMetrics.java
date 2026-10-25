@@ -10,7 +10,10 @@ public interface ChannelMetrics {
 
     ChannelMetrics NONE = new ChannelMetrics() {};
 
-    /** One per inbound message: ACCEPTED, SESSION_BUSY, OVERLOADED, WOULD_MISS_DEADLINE, or a refusal code. */
+    /**
+     * One per inbound message: ACCEPTED, SESSION_BUSY, OVERLOADED, WOULD_MISS_DEADLINE, a refusal
+     * code, or HANDOFF and INTENT_REFUSED when a phrase decided on arrival.
+     */
     default void admission(String outcome) {}
 
     /** From admission to the turn getting a worker. */
@@ -19,6 +22,12 @@ public interface ChannelMetrics {
     /** How long a worker was busy with the turn. */
     default void turnDuration(Duration duration) {}
 
-    /** DONE, or the failure code (TURN_TIMEOUT, EXPIRED_IN_QUEUE, MODEL_..., ...). */
+    /** DONE, HANDOFF, or the failure code (TURN_TIMEOUT, EXPIRED_IN_QUEUE, INTENT_REFUSED, MODEL_...). */
     default void turnOutcome(String outcome) {}
+
+    /**
+     * One per routed message: the intent and how it was decided (RULE, MODEL, FALLBACK_...). The
+     * one place every hand-off is counted, whether a phrase or the classifier decided it.
+     */
+    default void intent(String intent, String source) {}
 }

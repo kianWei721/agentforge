@@ -65,7 +65,9 @@ class WeComCallbackHandlerTest {
                     sender_userid VARCHAR(128) NOT NULL, agent_id VARCHAR(64), user_id VARCHAR(128),
                     session_key VARCHAR(128), execution_id VARCHAR(64), status VARCHAR(16) NOT NULL,
                     error_code VARCHAR(64), created_at TIMESTAMP(6) NOT NULL,
-                    updated_at TIMESTAMP(6) NOT NULL, UNIQUE (channel, bot_id, msg_id))
+                    updated_at TIMESTAMP(6) NOT NULL, intent VARCHAR(32), intent_source VARCHAR(32),
+                    intent_confidence DECIMAL(4, 3), intent_request_id VARCHAR(64),
+                    UNIQUE (channel, bot_id, msg_id))
                 """);
         inbound = new JdbcChannelInboundRepository(jdbc);
 
