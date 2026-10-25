@@ -33,7 +33,8 @@ class AgentRuntimeManagerTest {
 
         run(manager);
         assertEquals(2, created.size(), "third turn starts a new generation");
-        assertTrue(created.get(0).closed.get(), "the used-up generation is closed");
+        // Released in doFinally, which runs after blockLast has already returned: wait for it.
+        waitFor(() -> created.get(0).closed.get());
         assertFalse(created.get(1).closed.get());
     }
 
