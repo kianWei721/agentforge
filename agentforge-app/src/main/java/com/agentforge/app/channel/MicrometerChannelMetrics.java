@@ -1,11 +1,15 @@
 package com.agentforge.app.channel;
 
 import com.agentforge.channel.ChannelMetrics;
+import com.agentforge.channel.handoff.HandoffStatus;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;
 import java.time.Duration;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -22,6 +26,13 @@ import org.springframework.stereotype.Component;
  *       INTENT_REFUSED when the classifier decided them inside the turn
  *   <li>{@code agentforge.wecom.intent{intent,source}}: every routed message once, however it was
  *       decided; count hand-offs here ({@code intent=handoff}), not under admission or turn alone
+ *   <li>{@code agentforge.wecom.handoff.opened{result,source}}: NEW tickets and MERGED messages;
+ *       their sum matches {@code intent{intent=handoff}}
+ *   <li>{@code agentforge.wecom.handoff.notify{outcome}}, {@code .notify.delay}: staff-group notices
+ *   <li>{@code agentforge.wecom.handoff.open{status}}: PENDING and CLAIMED tickets, counted on
+ *       every notice tick (so only with a webhook)
+ *   <li>{@code agentforge.wecom.handoff.claim.wait}, {@code .resolve.duration{resolution}}: how
+ *       long tickets wait; {@code resolution=FALSE_TRIGGER} is the misroute rate
  * </ul>
  *
  * <p>Failure codes include the model gateway's, which this side does not control, so outcome
@@ -43,6 +54,7 @@ public class MicrometerChannelMetrics implements ChannelMetrics {
 
     private final MeterRegistry registry;
     private final Set<String> outcomes = ConcurrentHashMap.newKeySet();
+    private final Map<HandoffStatus, AtomicLong> openHandoffs = new ConcurrentHashMap<>();
     private final Timer queueWait;
     private final Timer turnDuration;
 
@@ -81,6 +93,51 @@ public class MicrometerChannelMetrics implements ChannelMetrics {
                         "source",
                         matches(CODE, source))
                 .increment();
+    }
+
+    @Override
+    public void handoffOpened(boolean merged, String source) {
+        registry.counter(
+                        "agentforge.wecom.handoff.opened",
+                        "result",
+                        merged ? "MERGED" : "NEW",
+                        "source",
+                        matches(CODE, source))
+                .increment();
+    }
+
+    @Override
+    public void handoffNotify(String outcome) {
+        registry.counter("agentforge.wecom.handoff.notify", "outcome", matches(CODE, outcome)).increment();
+    }
+
+    @Override
+    public void handoffNotifyDelay(Duration delay) {
+        registry.timer("agentforge.wecom.handoff.notify.delay").record(delay);
+    }
+
+    @Override
+    public void openHandoffs(Map<HandoffStatus, Long> counts) {
+        counts.forEach(
+                (status, count) ->
+                        openHandoffs.computeIfAbsent(
+                                        status,
+                                        key -> registry.gauge(
+                                                "agentforge.wecom.handoff.open",
+                                                Tags.of("status", key.name()),
+                                                new AtomicLong()))
+                                .set(count));
+    }
+
+    @Override
+    public void handoffClaimWait(Duration wait) {
+        registry.timer("agentforge.wecom.handoff.claim.wait").record(wait);
+    }
+
+    @Override
+    public void handoffResolved(String resolution, Duration open) {
+        registry.timer("agentforge.wecom.handoff.resolve.duration", "resolution", matches(CODE, resolution))
+                .record(open);
     }
 
     private static String matches(Pattern shape, String value) {

@@ -9,6 +9,9 @@ import com.agentforge.channel.ChannelInboundRepository;
 import com.agentforge.channel.ChannelInboundStatus;
 import com.agentforge.channel.ChannelIntent;
 import com.agentforge.channel.ChannelMetrics;
+import com.agentforge.channel.handoff.HandoffOpened;
+import com.agentforge.channel.handoff.HandoffOpening;
+import com.agentforge.channel.handoff.HandoffSettings;
 import com.agentforge.channel.intent.IntentClassifier;
 import com.agentforge.channel.intent.IntentClassifier.Classification;
 import com.agentforge.channel.intent.IntentRouter;
@@ -52,13 +55,20 @@ class WeComChannelServiceTest {
                     STAFF_GROUP_USER, AccessPrincipal.staff(STAFF_GROUP_USER));
     private List<String> agentTools = List.of("search_knowledge");
     private final List<String> intentsCounted = new ArrayList<>();
+    private final List<String> handoffsCounted = new ArrayList<>();
     private final ChannelMetrics metrics =
             new ChannelMetrics() {
                 @Override
                 public void intent(String intent, String source) {
                     intentsCounted.add(intent + "/" + source);
                 }
+
+                @Override
+                public void handoffOpened(boolean merged, String source) {
+                    handoffsCounted.add((merged ? "MERGED" : "NEW") + "/" + source);
+                }
             };
+    private HandoffSettings handoffSettings = HandoffSettings.DEFAULT;
     private SessionTurnGate gate;
     private Function<AgentRuntimeRequest, Flux<AgentStreamChunk>> answer =
             request ->
@@ -330,6 +340,67 @@ class WeComChannelServiceTest {
         assertNull(row.agentId());
         assertEquals(GROUP_USER, row.userId(), "the handoff list shows which group asked");
         assertEquals(new ChannelIntent("handoff", "RULE", null, null), row.intent());
+
+        HandoffOpening ticket = inbound.handoffs.get(0);
+        assertEquals(row.id(), ticket.inboundId());
+        assertEquals(WeComSessionKeys.group(BOT, "wrkCustA"), ticket.sessionKey());
+        assertEquals(GROUP_USER, ticket.userId());
+        assertEquals("cust-a", ticket.customerId());
+        assertEquals("zhangsan", ticket.senderUserId());
+        assertEquals("我要转人工", ticket.excerpt(), "the question, without the mention");
+        assertEquals(new ChannelIntent("handoff", "RULE", null, null), ticket.intent());
+        assertFalse(ticket.notifyStaff());
+        assertEquals(List.of("NEW/RULE"), handoffsCounted);
+    }
+
+    @Test
+    void withAStaffGroupToNotifyTheReplySaysTheMessageWasPassedOn() {
+        handoffSettings = new HandoffSettings(true, "已转给客服同事，他们会在群里回复你。", 120);
+        WeComChannelService service = service(runnable -> fail("no turn for a handoff"), router(false, null));
+
+        WeComStreamReply reply = service.handle(group("m1", "wrkCustA", "zhangsan", "@助手 我要投诉"));
+
+        assertEquals("已转给客服同事，他们会在群里回复你。", reply.content());
+        assertTrue(inbound.handoffs.get(0).notifyStaff());
+    }
+
+    @Test
+    void aSessionAskingAgainJoinsItsOpenTicketAndARedeliveryCountsNothing() {
+        WeComChannelService service = service(runnable -> fail("no turn for a handoff"), router(false, null));
+
+        service.handle(group("m1", "wrkCustA", "zhangsan", "@助手 转人工"));
+        service.handle(group("m2", "wrkCustA", "lisi", "@助手 我要投诉"));
+        service.handle(group("m2", "wrkCustA", "lisi", "@助手 我要投诉"));
+        service.handle(direct("m3", "zhangsan", "转人工"));
+
+        assertEquals(3, inbound.handoffs.size(), "the redelivery opened nothing");
+        assertEquals(List.of("NEW/RULE", "MERGED/RULE", "NEW/RULE"), handoffsCounted);
+        assertNull(inbound.handoffs.get(2).customerId(), "a staff user has no customer");
+    }
+
+    /** Found in review: without a ticket nobody is told, so the user may not hear otherwise. */
+    @Test
+    void whenTheTicketCannotBeWrittenTheReplyPromisesNothing() {
+        handoffSettings = new HandoffSettings(true, "已转给客服同事，他们会在群里回复你。", 120);
+        inbound.failHandoff = true;
+        WeComChannelService service =
+                service(
+                        Runnable::run,
+                        router(true, (text, intents, correlationId, timeout) -> new Classification("handoff", 0.95, "gw-9")));
+
+        WeComStreamReply reply = service.handle(group("m1", "wrkCustA", "zhangsan", "@助手 什么破东西我要退款"));
+
+        assertEquals("已登记", reply.content(), "the intent's own reply, not the notified one");
+        assertTrue(reply.finished());
+        assertEquals(ChannelInboundStatus.RECEIVED, inbound.rows.get("m1").status());
+        assertTrue(handoffsCounted.isEmpty());
+    }
+
+    @Test
+    void aRefusalOpensNoTicket() {
+        service(runnable -> fail("no turn"), router(false, null)).handle(direct("m1", "zhangsan", "please write code"));
+
+        assertTrue(inbound.handoffs.isEmpty());
     }
 
     @Test
@@ -375,6 +446,12 @@ class WeComChannelServiceTest {
         assertEquals(ChannelInboundStatus.HANDOFF, row.status());
         assertEquals(new ChannelIntent("handoff", "MODEL", 0.95, "gw-9"), row.intent());
         assertEquals(List.of("wecom-" + row.id()), correlationIds, "the gateway ledger finds the message");
+
+        HandoffOpening ticket = inbound.handoffs.get(0);
+        assertEquals(row.id(), ticket.inboundId());
+        assertEquals(new ChannelIntent("handoff", "MODEL", 0.95, "gw-9"), ticket.intent());
+        assertEquals("什么破东西我要退款", ticket.excerpt());
+        assertEquals(List.of("NEW/MODEL"), handoffsCounted);
     }
 
     @Test
@@ -527,7 +604,8 @@ class WeComChannelServiceTest {
                 new StreamBuffers(Duration.ofMinutes(10), clock),
                 clock,
                 metrics,
-                router);
+                router,
+                handoffSettings);
     }
 
     private static WeComInbound direct(String msgId, String from, String text) {
@@ -582,10 +660,39 @@ class WeComChannelServiceTest {
 
     static final class InMemoryInbound implements ChannelInboundRepository {
         final Map<String, ChannelInbound> rows = new ConcurrentHashMap<>();
+        final List<HandoffOpening> handoffs = new ArrayList<>();
+        /** Open ticket id by session. */
+        final Map<String, String> openTickets = new ConcurrentHashMap<>();
+        volatile boolean failHandoff;
 
         @Override
         public boolean insertIfAbsent(ChannelInbound inbound) {
             return rows.putIfAbsent(inbound.msgId(), inbound) == null;
+        }
+
+        @Override
+        public Optional<HandoffOpened> insertHandoff(ChannelInbound inbound, HandoffOpening handoff) {
+            return insertIfAbsent(inbound) ? Optional.of(open(handoff)) : Optional.empty();
+        }
+
+        @Override
+        public HandoffOpened completeAsHandoff(String id, HandoffOpening handoff, Instant updatedAt) {
+            if (failHandoff) {
+                throw new IllegalStateException("database down");
+            }
+            complete(id, ChannelInboundStatus.HANDOFF, null, null, updatedAt);
+            return open(handoff);
+        }
+
+        private synchronized HandoffOpened open(HandoffOpening handoff) {
+            handoffs.add(handoff);
+            String open = openTickets.get(handoff.sessionKey());
+            if (open != null) {
+                return new HandoffOpened(open, true);
+            }
+            String id = "ticket-" + openTickets.size();
+            openTickets.put(handoff.sessionKey(), id);
+            return new HandoffOpened(id, false);
         }
 
         @Override

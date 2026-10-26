@@ -29,8 +29,17 @@ final class IntentDataset {
     private IntentDataset() {}
 
     static List<Item> load() throws IOException {
+        return load("/intent/intent-eval.jsonl");
+    }
+
+    /** Negated requests, labelled before the negation guard was written; no split, no rule. */
+    static List<Item> loadNegationHoldout() throws IOException {
+        return load("/intent/intent-negation-holdout.jsonl");
+    }
+
+    private static List<Item> load(String resource) throws IOException {
         List<Item> items = new ArrayList<>();
-        try (InputStream in = IntentDataset.class.getResourceAsStream("/intent/intent-eval.jsonl")) {
+        try (InputStream in = IntentDataset.class.getResourceAsStream(resource)) {
             for (String line : new String(in.readAllBytes(), StandardCharsets.UTF_8).split("\n")) {
                 if (line.isBlank()) {
                     continue;

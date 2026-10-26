@@ -1,10 +1,13 @@
 package com.agentforge.infrastructure.config;
 
+import com.agentforge.channel.handoff.HandoffSettings;
 import com.agentforge.channel.intent.IntentDefinition;
 import com.agentforge.channel.intent.IntentRoutingSettings;
 import com.agentforge.channel.intent.IntentTarget;
 import com.agentforge.channel.wecom.WeComChannelSettings;
+import java.net.URI;
 import java.time.Duration;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -43,9 +46,14 @@ public class WeComChannelProperties {
     private Duration streamTtl = Duration.ofMinutes(10);
     private Duration timestampTolerance = Duration.ofMinutes(5);
     private final Intent intent = new Intent();
+    private final Handoff handoff = new Handoff();
 
     public Intent getIntent() {
         return intent;
+    }
+
+    public Handoff getHandoff() {
+        return handoff;
     }
 
     public boolean isEnabled() {
@@ -230,6 +238,7 @@ public class WeComChannelProperties {
         if (intent.isEnabled()) {
             intent.toSettings();
         }
+        handoff.validate();
     }
 
     public WeComChannelSettings toSettings() {
@@ -245,6 +254,104 @@ public class WeComChannelProperties {
         } catch (IllegalArgumentException invalid) {
             throw new IllegalStateException(
                     "Invalid WeCom channel configuration: " + invalid.getMessage(), invalid);
+        }
+    }
+
+    /**
+     * Hand-off tickets and the staff-group notice. Tickets are always opened; the notice is sent
+     * only with a webhook.
+     */
+    public static class Handoff {
+        /** The robot address holds its key: set it from the environment, never in a file. */
+        static final String WEBHOOK_HOST = "qyapi.weixin.qq.com";
+        /** Below this a burst could pass WeCom's 20 messages a minute per robot. */
+        static final Duration MIN_NOTIFY_INTERVAL = Duration.ofSeconds(3);
+
+        private String webhookUrl;
+        private List<String> mentionUserids = new ArrayList<>();
+        private String replyWhenNotified = "已转给客服同事，他们会在群里回复你。";
+        private int excerptChars = 120;
+        private Duration notifyInterval = Duration.ofSeconds(5);
+        private int maxItemsPerMessage = 10;
+        private int maxAttempts = 5;
+        /** Shorter than the interval, so one slow call never runs into the next tick. */
+        private Duration webhookTimeout = Duration.ofSeconds(4);
+        private String zone = "Asia/Shanghai";
+
+        public String getWebhookUrl() { return webhookUrl; }
+        public void setWebhookUrl(String webhookUrl) { this.webhookUrl = webhookUrl; }
+        public List<String> getMentionUserids() { return mentionUserids; }
+        public void setMentionUserids(List<String> mentionUserids) { this.mentionUserids = mentionUserids; }
+        public String getReplyWhenNotified() { return replyWhenNotified; }
+        public void setReplyWhenNotified(String replyWhenNotified) { this.replyWhenNotified = replyWhenNotified; }
+        public int getExcerptChars() { return excerptChars; }
+        public void setExcerptChars(int excerptChars) { this.excerptChars = excerptChars; }
+        public Duration getNotifyInterval() { return notifyInterval; }
+        public void setNotifyInterval(Duration notifyInterval) { this.notifyInterval = notifyInterval; }
+        public int getMaxItemsPerMessage() { return maxItemsPerMessage; }
+        public void setMaxItemsPerMessage(int maxItemsPerMessage) { this.maxItemsPerMessage = maxItemsPerMessage; }
+        public int getMaxAttempts() { return maxAttempts; }
+        public void setMaxAttempts(int maxAttempts) { this.maxAttempts = maxAttempts; }
+        public Duration getWebhookTimeout() { return webhookTimeout; }
+        public void setWebhookTimeout(Duration webhookTimeout) { this.webhookTimeout = webhookTimeout; }
+        public String getZone() { return zone; }
+        public void setZone(String zone) { this.zone = zone; }
+
+        public boolean notifies() {
+            return StringUtils.hasText(webhookUrl);
+        }
+
+        /** Customer text goes to this address: only WeCom's own host, over https. */
+        public URI webhook() {
+            URI uri;
+            try {
+                uri = URI.create(webhookUrl.trim());
+            } catch (IllegalArgumentException invalid) {
+                throw new IllegalStateException("WeCom hand-off webhook-url is not a valid address.");
+            }
+            if (!"https".equals(uri.getScheme()) || !WEBHOOK_HOST.equals(uri.getHost())) {
+                throw new IllegalStateException(
+                        "WeCom hand-off webhook-url must be https://" + WEBHOOK_HOST + "/...");
+            }
+            return uri;
+        }
+
+        public List<String> mentioned() {
+            return mentionUserids.stream().map(String::trim).filter(StringUtils::hasText).toList();
+        }
+
+        public HandoffSettings toSettings() {
+            try {
+                return new HandoffSettings(notifies(), replyWhenNotified, excerptChars);
+            } catch (IllegalArgumentException invalid) {
+                throw new IllegalStateException("Invalid WeCom hand-off configuration: " + invalid.getMessage(), invalid);
+            }
+        }
+
+        public void validate() {
+            toSettings();
+            if (!notifies()) {
+                return;
+            }
+            webhook();
+            if (notifyInterval == null || notifyInterval.compareTo(MIN_NOTIFY_INTERVAL) < 0) {
+                throw new IllegalStateException(
+                        "WeCom hand-off notify-interval must be at least " + MIN_NOTIFY_INTERVAL + ".");
+            }
+            if (maxItemsPerMessage < 1 || maxItemsPerMessage > 20 || maxAttempts < 1 || maxAttempts > 10) {
+                throw new IllegalStateException(
+                        "WeCom hand-off max-items-per-message must be 1-20 and max-attempts 1-10.");
+            }
+            if (webhookTimeout == null || webhookTimeout.isNegative() || webhookTimeout.isZero()
+                    || webhookTimeout.compareTo(notifyInterval) >= 0) {
+                throw new IllegalStateException(
+                        "WeCom hand-off webhook-timeout must be positive and shorter than notify-interval.");
+            }
+            try {
+                ZoneId.of(zone);
+            } catch (RuntimeException invalid) {
+                throw new IllegalStateException("WeCom hand-off zone is not a time zone: " + zone);
+            }
         }
     }
 

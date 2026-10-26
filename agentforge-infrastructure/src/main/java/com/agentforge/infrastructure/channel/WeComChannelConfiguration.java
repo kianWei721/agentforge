@@ -3,6 +3,9 @@ package com.agentforge.infrastructure.channel;
 import com.agentforge.agent.AgentDefinitionRepository;
 import com.agentforge.channel.ChannelInboundRepository;
 import com.agentforge.channel.ChannelMetrics;
+import com.agentforge.channel.handoff.ChannelHandoffRepository;
+import com.agentforge.channel.handoff.ChannelHandoffService;
+import com.agentforge.channel.handoff.HandoffNotificationDispatcher;
 import com.agentforge.channel.intent.IntentRouter;
 import com.agentforge.channel.intent.IntentRoutingSettings;
 import com.agentforge.channel.wecom.SessionTurnGate;
@@ -15,7 +18,9 @@ import com.agentforge.infrastructure.config.WeComChannelProperties;
 import com.agentforge.infrastructure.gateway.ModelGatewayClient;
 import com.agentforge.runtime.AgentConversationRuntimeService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.net.http.HttpClient;
 import java.time.Clock;
+import java.time.ZoneId;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -24,6 +29,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
 
 @Configuration
 @ConditionalOnProperty(
@@ -33,8 +39,53 @@ import org.springframework.jdbc.core.JdbcTemplate;
 public class WeComChannelConfiguration {
 
     @Bean
-    public ChannelInboundRepository channelInboundRepository(JdbcTemplate jdbcTemplate) {
-        return new JdbcChannelInboundRepository(jdbcTemplate);
+    public ChannelHandoffRepository channelHandoffRepository(JdbcTemplate jdbcTemplate) {
+        return new JdbcChannelHandoffRepository(jdbcTemplate);
+    }
+
+    /** The application's transaction manager: a HANDOFF row and its ticket commit together. */
+    @Bean
+    public ChannelInboundRepository channelInboundRepository(
+            JdbcTemplate jdbcTemplate,
+            ChannelHandoffRepository handoffRepository,
+            PlatformTransactionManager transactionManager) {
+        return new JdbcChannelInboundRepository(jdbcTemplate, handoffRepository, transactionManager);
+    }
+
+    @Bean
+    public ChannelHandoffService channelHandoffService(
+            ChannelHandoffRepository handoffRepository, ObjectProvider<ChannelMetrics> metricsProvider) {
+        return new ChannelHandoffService(
+                handoffRepository, Clock.systemUTC(), metricsProvider.getIfAvailable(() -> ChannelMetrics.NONE));
+    }
+
+    @Bean(destroyMethod = "close")
+    public HandoffNotificationLoop handoffNotificationLoop(
+            WeComChannelProperties properties,
+            ChannelHandoffRepository handoffRepository,
+            ObjectProvider<ChannelMetrics> metricsProvider) {
+        WeComChannelProperties.Handoff handoff = properties.getHandoff();
+        handoff.validate();
+        if (!handoff.notifies()) {
+            return HandoffNotificationLoop.off();
+        }
+        WeComWebhookSender sender =
+                new WeComWebhookSender(
+                        HttpClient.newBuilder().connectTimeout(handoff.getWebhookTimeout()).build(),
+                        handoff.webhook(),
+                        handoff.mentioned(),
+                        handoff.getWebhookTimeout(),
+                        new ObjectMapper());
+        return HandoffNotificationLoop.start(
+                new HandoffNotificationDispatcher(
+                        handoffRepository,
+                        sender,
+                        Clock.systemUTC(),
+                        metricsProvider.getIfAvailable(() -> ChannelMetrics.NONE),
+                        handoff.getMaxItemsPerMessage(),
+                        handoff.getMaxAttempts(),
+                        ZoneId.of(handoff.getZone())),
+                handoff.getNotifyInterval());
     }
 
     @Bean(destroyMethod = "shutdownNow")
@@ -83,7 +134,8 @@ public class WeComChannelConfiguration {
                 new StreamBuffers(properties.getStreamTtl(), Clock.systemUTC()),
                 Clock.systemUTC(),
                 metrics,
-                intentRouter(properties.getIntent(), gatewayProvider));
+                intentRouter(properties.getIntent(), gatewayProvider),
+                properties.getHandoff().toSettings());
     }
 
     /**

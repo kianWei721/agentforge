@@ -5,10 +5,13 @@ import static org.junit.jupiter.api.Assertions.*;
 import com.agentforge.channel.ChannelInbound;
 import com.agentforge.channel.ChannelIntent;
 import com.agentforge.channel.ChannelInboundStatus;
+import com.agentforge.channel.handoff.HandoffOpened;
+import com.agentforge.channel.handoff.HandoffOpening;
 import java.time.Instant;
 import org.h2.jdbcx.JdbcDataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 class JdbcChannelInboundRepositoryTest {
@@ -52,7 +55,66 @@ class JdbcChannelInboundRepositoryTest {
                     UNIQUE (channel, bot_id, msg_id)
                 )
                 """);
+        JdbcChannelHandoffRepositoryTest.createTable(jdbc);
+        this.jdbc = jdbc;
         repository = new JdbcChannelInboundRepository(jdbc);
+    }
+
+    private JdbcTemplate jdbc;
+
+    @Test
+    void aPhraseHandoffAndItsTicketAreWrittenTogetherAndOnce() {
+        ChannelInbound handoff = handoffRow("id-1", "msg-1");
+        HandoffOpening opening = JdbcChannelHandoffRepositoryTest.opening("id-1", "wecom:abc", NOW);
+
+        assertTrue(repository.insertHandoff(handoff, opening).isPresent());
+        assertTrue(repository.insertHandoff(handoffRow("id-2", "msg-1"), opening).isEmpty(), "a redelivery");
+
+        assertEquals(1, tickets());
+        assertEquals(ChannelInboundStatus.HANDOFF, repository.find("wecom", "bot-1", "msg-1").orElseThrow().status());
+    }
+
+    @Test
+    void aMessageWhoseTicketCannotBeWrittenIsNotRecordedEither() {
+        HandoffOpening tooLong = withExcerpt(JdbcChannelHandoffRepositoryTest.opening("id-1", "wecom:abc", NOW), "长".repeat(300));
+
+        assertThrows(DataAccessException.class, () -> repository.insertHandoff(handoffRow("id-1", "msg-1"), tooLong));
+
+        assertTrue(repository.find("wecom", "bot-1", "msg-1").isEmpty(), "WeCom redelivers and it is tried again");
+        assertEquals(0, tickets());
+    }
+
+    @Test
+    void aClassifierHandoffCompletesTheMessageWithItsTicketOrNotAtAll() {
+        repository.insertIfAbsent(row("id-1", "msg-1"));
+        HandoffOpening tooLong = withExcerpt(JdbcChannelHandoffRepositoryTest.opening("id-1", "wecom:abc", NOW), "长".repeat(300));
+
+        assertThrows(DataAccessException.class, () -> repository.completeAsHandoff("id-1", tooLong, NOW.plusSeconds(3)));
+        assertEquals(ChannelInboundStatus.RECEIVED, repository.find("wecom", "bot-1", "msg-1").orElseThrow().status());
+
+        HandoffOpened opened =
+                repository.completeAsHandoff(
+                        "id-1", JdbcChannelHandoffRepositoryTest.opening("id-1", "wecom:abc", NOW), NOW.plusSeconds(3));
+        assertFalse(opened.merged());
+        assertEquals(ChannelInboundStatus.HANDOFF, repository.find("wecom", "bot-1", "msg-1").orElseThrow().status());
+        assertEquals(1, tickets());
+    }
+
+    private int tickets() {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM af_channel_handoff", Integer.class);
+    }
+
+    private static ChannelInbound handoffRow(String id, String msgId) {
+        return new ChannelInbound(
+                id, "wecom", "bot-1", msgId, "GROUP", "chat-1", "zhangsan", null, "wecom-group:a",
+                "wecom:abc", null, ChannelInboundStatus.HANDOFF, null, NOW, NOW,
+                new ChannelIntent("handoff", "RULE", null, null));
+    }
+
+    private static HandoffOpening withExcerpt(HandoffOpening o, String excerpt) {
+        return new HandoffOpening(
+                o.channel(), o.botId(), o.chatType(), o.chatId(), o.sessionKey(), o.userId(), o.customerId(),
+                o.senderUserId(), o.inboundId(), o.intent(), excerpt, o.notifyStaff(), o.at());
     }
 
     @Test

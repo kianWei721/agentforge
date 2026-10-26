@@ -4,6 +4,9 @@ import com.agentforge.channel.ChannelInbound;
 import com.agentforge.channel.ChannelIntent;
 import com.agentforge.channel.ChannelInboundRepository;
 import com.agentforge.channel.ChannelInboundStatus;
+import com.agentforge.channel.handoff.ChannelHandoffRepository;
+import com.agentforge.channel.handoff.HandoffOpened;
+import com.agentforge.channel.handoff.HandoffOpening;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.ResultSet;
@@ -12,8 +15,13 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 public class JdbcChannelInboundRepository implements ChannelInboundRepository {
 
@@ -23,9 +31,47 @@ public class JdbcChannelInboundRepository implements ChannelInboundRepository {
                     + "intent, intent_source, intent_confidence, intent_request_id";
 
     private final JdbcTemplate jdbcTemplate;
+    private final ChannelHandoffRepository handoffs;
+    private final TransactionTemplate transaction;
 
+    /** With its own transaction manager on the template's data source. */
     public JdbcChannelInboundRepository(JdbcTemplate jdbcTemplate) {
+        this(jdbcTemplate,
+                new JdbcChannelHandoffRepository(jdbcTemplate),
+                new DataSourceTransactionManager(jdbcTemplate.getDataSource()));
+    }
+
+    public JdbcChannelInboundRepository(
+            JdbcTemplate jdbcTemplate, ChannelHandoffRepository handoffs, PlatformTransactionManager transactions) {
         this.jdbcTemplate = jdbcTemplate;
+        this.handoffs = handoffs;
+        this.transaction = new TransactionTemplate(transactions);
+    }
+
+    @Override
+    public Optional<HandoffOpened> insertHandoff(ChannelInbound inbound, HandoffOpening handoff) {
+        return inTransaction(() -> insertIfAbsent(inbound) ? Optional.of(handoffs.open(handoff)) : Optional.empty());
+    }
+
+    @Override
+    public HandoffOpened completeAsHandoff(String id, HandoffOpening handoff, Instant updatedAt) {
+        return inTransaction(
+                () -> {
+                    complete(id, ChannelInboundStatus.HANDOFF, null, null, updatedAt);
+                    return handoffs.open(handoff);
+                });
+    }
+
+    /**
+     * Once more after a lock conflict (deadlock victim, lock wait timeout): the whole transaction
+     * was rolled back, so running it again records nothing twice.
+     */
+    private <T> T inTransaction(Supplier<T> work) {
+        try {
+            return transaction.execute(status -> work.get());
+        } catch (ConcurrencyFailureException conflict) {
+            return transaction.execute(status -> work.get());
+        }
     }
 
     @Override

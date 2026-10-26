@@ -44,13 +44,4 @@ public record IntentDefinition(
             throw new IllegalArgumentException("intent '" + name + "' needs the reply the user sees");
         }
     }
-
-    boolean matches(String lowerCaseText) {
-        for (String keyword : keywords) {
-            if (lowerCaseText.contains(keyword)) {
-                return true;
-            }
-        }
-        return false;
-    }
 }
