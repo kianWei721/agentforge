@@ -179,6 +179,13 @@ phrase in a negated clause ("不用转人工") no longer hands off: on the label
 went from 6 to 0, and 15 of 16 new negated samples, written before the rule, are routed right. See
 [docs/V0.14-wecom-handoff.md](docs/V0.14-wecom-handoff.md).
 
+The channel agent's answers are measured on 40 labelled cases (44 turns) written before any model
+ran, through the gateway, as a customer group, with the production prompt, tool, retriever and
+access policy over an in-memory corpus: 117 of 120 case-runs pass by rule over three runs (the three
+failures are one correct answer phrased past the label); no turn retrieved another customer's or
+internal documents, no unanswerable question got an invented answer. See
+[docs/eval/agent-answer-eval-2026-10-26.md](docs/eval/agent-answer-eval-2026-10-26.md).
+
 ## External IoT Integration
 
 The HTTP adapter is intentionally configurable. Public defaults use synthetic endpoints:
