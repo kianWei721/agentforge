@@ -5,10 +5,12 @@ import com.agentforge.channel.intent.IntentClassifier.InvalidClassificationExcep
 import com.agentforge.core.model.ModelCallFailedException;
 import java.time.Duration;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 /**
  * Decides where a message goes, in two stages.
@@ -30,6 +32,23 @@ public final class IntentRouter {
      * timeout as its own margin, so a shorter call would only fail, possibly after being billed.
      */
     static final Duration MIN_CLASSIFY_TIME = Duration.ofSeconds(1);
+
+    /**
+     * Punctuation, line breaks, full-width spaces and tildes, which chats use for commas; not the
+     * plain space: a phrase may hold one ("write code"). One character class, so splitting cannot
+     * backtrack on the callback thread.
+     */
+    private static final Pattern CLAUSE_BREAK = Pattern.compile("[，。！？；、,.!?;\\r\\n\\u3000～~…]+");
+
+    private static final List<String> NEGATIONS = List.of("不用", "不要", "不是", "不需要", "无需", "别", "没有", "暂时不");
+
+    /** Words that hold a negation's characters without negating ("是不是", "特别"). */
+    private static final List<String> NOT_NEGATIONS =
+            List.of("是不是", "要不要", "用不用", "需不需要", "特别", "区别", "别人", "别的", "级别", "个别", "分别",
+                    "类别", "告别");
+
+    /** A negation counts only this close before the phrase: "不行，我要投诉，客服特别慢" still hands off. */
+    static final int NEGATION_WINDOW = 4;
 
     private final IntentRoutingSettings settings;
     private final IntentClassifier classifier;
@@ -73,10 +92,14 @@ public final class IntentRouter {
         if (!enabled()) {
             return Optional.empty();
         }
-        String lower = text.toLowerCase(Locale.ROOT);
+        // A negated phrase ("不用转人工，...") decides nothing: the classifier, or the default intent,
+        // gets the message. "不行，我要投诉" still matches: the negation is in another clause.
+        String[] clauses = CLAUSE_BREAK.split(text.toLowerCase(Locale.ROOT));
         for (IntentDefinition intent : settings.intents()) {
-            if (intent.matches(lower)) {
-                return Optional.of(decision(intent, IntentSource.RULE, null, null));
+            for (String clause : clauses) {
+                if (matchesUnnegated(intent, clause)) {
+                    return Optional.of(decision(intent, IntentSource.RULE, null, null));
+                }
             }
         }
         return settings.modelStage()
@@ -114,6 +137,33 @@ public final class IntentRouter {
             return fallback(IntentSource.FALLBACK_LOW_CONFIDENCE, result.gatewayRequestId());
         }
         return decision(chosen, IntentSource.MODEL, result.confidence(), result.gatewayRequestId());
+    }
+
+    /** Some occurrence of one of the intent's phrases without a negation just before it. */
+    private static boolean matchesUnnegated(IntentDefinition intent, String clause) {
+        for (String keyword : intent.keywords()) {
+            for (int at = clause.indexOf(keyword); at >= 0; at = clause.indexOf(keyword, at + 1)) {
+                if (!negatedBefore(clause, at)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean negatedBefore(String clause, int at) {
+        // Read a little further back so a compound reaching into the window is recognised whole.
+        String before = clause.substring(Math.max(0, at - NEGATION_WINDOW - 2), at);
+        for (String word : NOT_NEGATIONS) {
+            before = before.replace(word, "#".repeat(word.length()));
+        }
+        String window = before.substring(Math.max(0, before.length() - NEGATION_WINDOW));
+        for (String negation : NEGATIONS) {
+            if (window.contains(negation)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String cut(String text) {

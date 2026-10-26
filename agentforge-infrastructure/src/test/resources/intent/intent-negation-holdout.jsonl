@@ -1,0 +1,16 @@
+{"id":"n01","category":"negated_request","text":"不用找人工了，问题解决了","expected":"answer"}
+{"id":"n02","category":"negated_request","text":"我没有投诉，只是确认一下进度","expected":"answer"}
+{"id":"n03","category":"negated_request","text":"别转人工，先告诉我社保怎么交","expected":"answer"}
+{"id":"n04","category":"negated_request","text":"无需人工客服，发票抬头怎么改","expected":"answer"}
+{"id":"n05","category":"negated_request","text":"这事不是投诉，想问下退税多久到账","expected":"answer"}
+{"id":"n06","category":"negated_request","text":"不要转人工，我就问个开票时间","expected":"answer"}
+{"id":"n07","category":"negated_request","text":"暂时不需要人工客服，谢谢","expected":"answer"}
+{"id":"n08","category":"negated_request","text":"我不想投诉，只想知道流程","expected":"answer"}
+{"id":"n09","category":"negation_then_request","text":"不行，我要投诉你们的会计","expected":"handoff"}
+{"id":"n10","category":"negation_then_request","text":"不要机器人回答，转人工","expected":"handoff"}
+{"id":"n11","category":"negation_then_request","text":"你答得不对，帮我找人工","expected":"handoff"}
+{"id":"n12","category":"negation_then_request","text":"问题没解决，我要投诉","expected":"handoff"}
+{"id":"n13","category":"negation_then_request","text":"别再自动回复了，人工客服在哪","expected":"handoff"}
+{"id":"n14","category":"negation_then_request","text":"没有人理我，我要投诉","expected":"handoff"}
+{"id":"n15","category":"question_about_request","text":"为什么不能转人工？","expected":"handoff"}
+{"id":"n16","category":"negation_then_request","text":"不是我不想等，是真的急，转人工","expected":"handoff"}

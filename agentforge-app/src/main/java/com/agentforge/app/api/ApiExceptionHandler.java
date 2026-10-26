@@ -1,6 +1,8 @@
 package com.agentforge.app.api;
 
 import com.agentforge.agent.AgentNotFoundException;
+import com.agentforge.channel.handoff.ChannelHandoffInvalidStateException;
+import com.agentforge.channel.handoff.ChannelHandoffNotFoundException;
 import com.agentforge.conversation.ConversationNotFoundException;
 import com.agentforge.core.model.ModelCallFailedException;
 import com.agentforge.core.security.AccessDeniedException;
@@ -57,6 +59,18 @@ public class ApiExceptionHandler {
     @ResponseStatus(HttpStatus.CONFLICT)
     public ApiError handleConfirmationInvalidState(ToolConfirmationInvalidStateException exception) {
         return ApiError.of("TOOL_CONFIRMATION_INVALID_STATE", exception.getMessage());
+    }
+
+    @ExceptionHandler(ChannelHandoffNotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ApiError handleHandoffNotFound(ChannelHandoffNotFoundException exception) {
+        return ApiError.of("CHANNEL_HANDOFF_NOT_FOUND", exception.getMessage());
+    }
+
+    @ExceptionHandler(ChannelHandoffInvalidStateException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ApiError handleHandoffInvalidState(ChannelHandoffInvalidStateException exception) {
+        return ApiError.of("CHANNEL_HANDOFF_INVALID_STATE", exception.getMessage());
     }
 
     /** 503 when the gateway says a retry is safe, 502 otherwise; the request id finds the ledger row. */

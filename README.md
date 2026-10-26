@@ -2,7 +2,7 @@
 
 AgentForge is a Java-based experimental Agent runtime and governance project focused on production-oriented engineering: durable execution, tool governance, retrieval evaluation, safe promotion, rollback, and enterprise-system integration.
 
-> Status: V0.13 — agent turns through the model gateway (per agent); WeCom channel with session isolation verified at ten thousand groups and intent routing (answer, hand off to a person, refuse), on top of retrieval-layer access control (V0.8) and model calls through a standalone model gateway (V0.9). The project is under active development and is not presented as a drop-in production platform.
+> Status: V0.14 — WeCom hand-offs as tickets that staff are notified of, claim and resolve; agent turns through the model gateway (per agent, V0.13); WeCom channel with session isolation verified at ten thousand groups and intent routing (answer, hand off to a person, refuse), on top of retrieval-layer access control (V0.8) and model calls through a standalone model gateway (V0.9). The project is under active development and is not presented as a drop-in production platform.
 
 ## Why AgentForge
 
@@ -169,6 +169,15 @@ Phrases decide on arrival; a classifier through the model gateway decides the re
 unclear or failed goes to the agent. Each decision is recorded with its source, confidence and
 gateway request id. On a labelled set through the real gateway: 93.7% on the test split. See
 [docs/V0.12-intent-routing.md](docs/V0.12-intent-routing.md).
+
+A hand-off opens a ticket for its session, in the same transaction as the inbound row, or joins
+the one already open, so a group asking three times is one ticket. With a staff-group robot
+webhook configured, a single thread sends at most one merged notice per tick (12 a minute at the
+default 5 s, under WeCom's 20 per robot), retrying with backoff; staff list, claim and resolve
+tickets at `/api/v1/channel-handoffs`, and resolving as `FALSE_TRIGGER` measures misroutes. A
+phrase in a negated clause ("不用转人工") no longer hands off: on the labelled set its false hits
+went from 6 to 0, and 15 of 16 new negated samples, written before the rule, are routed right. See
+[docs/V0.14-wecom-handoff.md](docs/V0.14-wecom-handoff.md).
 
 ## External IoT Integration
 

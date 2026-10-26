@@ -29,8 +29,41 @@ public class IntentRouterTest {
         IntentDecision handoff = router.onArrival("我要投诉你们").orElseThrow();
         assertEquals(new IntentDecision("handoff", IntentTarget.HANDOFF, IntentSource.RULE, null, null), handoff);
         assertEquals("out_of_scope", router.onArrival("please WRITE CODE for me").orElseThrow().intent());
-        // Plain substrings: a negation matches too, a known limit.
-        assertEquals("handoff", router.onArrival("不用转人工").orElseThrow().intent());
+    }
+
+    @Test
+    void aPhraseInANegatedClauseLeavesTheMessageToTheModel() {
+        IntentRouter router = router(true, (text, intents, id, timeout) -> fail("no model on arrival"));
+
+        assertTrue(router.onArrival("不用转人工").isEmpty());
+        assertTrue(router.onArrival("我不是要投诉，问下发票").isEmpty());
+        // The negation is in another clause: the request stands.
+        assertEquals("handoff", router.onArrival("不行，我要投诉").orElseThrow().intent());
+        assertEquals("handoff", router.onArrival("不要机器人回答，转人工").orElseThrow().intent());
+
+        // Without the model stage, a negated request is the default intent's.
+        assertEquals("answer", router(false, null).onArrival("别转人工").orElseThrow().intent());
+    }
+
+    /** Found in review: requests that only look negated, and clauses chats break without commas. */
+    @Test
+    void aNegationCountsOnlyJustBeforeThePhraseAndNotInsideOtherWords() {
+        IntentRouter router = router(true, (text, intents, id, timeout) -> fail("no model on arrival"));
+
+        for (String request : List.of(
+                "我要投诉你们客服特别慢",
+                "我要投诉别的部门",
+                "是不是可以转人工",
+                "要不要转人工啊，等半天了",
+                "不要机器人了\n转人工",
+                "没人理我　我要投诉",
+                "别让我等了～转人工吧",
+                "这个问题不是我能解决的，帮我转人工")) {
+            assertEquals("handoff", router.onArrival(request).map(IntentDecision::intent).orElse(null), request);
+        }
+        for (String negated : List.of("不用转人工", "我不是要投诉", "暂时不需要转人工", "先别转人工")) {
+            assertTrue(router.onArrival(negated).isEmpty(), negated);
+        }
     }
 
     @Test

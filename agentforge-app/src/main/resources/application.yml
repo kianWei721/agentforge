@@ -77,6 +77,24 @@ agentforge:
       turn-timeout: 5m
       stream-ttl: 10m
       timestamp-tolerance: 5m
+      # Hand-off tickets (V0.14): every message handed to a person opens its session's ticket, or
+      # joins the one open; staff list, claim and resolve them at /api/v1/channel-handoffs.
+      handoff:
+        # A WeCom group robot in the staff group. Blank: tickets are still opened, nobody is told.
+        # The address holds the robot's key: set it from the environment only.
+        webhook-url: ${AGENTFORGE_WECOM_HANDOFF_WEBHOOK:}
+        # WeCom user ids to @ in the notice, comma separated.
+        mention-userids: ${AGENTFORGE_WECOM_HANDOFF_MENTION:}
+        reply-when-notified: 已转给客服同事，他们会在群里回复你。
+        # Phone, ID card and bank card numbers masked, then cut; 0 keeps no excerpt.
+        excerpt-chars: 120
+        # One message per interval at most, listing up to max-items-per-message tickets: 5s is
+        # 12 a minute, under WeCom's 20 per robot. At least 3s.
+        notify-interval: 5s
+        max-items-per-message: 10
+        max-attempts: 5
+        webhook-timeout: 4s
+        zone: Asia/Shanghai
       # Intent routing (V0.12). Phrases decide on arrival; with model-stage, a classifier through
       # the model gateway decides the rest. Whatever is unclear goes to the default intent, which
       # the agent answers. Names are recorded in af_channel_inbound and in metrics: keep them stable.
@@ -95,9 +113,11 @@ agentforge:
           - name: handoff
             description: 必须由人处理的诉求，例如明确要求人工、投诉、表达强烈不满、要求退款或改动自己的账户和订单
             target: handoff
-            # Matched as plain substrings, so keep them specific: a negation such as "不用转人工" also matches.
+            # Plain substrings, per clause: a phrase in a clause with a negation ("不用转人工") decides
+            # nothing and the classifier gets the message. Keep them specific.
             keywords: [转人工, 人工客服, 找人工, 投诉]
-            # Nobody is notified: the reply must not claim a person is on the way.
+            # Used when no staff group is notified (handoff.webhook-url blank): the ticket is still
+            # opened, but the reply must not claim the message was passed on.
             reply: 已登记，请直接联系群里的客服同事。
           - name: out_of_scope
             description: 与业务无关的请求，例如闲聊、娱乐、写代码、写作业、翻译与业务无关的内容

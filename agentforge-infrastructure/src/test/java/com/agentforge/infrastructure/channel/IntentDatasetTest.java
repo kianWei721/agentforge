@@ -48,7 +48,8 @@ class IntentDatasetTest {
 
     /**
      * Pins exactly what the phrases decide on the set: every explicit request they should catch,
-     * no false hit outside the negations, which are a known limit and counted here.
+     * and no false hit. The six negations ("不用转人工") were handed off by phrase until V0.14's
+     * negation guard; they now go to the classifier.
      */
     @Test
     void thePhrasesDecideExactlyWhatTheSetSays() throws Exception {
@@ -74,6 +75,30 @@ class IntentDatasetTest {
             }
         }
         assertEquals(List.of(), mismatches);
-        assertEquals(6, misfires, "the six negations, e.g. \"不用转人工\", are handed off by phrase");
+        assertEquals(0, misfires);
+    }
+
+    /**
+     * The negation guard on samples written before it was: they were not used to choose the
+     * negation words. What it gets wrong is listed, not tuned away.
+     */
+    @Test
+    void theNegationGuardOnTheHeldOutSet() throws Exception {
+        WeComChannelProperties.Intent shipped = IntentDataset.shipped();
+        shipped.setEnabled(true);
+        shipped.setModelStage(true);
+        IntentRouter router = new IntentRouter(shipped.toSettings(), (t, i, c, d) -> null);
+
+        List<String> wrong = new ArrayList<>();
+        for (Item item : IntentDataset.loadNegationHoldout()) {
+            String decided = router.onArrival(item.text()).map(IntentDecision::intent).orElse(null);
+            boolean handedOff = "handoff".equals(decided);
+            if (handedOff != item.expected().equals("handoff")) {
+                wrong.add(item.id());
+            }
+        }
+        // 15 of 16. n08 "我不想投诉" is handed off: "不想" is not one of the negation words, and
+        // adding it after seeing this sample would make the set a tuning set.
+        assertEquals(List.of("n08"), wrong);
     }
 }
